@@ -1,0 +1,82 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+generator pothos {
+  provider     = "prisma-pothos-types"
+  clientOutput = "@prisma/client"
+  output       = "../src/generated/pothos-types.ts"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id           String            @id @default(cuid())
+  clerkId      String            @unique
+  email        String            @unique
+  name         String?
+  achievements UserAchievement[]
+  trophies     Trophy[]
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@index([clerkId])
+}
+
+model Game {
+  id           String        @id @default(cuid())
+  title        String        @unique
+  description  String?
+  coverUrl     String?
+  achievements Achievement[]
+  trophies     Trophy[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([title])
+}
+
+model Achievement {
+  id          String            @id @default(cuid())
+  title       String
+  description String?
+  iconUrl     String?
+  game        Game              @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  gameId      String
+  users       UserAchievement[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@unique([gameId, title])
+  @@index([gameId])
+}
+
+model UserAchievement {
+  id            String      @id @default(cuid())
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId        String
+  achievement   Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+  achievementId String
+  createdAt     DateTime    @default(now())
+
+  @@unique([userId, achievementId])
+  @@index([userId])
+  @@index([achievementId])
+}
+
+model Trophy {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  game      Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  gameId    String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, gameId])
+  @@index([userId])
+  @@index([gameId])
+}
