@@ -11,6 +11,11 @@ dist/
 
 # Prisma
 prisma/migrations/**/migration_lock.toml
+prisma/*.db
+prisma/*.db-journal
+
+# Local scratch files
+password.txt
 
 # IDE
 .idea/
