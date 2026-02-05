@@ -6,6 +6,8 @@ import {
   GameMutationResult,
   DeleteGameResult,
 } from "../types/game.js";
+import { hasRequiredRole } from "../../context.js";
+import { UserRole } from "@prisma/client";
 
 // Create game mutation
 builder.mutationField("createGame", (t) =>
@@ -15,7 +17,32 @@ builder.mutationField("createGame", (t) =>
       input: t.arg({ type: CreateGameInput, required: true }),
     },
     resolve: async (_root, args, ctx) => {
+      if (!ctx.user) {
+        return {
+          success: false,
+          gameId: null,
+          error: {
+            code: ErrorCode.UNAUTHORIZED,
+            message: "You must be logged in to create a game",
+            field: null,
+          },
+        };
+      }
+
+      if (!hasRequiredRole(ctx.user, UserRole.TRUSTED)) {
+        return {
+          success: false,
+          gameId: null,
+          error: {
+            code: ErrorCode.FORBIDDEN,
+            message: "You do not have permission to create games",
+            field: null,
+          },
+        };
+      }
+
       const { title, description, coverUrl } = args.input;
+      const platformId = args.input.platformId ?? null;
 
       // Validate title
       const trimmedTitle = title.trim();
@@ -33,7 +60,12 @@ builder.mutationField("createGame", (t) =>
 
       // Check for duplicate title
       const existing = await ctx.prisma.game.findUnique({
-        where: { title: trimmedTitle },
+        where: {
+          title_platformId: {
+            title: trimmedTitle,
+            platformId,
+          },
+        },
       });
 
       if (existing) {
@@ -54,6 +86,7 @@ builder.mutationField("createGame", (t) =>
           title: trimmedTitle,
           description: description?.trim() || null,
           coverUrl: coverUrl?.trim() || null,
+          platformId,
         },
       });
 
@@ -75,6 +108,30 @@ builder.mutationField("updateGame", (t) =>
       input: t.arg({ type: UpdateGameInput, required: true }),
     },
     resolve: async (_root, args, ctx) => {
+      if (!ctx.user) {
+        return {
+          success: false,
+          gameId: null,
+          error: {
+            code: ErrorCode.UNAUTHORIZED,
+            message: "You must be logged in to update a game",
+            field: null,
+          },
+        };
+      }
+
+      if (!hasRequiredRole(ctx.user, UserRole.TRUSTED)) {
+        return {
+          success: false,
+          gameId: null,
+          error: {
+            code: ErrorCode.FORBIDDEN,
+            message: "You do not have permission to update games",
+            field: null,
+          },
+        };
+      }
+
       const { id, input } = args;
 
       // Check if game exists
@@ -99,6 +156,7 @@ builder.mutationField("updateGame", (t) =>
         title?: string;
         description?: string | null;
         coverUrl?: string | null;
+        platformId?: string | null;
       } = {};
 
       if (input.title !== undefined && input.title !== null) {
@@ -116,9 +174,16 @@ builder.mutationField("updateGame", (t) =>
         }
 
         // Check for duplicate title (excluding current game)
-        if (trimmedTitle !== existing.title) {
+        if (trimmedTitle !== existing.title || input.platformId !== undefined) {
+          const nextPlatformId =
+            input.platformId !== undefined ? input.platformId ?? null : existing.platformId;
           const duplicate = await ctx.prisma.game.findUnique({
-            where: { title: trimmedTitle },
+            where: {
+              title_platformId: {
+                title: trimmedTitle,
+                platformId: nextPlatformId,
+              },
+            },
           });
 
           if (duplicate) {
@@ -137,12 +202,40 @@ builder.mutationField("updateGame", (t) =>
         updateData.title = trimmedTitle;
       }
 
+      if (input.title === undefined && input.platformId !== undefined) {
+        const nextPlatformId = input.platformId ?? null;
+        const duplicate = await ctx.prisma.game.findUnique({
+          where: {
+            title_platformId: {
+              title: existing.title,
+              platformId: nextPlatformId,
+            },
+          },
+        });
+
+        if (duplicate) {
+          return {
+            success: false,
+            gameId: null,
+            error: {
+              code: ErrorCode.ALREADY_EXISTS,
+              message: `A game with title "${existing.title}" already exists for this platform`,
+              field: "platformId",
+            },
+          };
+        }
+      }
+
       if (input.description !== undefined) {
         updateData.description = input.description?.trim() || null;
       }
 
       if (input.coverUrl !== undefined) {
         updateData.coverUrl = input.coverUrl?.trim() || null;
+      }
+
+      if (input.platformId !== undefined) {
+        updateData.platformId = input.platformId ?? null;
       }
 
       // Update game
@@ -168,6 +261,30 @@ builder.mutationField("deleteGame", (t) =>
       id: t.arg.id({ required: true }),
     },
     resolve: async (_root, args, ctx) => {
+      if (!ctx.user) {
+        return {
+          success: false,
+          deletedId: null,
+          error: {
+            code: ErrorCode.UNAUTHORIZED,
+            message: "You must be logged in to delete a game",
+            field: null,
+          },
+        };
+      }
+
+      if (!hasRequiredRole(ctx.user, UserRole.TRUSTED)) {
+        return {
+          success: false,
+          deletedId: null,
+          error: {
+            code: ErrorCode.FORBIDDEN,
+            message: "You do not have permission to delete games",
+            field: null,
+          },
+        };
+      }
+
       const { id } = args;
 
       // Check if game exists
