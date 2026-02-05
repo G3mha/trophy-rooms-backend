@@ -5,6 +5,7 @@ import {
   UserAchievementMutationResult,
   DeleteResult,
 } from "../types/user-achievement.js";
+import { AchievementSetType, AchievementSetVisibility } from "@prisma/client";
 
 // Mark achievement as complete
 builder.mutationField("markAchievementComplete", (t) =>
@@ -79,6 +80,66 @@ builder.mutationField("markAchievementComplete", (t) =>
         },
       });
 
+      // Award trophy if all official/completionist achievements are complete
+      const achievementWithSet = await ctx.prisma.achievement.findUnique({
+        where: { id: achievementId },
+        select: {
+          achievementSet: {
+            select: {
+              gameId: true,
+            },
+          },
+        },
+      });
+
+      if (achievementWithSet?.achievementSet) {
+        const gameId = achievementWithSet.achievementSet.gameId;
+        const totalAchievements = await ctx.prisma.achievement.count({
+          where: {
+            achievementSet: {
+              gameId,
+              OR: [
+                { type: { in: [AchievementSetType.OFFICIAL, AchievementSetType.COMPLETIONIST] } },
+                { type: AchievementSetType.CUSTOM, visibility: AchievementSetVisibility.PUBLIC },
+              ],
+            },
+          },
+        });
+
+        if (totalAchievements > 0) {
+          const completedCount = await ctx.prisma.userAchievement.count({
+            where: {
+              userId: user.id,
+              achievement: {
+                achievementSet: {
+                  gameId,
+                  OR: [
+                    { type: { in: [AchievementSetType.OFFICIAL, AchievementSetType.COMPLETIONIST] } },
+                    { type: AchievementSetType.CUSTOM, visibility: AchievementSetVisibility.PUBLIC },
+                  ],
+                },
+              },
+            },
+          });
+
+          if (completedCount >= totalAchievements) {
+            await ctx.prisma.trophy.upsert({
+              where: {
+                userId_gameId: {
+                  userId: user.id,
+                  gameId,
+                },
+              },
+              update: {},
+              create: {
+                userId: user.id,
+                gameId,
+              },
+            });
+          }
+        }
+      }
+
       return {
         success: true,
         userAchievementId: userAchievement.id,
@@ -138,6 +199,59 @@ builder.mutationField("unmarkAchievementComplete", (t) =>
       await ctx.prisma.userAchievement.delete({
         where: { id: existing.id },
       });
+
+      // Remove trophy if no longer complete
+      const achievementWithSet = await ctx.prisma.achievement.findUnique({
+        where: { id: achievementId },
+        select: {
+          achievementSet: {
+            select: {
+              gameId: true,
+            },
+          },
+        },
+      });
+
+      if (achievementWithSet?.achievementSet) {
+        const gameId = achievementWithSet.achievementSet.gameId;
+        const totalAchievements = await ctx.prisma.achievement.count({
+          where: {
+            achievementSet: {
+              gameId,
+              OR: [
+                { type: { in: [AchievementSetType.OFFICIAL, AchievementSetType.COMPLETIONIST] } },
+                { type: AchievementSetType.CUSTOM, visibility: AchievementSetVisibility.PUBLIC },
+              ],
+            },
+          },
+        });
+
+        if (totalAchievements > 0) {
+          const completedCount = await ctx.prisma.userAchievement.count({
+            where: {
+              userId: user.id,
+              achievement: {
+                achievementSet: {
+                  gameId,
+                  OR: [
+                    { type: { in: [AchievementSetType.OFFICIAL, AchievementSetType.COMPLETIONIST] } },
+                    { type: AchievementSetType.CUSTOM, visibility: AchievementSetVisibility.PUBLIC },
+                  ],
+                },
+              },
+            },
+          });
+
+          if (completedCount < totalAchievements) {
+            await ctx.prisma.trophy.deleteMany({
+              where: {
+                userId: user.id,
+                gameId,
+              },
+            });
+          }
+        }
+      }
 
       return {
         success: true,
