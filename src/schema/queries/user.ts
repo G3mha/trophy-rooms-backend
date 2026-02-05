@@ -101,13 +101,17 @@ builder.queryField("myStats", (t) =>
             where: { userId: ctx.user.id },
             select: {
               achievement: {
-                select: { gameId: true },
+                select: {
+                  achievementSet: {
+                    select: { gameId: true },
+                  },
+                },
               },
             },
           })
           .then((results) => {
             const uniqueGameIds = new Set(
-              results.map((r) => r.achievement.gameId)
+              results.map((r) => r.achievement.achievementSet.gameId)
             );
             return uniqueGameIds.size;
           }),
