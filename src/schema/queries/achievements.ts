@@ -1,9 +1,10 @@
-import { Prisma } from "@prisma/client";
+import { Prisma, AchievementSetVisibility, UserRole } from "@prisma/client";
 import { builder } from "../builder.js";
 import {
   AchievementsFilterInput,
   AchievementOrderBy,
 } from "../types/achievement.js";
+import { hasRequiredRole } from "../../context.js";
 
 // Achievements connection with cursor-based pagination
 builder.queryField("achievements", (t) =>
@@ -14,7 +15,55 @@ builder.queryField("achievements", (t) =>
       filter: t.arg({ type: AchievementsFilterInput }),
       orderBy: t.arg({ type: AchievementOrderBy }),
     },
-    totalCount: (_connection, _args, ctx) => ctx.prisma.achievement.count(),
+    totalCount: async (_connection, args, ctx) => {
+      const { filter } = args;
+      const where: Prisma.AchievementWhereInput = {};
+
+      if (filter?.search) {
+        where.OR = [
+          { title: { contains: filter.search, mode: "insensitive" } },
+          { description: { contains: filter.search, mode: "insensitive" } },
+        ];
+      }
+
+      if (filter?.gameId) {
+        where.achievementSet = { gameId: filter.gameId };
+      }
+
+      if (filter?.achievementSetId) {
+        where.achievementSetId = filter.achievementSetId;
+      }
+
+      if (ctx.user && (filter?.onlyCompleted || filter?.onlyIncomplete)) {
+        if (filter.onlyCompleted) {
+          where.users = {
+            some: { userId: ctx.user.id },
+          };
+        } else if (filter.onlyIncomplete) {
+          where.users = {
+            none: { userId: ctx.user.id },
+          };
+        }
+      }
+
+      const visibilityFilter = !ctx.user
+        ? { visibility: AchievementSetVisibility.PUBLIC }
+        : hasRequiredRole(ctx.user, UserRole.TRUSTED)
+          ? {}
+          : {
+              OR: [
+                { visibility: AchievementSetVisibility.PUBLIC },
+                { createdByUserId: ctx.user.id },
+              ],
+            };
+
+      where.achievementSet = {
+        ...(where.achievementSet ?? {}),
+        ...(Object.keys(visibilityFilter).length ? visibilityFilter : {}),
+      };
+
+      return ctx.prisma.achievement.count({ where });
+    },
     resolve: async (query, _root, args, ctx) => {
       const { filter, orderBy } = args;
 
@@ -29,7 +78,11 @@ builder.queryField("achievements", (t) =>
       }
 
       if (filter?.gameId) {
-        where.gameId = filter.gameId;
+        where.achievementSet = { gameId: filter.gameId };
+      }
+
+      if (filter?.achievementSetId) {
+        where.achievementSetId = filter.achievementSetId;
       }
 
       // Filter by completion status for authenticated users
@@ -44,6 +97,22 @@ builder.queryField("achievements", (t) =>
           };
         }
       }
+
+      const visibilityFilter = !ctx.user
+        ? { visibility: AchievementSetVisibility.PUBLIC }
+        : hasRequiredRole(ctx.user, UserRole.TRUSTED)
+          ? {}
+          : {
+              OR: [
+                { visibility: AchievementSetVisibility.PUBLIC },
+                { createdByUserId: ctx.user.id },
+              ],
+            };
+
+      where.achievementSet = {
+        ...(where.achievementSet ?? {}),
+        ...(Object.keys(visibilityFilter).length ? visibilityFilter : {}),
+      };
 
       // Build order by clause
       let orderByClause: Prisma.AchievementOrderByWithRelationInput;
