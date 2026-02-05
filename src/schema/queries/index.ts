@@ -2,3 +2,6 @@
 import "./games.js";
 import "./achievements.js";
 import "./user.js";
+import "./platforms.js";
+import "./achievement-sets.js";
+import "./users.js";
