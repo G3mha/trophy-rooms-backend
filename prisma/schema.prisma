@@ -9,9 +9,25 @@ generator pothos {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+enum AchievementSetType {
+  OFFICIAL
+  COMPLETIONIST
+  CUSTOM
+}
+
+enum AchievementSetVisibility {
+  PRIVATE
+  PUBLIC
+}
+
+enum UserRole {
+  USER
+  TRUSTED
+  ADMIN
 }
 
 model User {
@@ -19,40 +35,73 @@ model User {
   clerkId      String            @unique
   email        String            @unique
   name         String?
+  role         UserRole          @default(USER)
   achievements UserAchievement[]
   trophies     Trophy[]
+  achievementSets AchievementSet[] @relation("AchievementSetCreator")
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
 
   @@index([clerkId])
 }
 
-model Game {
-  id           String        @id @default(cuid())
-  title        String        @unique
-  description  String?
-  coverUrl     String?
-  achievements Achievement[]
-  trophies     Trophy[]
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+model Platform {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  slug      String   @unique
+  games     Game[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
 
-  @@index([title])
+model Game {
+  id              String           @id @default(cuid())
+  title           String           
+  description     String?
+  coverUrl        String?
+  platform        Platform?        @relation(fields: [platformId], references: [id])
+  platformId      String?
+  achievementSets AchievementSet[]
+  trophies        Trophy[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@unique([title, platformId])
+  @@index([platformId])
+}
+
+model AchievementSet {
+  id           String             @id @default(cuid())
+  title        String
+  type         AchievementSetType @default(OFFICIAL)
+  visibility   AchievementSetVisibility @default(PRIVATE)
+  game         Game               @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  gameId       String
+  createdBy    User?              @relation("AchievementSetCreator", fields: [createdByUserId], references: [id])
+  createdByUserId String?
+  achievements Achievement[]
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  @@index([gameId])
+  @@index([createdByUserId])
+  @@unique([gameId, title, type, createdByUserId])
 }
 
 model Achievement {
-  id          String            @id @default(cuid())
-  title       String
-  description String?
-  iconUrl     String?
-  game        Game              @relation(fields: [gameId], references: [id], onDelete: Cascade)
-  gameId      String
-  users       UserAchievement[]
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  id              String            @id @default(cuid())
+  title           String
+  description     String?
+  iconUrl         String?
+  points          Int               @default(0)
+  achievementSet  AchievementSet    @relation(fields: [achievementSetId], references: [id], onDelete: Cascade)
+  achievementSetId String
+  users           UserAchievement[]
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
 
-  @@unique([gameId, title])
-  @@index([gameId])
+  @@index([achievementSetId])
+  @@unique([achievementSetId, title])
 }
 
 model UserAchievement {
