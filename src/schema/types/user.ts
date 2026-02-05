@@ -1,10 +1,16 @@
 import { builder } from "../builder.js";
+import { UserRole } from "@prisma/client";
+
+builder.enumType(UserRole, {
+  name: "UserRole",
+});
 
 builder.prismaObject("User", {
   fields: (t) => ({
     id: t.exposeID("id"),
     email: t.exposeString("email"),
     name: t.exposeString("name", { nullable: true }),
+    role: t.expose("role", { type: UserRole }),
     achievements: t.relation("achievements", {
       query: {
         orderBy: { createdAt: "desc" },
@@ -24,12 +30,17 @@ builder.prismaObject("User", {
           where: { userId: user.id },
           select: {
             achievement: {
-              select: { gameId: true },
+              select: {
+                achievementSet: {
+                  select: { gameId: true },
+                },
+              },
             },
           },
-          distinct: ["achievementId"],
         });
-        const uniqueGameIds = new Set(result.map((r) => r.achievement.gameId));
+        const uniqueGameIds = new Set(
+          result.map((r) => r.achievement.achievementSet.gameId)
+        );
         return uniqueGameIds.size;
       },
     }),

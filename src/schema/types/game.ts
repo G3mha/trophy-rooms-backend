@@ -1,5 +1,7 @@
 import { builder, MutationErrorRef } from "../builder.js";
 import { ErrorCode } from "../../lib/errors.js";
+import { AchievementSetVisibility, UserRole } from "@prisma/client";
+import { hasRequiredRole } from "../../context.js";
 
 builder.prismaObject("Game", {
   fields: (t) => ({
@@ -7,9 +9,42 @@ builder.prismaObject("Game", {
     title: t.exposeString("title"),
     description: t.exposeString("description", { nullable: true }),
     coverUrl: t.exposeString("coverUrl", { nullable: true }),
-    achievements: t.relation("achievements", {
-      query: {
-        orderBy: { title: "asc" },
+    platform: t.relation("platform", { nullable: true }),
+    platformId: t.exposeString("platformId", { nullable: true }),
+    achievementSets: t.prismaField({
+      type: ["AchievementSet"],
+      resolve: (query, game, _args, ctx) => {
+        const baseWhere = { gameId: game.id };
+        if (!ctx.user) {
+          return ctx.prisma.achievementSet.findMany({
+            ...query,
+            where: {
+              ...baseWhere,
+              visibility: AchievementSetVisibility.PUBLIC,
+            },
+            orderBy: { title: "asc" },
+          });
+        }
+
+        if (hasRequiredRole(ctx.user, UserRole.TRUSTED)) {
+          return ctx.prisma.achievementSet.findMany({
+            ...query,
+            where: baseWhere,
+            orderBy: { title: "asc" },
+          });
+        }
+
+        return ctx.prisma.achievementSet.findMany({
+          ...query,
+          where: {
+            ...baseWhere,
+            OR: [
+              { visibility: AchievementSetVisibility.PUBLIC },
+              { createdByUserId: ctx.user.id },
+            ],
+          },
+          orderBy: { title: "asc" },
+        });
       },
     }),
     trophies: t.relation("trophies", {
@@ -17,7 +52,52 @@ builder.prismaObject("Game", {
         orderBy: { createdAt: "desc" },
       },
     }),
-    achievementCount: t.relationCount("achievements"),
+    achievementSetCount: t.int({
+      resolve: async (game, _args, ctx) => {
+        const visibilityFilter = !ctx.user
+          ? { visibility: AchievementSetVisibility.PUBLIC }
+          : hasRequiredRole(ctx.user, UserRole.TRUSTED)
+            ? {}
+            : {
+                OR: [
+                  { visibility: AchievementSetVisibility.PUBLIC },
+                  { createdByUserId: ctx.user.id },
+                ],
+              };
+
+        return ctx.prisma.achievementSet.count({
+          where: {
+            gameId: game.id,
+            ...(Object.keys(visibilityFilter).length ? visibilityFilter : {}),
+          },
+        });
+      },
+    }),
+    achievementCount: t.int({
+      resolve: async (game, _args, ctx) => {
+        const visibilityFilter = !ctx.user
+          ? { visibility: AchievementSetVisibility.PUBLIC }
+          : hasRequiredRole(ctx.user, UserRole.TRUSTED)
+            ? {}
+            : {
+                OR: [
+                  { visibility: AchievementSetVisibility.PUBLIC },
+                  { createdByUserId: ctx.user.id },
+                ],
+              };
+
+        return ctx.prisma.achievement.count({
+          where: {
+            achievementSet: {
+              gameId: game.id,
+              ...(Object.keys(visibilityFilter).length
+                ? visibilityFilter
+                : {}),
+            },
+          },
+        });
+      },
+    }),
     trophyCount: t.relationCount("trophies"),
     createdAt: t.expose("createdAt", { type: "DateTime" }),
     updatedAt: t.expose("updatedAt", { type: "DateTime" }),
@@ -30,6 +110,7 @@ export const CreateGameInput = builder.inputType("CreateGameInput", {
     title: t.string({ required: true }),
     description: t.string(),
     coverUrl: t.string(),
+    platformId: t.id(),
   }),
 });
 
@@ -38,6 +119,7 @@ export const UpdateGameInput = builder.inputType("UpdateGameInput", {
     title: t.string(),
     description: t.string(),
     coverUrl: t.string(),
+    platformId: t.id(),
   }),
 });
 
@@ -46,6 +128,7 @@ export const GamesFilterInput = builder.inputType("GamesFilterInput", {
   fields: (t) => ({
     search: t.string(),
     hasAchievements: t.boolean(),
+    platformId: t.id(),
   }),
 });
 
