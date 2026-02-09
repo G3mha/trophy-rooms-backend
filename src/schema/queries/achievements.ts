@@ -26,8 +26,10 @@ builder.queryField("achievements", (t) =>
         ];
       }
 
+      const achievementSetWhere: Prisma.AchievementSetWhereInput = {};
+
       if (filter?.gameId) {
-        where.achievementSet = { gameId: filter.gameId };
+        achievementSetWhere.gameId = filter.gameId;
       }
 
       if (filter?.achievementSetId) {
@@ -57,10 +59,13 @@ builder.queryField("achievements", (t) =>
               ],
             };
 
-      where.achievementSet = {
-        ...(where.achievementSet ?? {}),
-        ...(Object.keys(visibilityFilter).length ? visibilityFilter : {}),
-      };
+      if (Object.keys(visibilityFilter).length > 0) {
+        Object.assign(achievementSetWhere, visibilityFilter);
+      }
+
+      if (Object.keys(achievementSetWhere).length > 0) {
+        where.achievementSet = { is: achievementSetWhere };
+      }
 
       return ctx.prisma.achievement.count({ where });
     },
@@ -77,8 +82,10 @@ builder.queryField("achievements", (t) =>
         ];
       }
 
+      const achievementSetWhere: Prisma.AchievementSetWhereInput = {};
+
       if (filter?.gameId) {
-        where.achievementSet = { gameId: filter.gameId };
+        achievementSetWhere.gameId = filter.gameId;
       }
 
       if (filter?.achievementSetId) {
@@ -109,10 +116,13 @@ builder.queryField("achievements", (t) =>
               ],
             };
 
-      where.achievementSet = {
-        ...(where.achievementSet ?? {}),
-        ...(Object.keys(visibilityFilter).length ? visibilityFilter : {}),
-      };
+      if (Object.keys(visibilityFilter).length > 0) {
+        Object.assign(achievementSetWhere, visibilityFilter);
+      }
+
+      if (Object.keys(achievementSetWhere).length > 0) {
+        where.achievementSet = { is: achievementSetWhere };
+      }
 
       // Build order by clause
       let orderByClause: Prisma.AchievementOrderByWithRelationInput;
