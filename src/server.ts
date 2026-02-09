@@ -12,16 +12,37 @@ function getCorsOrigins(): string[] {
     .filter(Boolean);
 }
 
-const corsOrigins = getCorsOrigins();
+const allowedOrigins = new Set(getCorsOrigins());
+
+function isAllowedOrigin(origin: string | null): boolean {
+  if (!origin) return false;
+  if (allowedOrigins.has(origin)) return true;
+  if (origin.endsWith(".trophyrooms.org")) return true;
+  if (origin.endsWith(".vercel.app")) return true;
+  return false;
+}
 
 export const yoga = createYoga({
   schema,
   context: ({ request }) => createContext(request),
-  cors: {
-    origin: corsOrigins,
-    credentials: true,
-    methods: ["POST", "GET", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+  cors: (request) => {
+    const origin = request.headers.get("origin");
+    if (origin && isAllowedOrigin(origin)) {
+      return {
+        origin,
+        credentials: true,
+        methods: ["POST", "GET", "OPTIONS"],
+        allowedHeaders: ["Content-Type", "Authorization"],
+      };
+    }
+    if (origin) {
+      logger.warn({ origin }, "Blocked CORS request from unknown origin");
+    }
+    // Return empty origin to block the request
+    return {
+      origin: [],
+      credentials: false,
+    };
   },
   graphqlEndpoint: "/graphql",
   healthCheckEndpoint: "/health",
