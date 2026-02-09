@@ -6,14 +6,33 @@ import { logger } from "./lib/logger.js";
 // Parse CORS origins from environment
 function getCorsOrigins(): string[] {
   const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
-  return frontendUrl.split(",").map((url) => url.trim());
+  return frontendUrl
+    .split(",")
+    .map((url) => url.trim())
+    .filter(Boolean);
+}
+
+const corsOrigins = new Set(getCorsOrigins());
+
+function isAllowedOrigin(origin: string | undefined | null): boolean {
+  if (!origin) return true;
+  if (corsOrigins.has(origin)) return true;
+  if (origin.endsWith(".trophyrooms.org")) return true;
+  if (origin.endsWith(".vercel.app")) return true;
+  return false;
 }
 
 export const yoga = createYoga({
   schema,
   context: ({ request }) => createContext(request),
   cors: {
-    origin: getCorsOrigins(),
+    origin: (origin) => {
+      if (isAllowedOrigin(origin)) {
+        return origin ?? true;
+      }
+      logger.warn({ origin }, "Blocked CORS origin");
+      return false;
+    },
     credentials: true,
     methods: ["POST", "GET", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
