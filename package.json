@@ -22,6 +22,7 @@
     "@pothos/plugin-relay": "^4.3.0",
     "@pothos/plugin-validation": "^4.2.0",
     "@prisma/client": "^6.1.0",
+    "@types/node": "^22.10.0",
     "graphql": "^16.9.0",
     "graphql-yoga": "^5.10.0",
     "pino": "^9.5.0",
@@ -29,7 +30,6 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
-    "@types/node": "^22.10.0",
     "prisma": "^6.1.0",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0"
