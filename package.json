@@ -13,7 +13,7 @@
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "db:seed": "tsx scripts/seed-games.ts",
-    "postinstall": "prisma generate"
+    "postinstall": "node -e \"if (!process.env.PRISMA_SKIP_POSTINSTALL_GENERATE) { require('child_process').execSync('npx prisma generate', { stdio: 'inherit' }); }\""
   },
   "dependencies": {
     "@clerk/backend": "^1.21.0",
