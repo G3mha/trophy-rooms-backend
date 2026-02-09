@@ -36,7 +36,7 @@ builder.mutationField("setUserRole", (t) =>
     type: UserRoleMutationResult,
     args: {
       userId: t.arg.id({ required: true }),
-      role: t.arg({ type: "UserRole", required: true }),
+      role: t.arg({ type: UserRole, required: true }),
     },
     resolve: async (_root, { userId, role }, ctx) => {
       if (!ctx.user) {
