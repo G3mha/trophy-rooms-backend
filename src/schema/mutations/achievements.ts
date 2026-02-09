@@ -32,7 +32,7 @@ builder.mutationField("createAchievement", (t) =>
       const { title, description, iconUrl, points, achievementSetId } = args.input;
 
       // Validate title
-      const trimmedTitle = title.trim();
+      const trimmedTitle = title?.trim() ?? "";
       if (!trimmedTitle) {
         return {
           success: false,
@@ -197,7 +197,7 @@ builder.mutationField("updateAchievement", (t) =>
         };
       }
 
-      if (input.title !== undefined) {
+      if (input.title != null) {
         const trimmedTitle = input.title.trim();
         if (!trimmedTitle) {
           return {
