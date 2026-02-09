@@ -18,6 +18,8 @@ const server = createServer((req, res) => {
         url,
         statusCode: res.statusCode,
         durationMs,
+        origin: req.headers.origin,
+        referer: req.headers.referer,
       },
       "HTTP request"
     );
