@@ -4,7 +4,7 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN PRISMA_SKIP_POSTINSTALL_GENERATE=1 npm ci
 
 COPY prisma ./prisma
 COPY tsconfig.json ./
