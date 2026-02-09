@@ -12,27 +12,13 @@ function getCorsOrigins(): string[] {
     .filter(Boolean);
 }
 
-const corsOrigins = new Set(getCorsOrigins());
-
-function isAllowedOrigin(origin: string | undefined | null): boolean {
-  if (!origin) return true;
-  if (corsOrigins.has(origin)) return true;
-  if (origin.endsWith(".trophyrooms.org")) return true;
-  if (origin.endsWith(".vercel.app")) return true;
-  return false;
-}
+const corsOrigins = getCorsOrigins();
 
 export const yoga = createYoga({
   schema,
   context: ({ request }) => createContext(request),
   cors: {
-    origin: (origin) => {
-      if (isAllowedOrigin(origin)) {
-        return origin ?? true;
-      }
-      logger.warn({ origin }, "Blocked CORS origin");
-      return false;
-    },
+    origin: corsOrigins,
     credentials: true,
     methods: ["POST", "GET", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
