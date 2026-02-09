@@ -4,7 +4,27 @@ import { logger } from "./lib/logger.js";
 
 const port = parseInt(process.env.PORT || "4000", 10);
 
-const server = createServer(yoga);
+const server = createServer((req, res) => {
+  const start = Date.now();
+
+  res.on("finish", () => {
+    const durationMs = Date.now() - start;
+    const method = req.method ?? "UNKNOWN";
+    const url = req.url ?? "/";
+
+    logger.info(
+      {
+        method,
+        url,
+        statusCode: res.statusCode,
+        durationMs,
+      },
+      "HTTP request"
+    );
+  });
+
+  yoga(req, res);
+});
 
 server.listen(port, () => {
   logger.info(
