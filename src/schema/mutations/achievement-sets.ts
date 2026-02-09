@@ -31,7 +31,7 @@ builder.mutationField("createAchievementSet", (t) =>
         };
       }
 
-      const trimmedTitle = input.title.trim();
+      const trimmedTitle = input.title?.trim() ?? "";
       if (!trimmedTitle) {
         return {
           success: false,
@@ -198,7 +198,7 @@ builder.mutationField("updateAchievementSet", (t) =>
         visibility?: AchievementSetVisibility;
       } = {};
 
-      if (input.title !== undefined) {
+      if (input.title != null) {
         const trimmedTitle = input.title.trim();
         if (!trimmedTitle) {
           return {
@@ -248,7 +248,7 @@ builder.mutationField("updateAchievementSet", (t) =>
         updateData.title = trimmedTitle;
       }
 
-      if (input.visibility !== undefined) {
+      if (input.visibility != null) {
         if (existing.type !== AchievementSetType.CUSTOM) {
           return {
             success: false,
@@ -447,7 +447,7 @@ builder.mutationField("setAchievementSetType", (t) =>
     type: AchievementSetMutationResult,
     args: {
       id: t.arg.id({ required: true }),
-      type: t.arg({ type: "AchievementSetType", required: true }),
+      type: t.arg({ type: AchievementSetType, required: true }),
     },
     resolve: async (_root, { id, type }, ctx) => {
       if (!ctx.user) {
