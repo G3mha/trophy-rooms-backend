@@ -1,4 +1,9 @@
-import { Prisma, AchievementSetVisibility, UserRole } from "@prisma/client";
+import {
+  Prisma,
+  AchievementSetVisibility,
+  AchievementSetType,
+  UserRole,
+} from "@prisma/client";
 import { builder } from "../builder.js";
 import { hasRequiredRole } from "../../context.js";
 
@@ -7,8 +12,8 @@ builder.queryField("achievementSets", (t) =>
     type: ["AchievementSet"],
     args: {
       gameId: t.arg.id(),
-      visibility: t.arg({ type: "AchievementSetVisibility" }),
-      type: t.arg({ type: "AchievementSetType" }),
+      visibility: t.arg({ type: AchievementSetVisibility }),
+      type: t.arg({ type: AchievementSetType }),
     },
     resolve: (query, _root, args, ctx) => {
       const where: Prisma.AchievementSetWhereInput = {};
@@ -37,7 +42,12 @@ builder.queryField("achievementSets", (t) =>
             };
 
       if (Object.keys(visibilityScope).length > 0) {
-        where.AND = [...(where.AND ?? []), visibilityScope];
+        const andConditions = Array.isArray(where.AND)
+          ? where.AND
+          : where.AND
+            ? [where.AND]
+            : [];
+        where.AND = [...andConditions, visibilityScope];
       }
 
       return ctx.prisma.achievementSet.findMany({
