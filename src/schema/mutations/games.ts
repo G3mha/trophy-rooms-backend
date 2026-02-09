@@ -59,12 +59,10 @@ builder.mutationField("createGame", (t) =>
       }
 
       // Check for duplicate title
-      const existing = await ctx.prisma.game.findUnique({
+      const existing = await ctx.prisma.game.findFirst({
         where: {
-          title_platformId: {
-            title: trimmedTitle,
-            platformId,
-          },
+          title: trimmedTitle,
+          platformId,
         },
       });
 
@@ -177,12 +175,10 @@ builder.mutationField("updateGame", (t) =>
         if (trimmedTitle !== existing.title || input.platformId !== undefined) {
           const nextPlatformId =
             input.platformId !== undefined ? input.platformId ?? null : existing.platformId;
-          const duplicate = await ctx.prisma.game.findUnique({
+          const duplicate = await ctx.prisma.game.findFirst({
             where: {
-              title_platformId: {
-                title: trimmedTitle,
-                platformId: nextPlatformId,
-              },
+              title: trimmedTitle,
+              platformId: nextPlatformId,
             },
           });
 
@@ -204,12 +200,10 @@ builder.mutationField("updateGame", (t) =>
 
       if (input.title === undefined && input.platformId !== undefined) {
         const nextPlatformId = input.platformId ?? null;
-        const duplicate = await ctx.prisma.game.findUnique({
+        const duplicate = await ctx.prisma.game.findFirst({
           where: {
-            title_platformId: {
-              title: existing.title,
-              platformId: nextPlatformId,
-            },
+            title: existing.title,
+            platformId: nextPlatformId,
           },
         });
 
