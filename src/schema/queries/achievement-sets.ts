@@ -2,10 +2,8 @@ import {
   Prisma,
   AchievementSetVisibility,
   AchievementSetType,
-  UserRole,
 } from "@prisma/client";
 import { builder } from "../builder.js";
-import { hasRequiredRole } from "../../context.js";
 
 builder.queryField("achievementSets", (t) =>
   t.prismaField({

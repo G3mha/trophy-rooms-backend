@@ -1,7 +1,5 @@
 import { builder, MutationErrorRef } from "../builder.js";
 import { ErrorCode } from "../../lib/errors.js";
-import { AchievementSetVisibility, UserRole } from "@prisma/client";
-import { hasRequiredRole } from "../../context.js";
 
 builder.prismaObject("Game", {
   fields: (t) => ({
