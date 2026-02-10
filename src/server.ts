@@ -17,7 +17,13 @@ const allowedOrigins = new Set(getCorsOrigins());
 function isAllowedOrigin(origin: string | null): boolean {
   if (!origin) return false;
   if (allowedOrigins.has(origin)) return true;
-  if (origin.endsWith(".trophyrooms.org")) return true;
+  // Allow trophyrooms.org and all subdomains
+  if (
+    origin === "https://trophyrooms.org" ||
+    origin.endsWith(".trophyrooms.org")
+  ) {
+    return true;
+  }
   if (origin.endsWith(".vercel.app")) return true;
   return false;
 }
