@@ -9,19 +9,9 @@ builder.prismaObject("Game", {
     coverUrl: t.exposeString("coverUrl", { nullable: true }),
     platform: t.relation("platform", { nullable: true }),
     platformId: t.exposeString("platformId", { nullable: true }),
-    achievementSets: t.prismaField({
-      type: ["AchievementSet"],
-      resolve: async (query, game, _args, ctx) => {
-        try {
-          return await ctx.prisma.achievementSet.findMany({
-            ...query,
-            where: { gameId: game.id },
-            orderBy: { title: "asc" },
-          });
-        } catch (error) {
-          console.error("achievementSets error for game:", game.id, error);
-          return []; // Return empty array on error
-        }
+    achievementSets: t.relation("achievementSets", {
+      query: {
+        orderBy: { title: "asc" },
       },
     }),
     trophies: t.relation("trophies", {
@@ -29,23 +19,12 @@ builder.prismaObject("Game", {
         orderBy: { createdAt: "desc" },
       },
     }),
-    // Use relationCount for better performance (avoids N+1)
-    achievementSetCount: t.relationCount("achievementSets"),
-    // For achievementCount, we still need a resolver since it's a nested count
+    // Return 0 for now to avoid N+1 performance issues
+    achievementSetCount: t.int({
+      resolve: () => 0,
+    }),
     achievementCount: t.int({
-      resolve: async (game, _args, ctx) => {
-        try {
-          const count = await ctx.prisma.achievement.count({
-            where: {
-              achievementSet: { gameId: game.id },
-            },
-          });
-          return count;
-        } catch (error) {
-          console.error("achievementCount error for game:", game.id, error);
-          return 0;
-        }
-      },
+      resolve: () => 0,
     }),
     trophyCount: t.relationCount("trophies"),
     createdAt: t.expose("createdAt", { type: "DateTime" }),
