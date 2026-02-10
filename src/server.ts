@@ -14,18 +14,38 @@ function getCorsOrigins(): string[] {
 
 const allowedOrigins = new Set(getCorsOrigins());
 
-function isAllowedOrigin(origin: string | null): boolean {
-  if (!origin) return false;
+function isAllowedOrigin(origin: string): boolean {
   if (allowedOrigins.has(origin)) return true;
-  // Allow trophyrooms.org and all subdomains
-  if (
-    origin === "https://trophyrooms.org" ||
-    origin.endsWith(".trophyrooms.org")
-  ) {
-    return true;
+
+  try {
+    const url = new URL(origin);
+
+    // Allow localhost in development
+    if (
+      url.protocol === "http:" &&
+      (url.hostname === "localhost" || url.hostname === "127.0.0.1")
+    ) {
+      return true;
+    }
+
+    // Only HTTPS for production domains
+    if (url.protocol !== "https:") return false;
+
+    // trophyrooms.org and all subdomains
+    if (
+      url.hostname === "trophyrooms.org" ||
+      url.hostname.endsWith(".trophyrooms.org")
+    ) {
+      return true;
+    }
+
+    // Vercel preview deployments
+    if (url.hostname.endsWith(".vercel.app")) return true;
+
+    return false;
+  } catch {
+    return false;
   }
-  if (origin.endsWith(".vercel.app")) return true;
-  return false;
 }
 
 export const yoga = createYoga({
@@ -33,22 +53,29 @@ export const yoga = createYoga({
   context: ({ request }) => createContext(request),
   cors: (request) => {
     const origin = request.headers.get("origin");
-    if (origin && isAllowedOrigin(origin)) {
+
+    // No Origin = same-origin or non-browser (curl, GraphiQL)
+    if (!origin) {
+      return {
+        origin: "*",
+        credentials: false,
+        methods: ["POST", "GET", "OPTIONS"],
+        allowedHeaders: ["Content-Type", "Authorization"],
+      };
+    }
+
+    if (isAllowedOrigin(origin)) {
       return {
         origin,
         credentials: true,
         methods: ["POST", "GET", "OPTIONS"],
         allowedHeaders: ["Content-Type", "Authorization"],
+        maxAge: 86400,
       };
     }
-    if (origin) {
-      logger.warn({ origin }, "Blocked CORS request from unknown origin");
-    }
-    // Return empty origin to block the request
-    return {
-      origin: [],
-      credentials: false,
-    };
+
+    logger.warn({ origin }, "Blocked CORS request from unknown origin");
+    return false;
   },
   graphqlEndpoint: "/graphql",
   healthCheckEndpoint: "/health",
