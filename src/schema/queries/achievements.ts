@@ -64,7 +64,7 @@ builder.queryField("achievements", (t) =>
       }
 
       if (Object.keys(achievementSetWhere).length > 0) {
-        where.achievementSet = { is: achievementSetWhere };
+        where.achievementSet = achievementSetWhere;
       }
 
       return ctx.prisma.achievement.count({ where });
@@ -121,7 +121,7 @@ builder.queryField("achievements", (t) =>
       }
 
       if (Object.keys(achievementSetWhere).length > 0) {
-        where.achievementSet = { is: achievementSetWhere };
+        where.achievementSet = achievementSetWhere;
       }
 
       // Build order by clause

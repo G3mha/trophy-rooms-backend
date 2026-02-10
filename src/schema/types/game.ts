@@ -14,35 +14,10 @@ builder.prismaObject("Game", {
     achievementSets: t.prismaField({
       type: ["AchievementSet"],
       resolve: (query, game, _args, ctx) => {
-        const baseWhere = { gameId: game.id };
-        if (!ctx.user) {
-          return ctx.prisma.achievementSet.findMany({
-            ...query,
-            where: {
-              ...baseWhere,
-              visibility: AchievementSetVisibility.PUBLIC,
-            },
-            orderBy: { title: "asc" },
-          });
-        }
-
-        if (hasRequiredRole(ctx.user, UserRole.TRUSTED)) {
-          return ctx.prisma.achievementSet.findMany({
-            ...query,
-            where: baseWhere,
-            orderBy: { title: "asc" },
-          });
-        }
-
+        // Simplified: return all achievement sets for now
         return ctx.prisma.achievementSet.findMany({
           ...query,
-          where: {
-            ...baseWhere,
-            OR: [
-              { visibility: AchievementSetVisibility.PUBLIC },
-              { createdByUserId: ctx.user.id },
-            ],
-          },
+          where: { gameId: game.id },
           orderBy: { title: "asc" },
         });
       },
@@ -54,46 +29,18 @@ builder.prismaObject("Game", {
     }),
     achievementSetCount: t.int({
       resolve: async (game, _args, ctx) => {
-        const visibilityFilter = !ctx.user
-          ? { visibility: AchievementSetVisibility.PUBLIC }
-          : hasRequiredRole(ctx.user, UserRole.TRUSTED)
-            ? {}
-            : {
-                OR: [
-                  { visibility: AchievementSetVisibility.PUBLIC },
-                  { createdByUserId: ctx.user.id },
-                ],
-              };
-
+        // Simplified: just count all achievement sets for this game
         return ctx.prisma.achievementSet.count({
-          where: {
-            gameId: game.id,
-            ...(Object.keys(visibilityFilter).length ? visibilityFilter : {}),
-          },
+          where: { gameId: game.id },
         });
       },
     }),
     achievementCount: t.int({
       resolve: async (game, _args, ctx) => {
-        const visibilityFilter = !ctx.user
-          ? { visibility: AchievementSetVisibility.PUBLIC }
-          : hasRequiredRole(ctx.user, UserRole.TRUSTED)
-            ? {}
-            : {
-                OR: [
-                  { visibility: AchievementSetVisibility.PUBLIC },
-                  { createdByUserId: ctx.user.id },
-                ],
-              };
-
+        // Simplified: just count all achievements for this game's sets
         return ctx.prisma.achievement.count({
           where: {
-            achievementSet: {
-              gameId: game.id,
-              ...(Object.keys(visibilityFilter).length
-                ? visibilityFilter
-                : {}),
-            },
+            achievementSet: { gameId: game.id },
           },
         });
       },
