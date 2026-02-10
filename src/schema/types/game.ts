@@ -11,13 +11,17 @@ builder.prismaObject("Game", {
     platformId: t.exposeString("platformId", { nullable: true }),
     achievementSets: t.prismaField({
       type: ["AchievementSet"],
-      resolve: (query, game, _args, ctx) => {
-        // Simplified: return all achievement sets for now
-        return ctx.prisma.achievementSet.findMany({
-          ...query,
-          where: { gameId: game.id },
-          orderBy: { title: "asc" },
-        });
+      resolve: async (query, game, _args, ctx) => {
+        try {
+          return await ctx.prisma.achievementSet.findMany({
+            ...query,
+            where: { gameId: game.id },
+            orderBy: { title: "asc" },
+          });
+        } catch (error) {
+          console.error("achievementSets error for game:", game.id, error);
+          return []; // Return empty array on error
+        }
       },
     }),
     trophies: t.relation("trophies", {
@@ -27,20 +31,30 @@ builder.prismaObject("Game", {
     }),
     achievementSetCount: t.int({
       resolve: async (game, _args, ctx) => {
-        // Simplified: just count all achievement sets for this game
-        return ctx.prisma.achievementSet.count({
-          where: { gameId: game.id },
-        });
+        try {
+          const count = await ctx.prisma.achievementSet.count({
+            where: { gameId: game.id },
+          });
+          return count;
+        } catch (error) {
+          console.error("achievementSetCount error for game:", game.id, error);
+          return 0; // Return 0 on error to prevent breaking the query
+        }
       },
     }),
     achievementCount: t.int({
       resolve: async (game, _args, ctx) => {
-        // Simplified: just count all achievements for this game's sets
-        return ctx.prisma.achievement.count({
-          where: {
-            achievementSet: { gameId: game.id },
-          },
-        });
+        try {
+          const count = await ctx.prisma.achievement.count({
+            where: {
+              achievementSet: { gameId: game.id },
+            },
+          });
+          return count;
+        } catch (error) {
+          console.error("achievementCount error for game:", game.id, error);
+          return 0; // Return 0 on error to prevent breaking the query
+        }
       },
     }),
     trophyCount: t.relationCount("trophies"),

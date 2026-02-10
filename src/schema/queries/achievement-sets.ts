@@ -13,27 +13,31 @@ builder.queryField("achievementSets", (t) =>
       visibility: t.arg({ type: AchievementSetVisibility }),
       type: t.arg({ type: AchievementSetType }),
     },
-    resolve: (query, _root, args, _ctx) => {
-      const where: Prisma.AchievementSetWhereInput = {};
+    resolve: async (query, _root, args, ctx) => {
+      try {
+        const where: Prisma.AchievementSetWhereInput = {};
 
-      if (args.gameId) {
-        where.gameId = args.gameId;
+        if (args.gameId) {
+          where.gameId = args.gameId;
+        }
+
+        if (args.type) {
+          where.type = args.type;
+        }
+
+        if (args.visibility) {
+          where.visibility = args.visibility;
+        }
+
+        return await ctx.prisma.achievementSet.findMany({
+          ...query,
+          where,
+          orderBy: { title: "asc" },
+        });
+      } catch (error) {
+        console.error("achievementSets query error:", error);
+        return [];
       }
-
-      if (args.type) {
-        where.type = args.type;
-      }
-
-      if (args.visibility) {
-        where.visibility = args.visibility;
-      }
-
-      // Simplified: no visibility scope filtering for now
-      return _ctx.prisma.achievementSet.findMany({
-        ...query,
-        where,
-        orderBy: { title: "asc" },
-      });
     },
   })
 );
