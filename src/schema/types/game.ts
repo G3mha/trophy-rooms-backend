@@ -29,19 +29,9 @@ builder.prismaObject("Game", {
         orderBy: { createdAt: "desc" },
       },
     }),
-    achievementSetCount: t.int({
-      resolve: async (game, _args, ctx) => {
-        try {
-          const count = await ctx.prisma.achievementSet.count({
-            where: { gameId: game.id },
-          });
-          return count;
-        } catch (error) {
-          console.error("achievementSetCount error for game:", game.id, error);
-          return 0; // Return 0 on error to prevent breaking the query
-        }
-      },
-    }),
+    // Use relationCount for better performance (avoids N+1)
+    achievementSetCount: t.relationCount("achievementSets"),
+    // For achievementCount, we still need a resolver since it's a nested count
     achievementCount: t.int({
       resolve: async (game, _args, ctx) => {
         try {
@@ -53,7 +43,7 @@ builder.prismaObject("Game", {
           return count;
         } catch (error) {
           console.error("achievementCount error for game:", game.id, error);
-          return 0; // Return 0 on error to prevent breaking the query
+          return 0;
         }
       },
     }),
