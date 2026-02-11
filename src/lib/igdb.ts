@@ -220,18 +220,20 @@ export async function fetchGamesForPlatform(
     `platforms = (${platformFilter})`,
   ];
 
-  if (filter.categoryInclude && filter.categoryInclude.length > 0) {
-    conditions.push(`category = (${filter.categoryInclude.join(", ")})`);
-  }
+  // NOTE: Category filter disabled - most IGDB games don't have category set
+  // The field is null for most games, so category = 0 returns empty results
+  // if (filter.categoryInclude && filter.categoryInclude.length > 0) {
+  //   conditions.push(`category = (${filter.categoryInclude.join(", ")})`);
+  // }
 
-  if (filter.minRating !== undefined) {
-    // Use rating (user rating) as it's more commonly populated than total_rating
-    conditions.push(`rating >= ${filter.minRating}`);
-  }
-
-  if (filter.minRatingCount !== undefined) {
-    conditions.push(`rating_count >= ${filter.minRatingCount}`);
-  }
+  // NOTE: Rating filters also disabled - most games don't have ratings
+  // This causes 0 results for most platforms
+  // if (filter.minRating !== undefined) {
+  //   conditions.push(`rating >= ${filter.minRating}`);
+  // }
+  // if (filter.minRatingCount !== undefined) {
+  //   conditions.push(`rating_count >= ${filter.minRatingCount}`);
+  // }
 
   const query = `
     fields id, name, summary, cover.image_id, first_release_date, genres.name,
@@ -291,18 +293,7 @@ export async function countGamesForPlatform(
     `platforms = (${platformFilter})`,
   ];
 
-  if (filter.categoryInclude && filter.categoryInclude.length > 0) {
-    conditions.push(`category = (${filter.categoryInclude.join(", ")})`);
-  }
-
-  if (filter.minRating !== undefined) {
-    // Use rating (user rating) as it's more commonly populated than total_rating
-    conditions.push(`rating >= ${filter.minRating}`);
-  }
-
-  if (filter.minRatingCount !== undefined) {
-    conditions.push(`rating_count >= ${filter.minRatingCount}`);
-  }
+  // NOTE: Filters disabled - see fetchGamesForPlatform for explanation
 
   const query = `
     fields id;
