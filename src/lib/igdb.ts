@@ -4,7 +4,7 @@ interface IGDBToken {
   token_type: string;
 }
 
-interface IGDBGame {
+export interface IGDBGame {
   id: number;
   name: string;
   summary?: string;
@@ -15,15 +15,133 @@ interface IGDBGame {
   first_release_date?: number;
   genres?: { id: number; name: string }[];
   rating?: number;
+  rating_count?: number;
   total_rating?: number;
+  total_rating_count?: number;
+  category?: number; // 0 = main game, 1 = DLC, etc.
+  platforms?: { id: number; name: string }[];
 }
+
+// IGDB Platform IDs mapped to our slugs
+export const IGDB_PLATFORM_MAP: Record<string, number[]> = {
+  // Nintendo Consoles
+  "nes": [18],
+  "snes": [19],
+  "n64": [4],
+  "gamecube": [21],
+  "wii": [5],
+  "wii-u": [41],
+  "switch": [130, 508], // Switch and Switch 2
+
+  // Nintendo Handhelds
+  "game-boy": [33],
+  "game-boy-color": [22],
+  "gba": [24],
+  "nds": [20],
+  "3ds": [37],
+
+  // PlayStation
+  "ps1": [7],
+  "ps2": [8],
+  "ps3": [9],
+  "ps4": [48],
+  "ps5": [167],
+  "psp": [38],
+  "vita": [46],
+
+  // Xbox
+  "xbox": [11],
+  "xbox-360": [12],
+  "xbox-one": [49],
+  "xbox-series": [169],
+
+  // Sega
+  "master-system": [64],
+  "genesis": [29], // Mega Drive
+  "saturn": [32],
+  "dreamcast": [23],
+  "game-gear": [35],
+
+  // PC - all map to PC platform in IGDB
+  "pc": [6],
+  "macos": [14],
+  "linux": [3],
+  "steam": [6],     // Steam games are PC games
+  "epic": [6],      // Epic games are PC games
+  "gog": [6],       // GOG games are PC games
+
+  // Mobile & Other
+  "ios": [39],
+  "android": [34],
+  "atari-2600": [59],
+  "atari-7800": [60],
+  "neo-geo": [80],
+  "turbografx-16": [86],
+};
+
+// Game category enum from IGDB
+export enum IGDBGameCategory {
+  MainGame = 0,
+  DLCAddon = 1,
+  Expansion = 2,
+  Bundle = 3,
+  StandaloneExpansion = 4,
+  Mod = 5,
+  Episode = 6,
+  Season = 7,
+  Remake = 8,
+  Remaster = 9,
+  ExpandedGame = 10,
+  Port = 11,
+  Fork = 12,
+  Pack = 13,
+  Update = 14,
+}
+
+export interface QualityFilter {
+  minRating?: number;          // Minimum rating (0-100)
+  minRatingCount?: number;     // Minimum number of ratings
+  categoryInclude?: number[];  // Game categories to include
+}
+
+// Quality filter presets
+export const QUALITY_FILTERS = {
+  strict: {
+    minRating: 60,
+    minRatingCount: 10,
+    categoryInclude: [
+      IGDBGameCategory.MainGame,
+      IGDBGameCategory.Remake,
+      IGDBGameCategory.Remaster,
+      IGDBGameCategory.StandaloneExpansion,
+    ],
+  } as QualityFilter,
+  moderate: {
+    minRating: 50,
+    minRatingCount: 5,
+    categoryInclude: [
+      IGDBGameCategory.MainGame,
+      IGDBGameCategory.Remake,
+      IGDBGameCategory.Remaster,
+      IGDBGameCategory.StandaloneExpansion,
+      IGDBGameCategory.ExpandedGame,
+    ],
+  } as QualityFilter,
+  permissive: {
+    minRatingCount: 1,
+    categoryInclude: [
+      IGDBGameCategory.MainGame,
+      IGDBGameCategory.Remake,
+      IGDBGameCategory.Remaster,
+      IGDBGameCategory.StandaloneExpansion,
+      IGDBGameCategory.ExpandedGame,
+      IGDBGameCategory.Port,
+    ],
+  } as QualityFilter,
+};
 
 const TWITCH_CLIENT_ID = process.env.TWITCH_CLIENT_ID!;
 const TWITCH_CLIENT_SECRET = process.env.TWITCH_CLIENT_SECRET!;
-
-// Platform IDs
-const NINTENDO_SWITCH_PLATFORM_ID = 130;
-const NINTENDO_SWITCH_2_PLATFORM_ID = 508;
 
 let cachedToken: { token: string; expiresAt: number } | null = null;
 
@@ -75,14 +193,39 @@ export async function igdbRequest<T>(
   return response.json();
 }
 
-export async function fetchNintendoSwitchGames(
+/**
+ * Fetch games for specific platform IDs with quality filtering
+ */
+export async function fetchGamesForPlatform(
+  igdbPlatformIds: number[],
+  filter: QualityFilter,
   offset: number = 0,
   limit: number = 500
 ): Promise<IGDBGame[]> {
+  const platformFilter = igdbPlatformIds.join(", ");
+
+  // Build where conditions
+  const conditions: string[] = [
+    `platforms = (${platformFilter})`,
+  ];
+
+  if (filter.categoryInclude && filter.categoryInclude.length > 0) {
+    conditions.push(`category = (${filter.categoryInclude.join(", ")})`);
+  }
+
+  if (filter.minRating !== undefined) {
+    conditions.push(`total_rating >= ${filter.minRating}`);
+  }
+
+  if (filter.minRatingCount !== undefined) {
+    conditions.push(`total_rating_count >= ${filter.minRatingCount}`);
+  }
+
   const query = `
-    fields id, name, summary, cover.image_id, first_release_date, genres.name, rating, total_rating;
-    where platforms = (${NINTENDO_SWITCH_PLATFORM_ID}, ${NINTENDO_SWITCH_2_PLATFORM_ID});
-    sort id asc;
+    fields id, name, summary, cover.image_id, first_release_date, genres.name,
+           rating, rating_count, total_rating, total_rating_count, category, platforms.name;
+    where ${conditions.join(" & ")};
+    sort total_rating desc;
     offset ${offset};
     limit ${limit};
   `;
@@ -90,19 +233,26 @@ export async function fetchNintendoSwitchGames(
   return igdbRequest<IGDBGame[]>("games", query);
 }
 
-export async function fetchAllNintendoSwitchGames(): Promise<IGDBGame[]> {
+/**
+ * Fetch all games for a platform with quality filtering
+ */
+export async function fetchAllGamesForPlatform(
+  igdbPlatformIds: number[],
+  filter: QualityFilter,
+  onProgress?: (fetched: number) => void
+): Promise<IGDBGame[]> {
   const allGames: IGDBGame[] = [];
   let offset = 0;
   const limit = 500;
   let hasMore = true;
 
-  console.log("Fetching Nintendo Switch games from IGDB...");
-
   while (hasMore) {
-    console.log(`Fetching games ${offset} to ${offset + limit}...`);
-
-    const games = await fetchNintendoSwitchGames(offset, limit);
+    const games = await fetchGamesForPlatform(igdbPlatformIds, filter, offset, limit);
     allGames.push(...games);
+
+    if (onProgress) {
+      onProgress(allGames.length);
+    }
 
     if (games.length < limit) {
       hasMore = false;
@@ -113,22 +263,59 @@ export async function fetchAllNintendoSwitchGames(): Promise<IGDBGame[]> {
     }
   }
 
-  console.log(`Total games fetched: ${allGames.length}`);
   return allGames;
 }
 
-export async function countNintendoSwitchGames(): Promise<number> {
-  // IGDB count endpoint requires just the where clause
-  // We'll estimate by fetching with limit 1 and checking total
+/**
+ * Count games for a platform with quality filtering
+ */
+export async function countGamesForPlatform(
+  igdbPlatformIds: number[],
+  filter: QualityFilter
+): Promise<number> {
+  const platformFilter = igdbPlatformIds.join(", ");
+
+  const conditions: string[] = [
+    `platforms = (${platformFilter})`,
+  ];
+
+  if (filter.categoryInclude && filter.categoryInclude.length > 0) {
+    conditions.push(`category = (${filter.categoryInclude.join(", ")})`);
+  }
+
+  if (filter.minRating !== undefined) {
+    conditions.push(`total_rating >= ${filter.minRating}`);
+  }
+
+  if (filter.minRatingCount !== undefined) {
+    conditions.push(`total_rating_count >= ${filter.minRatingCount}`);
+  }
+
   const query = `
     fields id;
-    where platforms = (${NINTENDO_SWITCH_PLATFORM_ID}, ${NINTENDO_SWITCH_2_PLATFORM_ID});
+    where ${conditions.join(" & ")};
     limit 500;
   `;
 
-  const games = await igdbRequest<{ id: number }[]>("games", query);
-  // Return actual fetched count as estimate (will fetch all in the main function)
-  return games.length > 0 ? 5000 : 0; // Estimate ~5000 Switch games
+  // IGDB doesn't have a true count endpoint, so we estimate
+  const games = await igdbRequest<{ id: number }[]>("games/count", query);
+  return (games as unknown as { count: number }).count || 0;
+}
+
+// Legacy functions for backwards compatibility
+export async function fetchNintendoSwitchGames(
+  offset: number = 0,
+  limit: number = 500
+): Promise<IGDBGame[]> {
+  return fetchGamesForPlatform([130, 508], {}, offset, limit);
+}
+
+export async function fetchAllNintendoSwitchGames(): Promise<IGDBGame[]> {
+  return fetchAllGamesForPlatform([130, 508], {});
+}
+
+export async function countNintendoSwitchGames(): Promise<number> {
+  return countGamesForPlatform([130, 508], {});
 }
 
 export function getCoverUrl(
@@ -137,5 +324,3 @@ export function getCoverUrl(
 ): string {
   return `https://images.igdb.com/igdb/image/upload/t_${size}/${imageId}.jpg`;
 }
-
-export type { IGDBGame };
