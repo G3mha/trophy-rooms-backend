@@ -106,9 +106,10 @@ export interface QualityFilter {
 
 // Quality filter presets
 export const QUALITY_FILTERS = {
+  // Strict: Only well-rated games with sufficient reviews
   strict: {
-    minRating: 60,
-    minRatingCount: 10,
+    minRating: 65,
+    minRatingCount: 5,
     categoryInclude: [
       IGDBGameCategory.MainGame,
       IGDBGameCategory.Remake,
@@ -116,9 +117,10 @@ export const QUALITY_FILTERS = {
       IGDBGameCategory.StandaloneExpansion,
     ],
   } as QualityFilter,
+  // Moderate: Good games with some reviews
   moderate: {
     minRating: 50,
-    minRatingCount: 5,
+    minRatingCount: 3,
     categoryInclude: [
       IGDBGameCategory.MainGame,
       IGDBGameCategory.Remake,
@@ -127,6 +129,7 @@ export const QUALITY_FILTERS = {
       IGDBGameCategory.ExpandedGame,
     ],
   } as QualityFilter,
+  // Permissive: Any main game with at least one rating
   permissive: {
     minRatingCount: 1,
     categoryInclude: [
@@ -136,6 +139,14 @@ export const QUALITY_FILTERS = {
       IGDBGameCategory.StandaloneExpansion,
       IGDBGameCategory.ExpandedGame,
       IGDBGameCategory.Port,
+    ],
+  } as QualityFilter,
+  // No filter: Just main games, no rating requirement
+  noFilter: {
+    categoryInclude: [
+      IGDBGameCategory.MainGame,
+      IGDBGameCategory.Remake,
+      IGDBGameCategory.Remaster,
     ],
   } as QualityFilter,
 };
@@ -214,11 +225,12 @@ export async function fetchGamesForPlatform(
   }
 
   if (filter.minRating !== undefined) {
-    conditions.push(`total_rating >= ${filter.minRating}`);
+    // Use rating (user rating) as it's more commonly populated than total_rating
+    conditions.push(`rating >= ${filter.minRating}`);
   }
 
   if (filter.minRatingCount !== undefined) {
-    conditions.push(`total_rating_count >= ${filter.minRatingCount}`);
+    conditions.push(`rating_count >= ${filter.minRatingCount}`);
   }
 
   const query = `
@@ -284,11 +296,12 @@ export async function countGamesForPlatform(
   }
 
   if (filter.minRating !== undefined) {
-    conditions.push(`total_rating >= ${filter.minRating}`);
+    // Use rating (user rating) as it's more commonly populated than total_rating
+    conditions.push(`rating >= ${filter.minRating}`);
   }
 
   if (filter.minRatingCount !== undefined) {
-    conditions.push(`total_rating_count >= ${filter.minRatingCount}`);
+    conditions.push(`rating_count >= ${filter.minRatingCount}`);
   }
 
   const query = `

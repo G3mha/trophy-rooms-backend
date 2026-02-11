@@ -22,11 +22,11 @@ async function main() {
     process.exit(1);
   }
 
-  const filter = QUALITY_FILTERS.strict;
-  console.log("Quality filter: STRICT");
-  console.log(`  - Min rating: ${filter.minRating}`);
-  console.log(`  - Min rating count: ${filter.minRatingCount}`);
-  console.log(`  - Categories: Main games, Remakes, Remasters, Standalone Expansions\n`);
+  const filter = QUALITY_FILTERS.moderate;
+  console.log("Quality filter: MODERATE");
+  console.log(`  - Min rating: ${filter.minRating || "none"}`);
+  console.log(`  - Min rating count: ${filter.minRatingCount || "none"}`);
+  console.log(`  - Categories: Main games, Remakes, Remasters, Standalone Expansions, Expanded Games\n`);
 
   // Get all platforms from database
   const platforms = await prisma.platform.findMany({
