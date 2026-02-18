@@ -31,6 +31,12 @@ enum UserRole {
   ADMIN
 }
 
+enum AchievementTier {
+  BRONZE
+  SILVER
+  GOLD
+}
+
 model User {
   id           String            @id @default(cuid())
   clerkId      String            @unique
@@ -95,6 +101,7 @@ model Achievement {
   description     String?
   iconUrl         String?
   points          Int               @default(0)
+  tier            AchievementTier   @default(BRONZE)
   achievementSet  AchievementSet    @relation(fields: [achievementSetId], references: [id], onDelete: Cascade)
   achievementSetId String
   users           UserAchievement[]
