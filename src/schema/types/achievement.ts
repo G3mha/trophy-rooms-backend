@@ -1,6 +1,11 @@
 import { builder, MutationErrorRef } from "../builder.js";
 import { ErrorCode } from "../../lib/errors.js";
 
+// AchievementTier enum for GraphQL
+export const AchievementTierEnum = builder.enumType("AchievementTier", {
+  values: ["BRONZE", "SILVER", "GOLD"] as const,
+});
+
 builder.prismaObject("Achievement", {
   fields: (t) => ({
     id: t.exposeID("id"),
@@ -8,6 +13,7 @@ builder.prismaObject("Achievement", {
     description: t.exposeString("description", { nullable: true }),
     iconUrl: t.exposeString("iconUrl", { nullable: true }),
     points: t.exposeInt("points"),
+    tier: t.expose("tier", { type: AchievementTierEnum }),
     achievementSet: t.relation("achievementSet"),
     achievementSetId: t.exposeString("achievementSetId"),
     userCount: t.relationCount("users"),
@@ -40,6 +46,7 @@ export const CreateAchievementInput = builder.inputType(
       description: t.string(),
       iconUrl: t.string(),
       points: t.int({ required: false, defaultValue: 0 }),
+      tier: t.field({ type: AchievementTierEnum, required: false }),
       achievementSetId: t.id({ required: true }),
     }),
   }
@@ -53,6 +60,7 @@ export const UpdateAchievementInput = builder.inputType(
       description: t.string(),
       iconUrl: t.string(),
       points: t.int(),
+      tier: t.field({ type: AchievementTierEnum, required: false }),
     }),
   }
 );
@@ -63,6 +71,7 @@ export const BulkAchievementInput = builder.inputType("BulkAchievementInput", {
     description: t.string(),
     iconUrl: t.string(),
     points: t.int(),
+    tier: t.field({ type: AchievementTierEnum, required: false }),
   }),
 });
 
