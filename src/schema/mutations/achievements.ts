@@ -29,7 +29,7 @@ builder.mutationField("createAchievement", (t) =>
         };
       }
 
-      const { title, description, iconUrl, points, achievementSetId } = args.input;
+      const { title, description, iconUrl, points, tier, achievementSetId } = args.input;
 
       // Validate title
       const trimmedTitle = title?.trim() ?? "";
@@ -119,6 +119,7 @@ builder.mutationField("createAchievement", (t) =>
           description: description?.trim() || null,
           iconUrl: iconUrl?.trim() || null,
           points: points ?? 0,
+          tier: tier ?? "BRONZE",
           achievementSetId,
         },
       });
@@ -242,6 +243,7 @@ builder.mutationField("updateAchievement", (t) =>
           description: input.description?.trim() || undefined,
           iconUrl: input.iconUrl?.trim() || undefined,
           points: input.points ?? undefined,
+          tier: input.tier ?? undefined,
         },
       });
 
@@ -416,6 +418,7 @@ builder.mutationField("bulkCreateAchievements", (t) =>
           description: item.description?.trim() || null,
           iconUrl: item.iconUrl?.trim() || null,
           points: item.points ?? 0,
+          tier: item.tier ?? "BRONZE",
         }))
         .filter((item) => item.title.length > 0);
 
