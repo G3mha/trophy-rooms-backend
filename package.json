@@ -15,6 +15,10 @@
     "db:seed": "tsx scripts/seed-games.ts",
     "db:seed-platforms": "tsx scripts/seed-platforms.ts",
     "db:seed-all": "tsx scripts/seed-all-platforms.ts",
+    "db:cleanup": "tsx scripts/cleanup-shovelware.ts",
+    "db:counts": "tsx scripts/platform-counts.ts",
+    "db:verify": "tsx scripts/verify-cleanup.ts",
+    "db:cleanup-titles": "tsx scripts/cleanup-weird-titles.ts",
     "postinstall": "node -e \"if (!process.env.PRISMA_SKIP_POSTINSTALL_GENERATE) { require('child_process').execSync('npx prisma generate', { stdio: 'inherit' }); }\""
   },
   "dependencies": {
