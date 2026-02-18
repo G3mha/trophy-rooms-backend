@@ -209,7 +209,7 @@ export async function igdbRequest<T>(
  */
 export async function fetchGamesForPlatform(
   igdbPlatformIds: number[],
-  filter: QualityFilter,
+  _filter: QualityFilter,
   offset: number = 0,
   limit: number = 500
 ): Promise<IGDBGame[]> {
@@ -285,7 +285,7 @@ export async function fetchAllGamesForPlatform(
  */
 export async function countGamesForPlatform(
   igdbPlatformIds: number[],
-  filter: QualityFilter
+  _filter: QualityFilter
 ): Promise<number> {
   const platformFilter = igdbPlatformIds.join(", ");
 
@@ -355,7 +355,7 @@ export async function searchGameByTitle(
 
   try {
     const results = await igdbRequest<IGDBGame[]>("games", query);
-    return results.length > 0 ? results[0] : null;
+    return results[0] ?? null;
   } catch {
     return null;
   }
