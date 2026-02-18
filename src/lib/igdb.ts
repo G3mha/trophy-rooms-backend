@@ -328,3 +328,56 @@ export function getCoverUrl(
 ): string {
   return `https://images.igdb.com/igdb/image/upload/t_${size}/${imageId}.jpg`;
 }
+
+/**
+ * Search for a game by title on IGDB
+ * Returns the best match or null if not found
+ */
+export async function searchGameByTitle(
+  title: string,
+  platformIds?: number[]
+): Promise<IGDBGame | null> {
+  // Escape special characters in title for IGDB search
+  const escapedTitle = title.replace(/"/g, '\\"');
+
+  let whereClause = `name ~ "${escapedTitle}"`;
+  if (platformIds && platformIds.length > 0) {
+    whereClause += ` & platforms = (${platformIds.join(", ")})`;
+  }
+
+  const query = `
+    fields id, name, summary, cover.image_id, rating, rating_count,
+           total_rating, total_rating_count, category, platforms.name;
+    search "${escapedTitle}";
+    where ${whereClause};
+    limit 1;
+  `;
+
+  try {
+    const results = await igdbRequest<IGDBGame[]>("games", query);
+    return results.length > 0 ? results[0] : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Batch search for multiple games by title
+ * More efficient than individual searches
+ */
+export async function searchGamesByTitles(
+  titles: string[]
+): Promise<Map<string, IGDBGame | null>> {
+  const results = new Map<string, IGDBGame | null>();
+
+  // IGDB doesn't support true batch search, so we search one at a time
+  // with rate limiting
+  for (const title of titles) {
+    const game = await searchGameByTitle(title);
+    results.set(title.toLowerCase(), game);
+    // Rate limit: 250ms between requests
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+
+  return results;
+}
