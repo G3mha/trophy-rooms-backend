@@ -8,3 +8,4 @@ import "./users.js";
 import "./leaderboard.js";
 import "./activity.js";
 import "./game-progress.js";
+import "./wishlist.js";
