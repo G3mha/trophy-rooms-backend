@@ -41,7 +41,7 @@ builder.mutationField("createGame", (t) =>
         };
       }
 
-      const { title, description, coverUrl } = args.input;
+      const { title, description, coverUrl, releaseDate, developer, publisher, genre, esrbRating, screenshots } = args.input;
       const platformId = args.input.platformId ?? null;
 
       // Validate title
@@ -84,6 +84,12 @@ builder.mutationField("createGame", (t) =>
           title: trimmedTitle,
           description: description?.trim() || null,
           coverUrl: coverUrl?.trim() || null,
+          releaseDate: releaseDate ?? null,
+          developer: developer?.trim() || null,
+          publisher: publisher?.trim() || null,
+          genre: genre?.trim() || null,
+          esrbRating: esrbRating?.trim() || null,
+          screenshots: screenshots ?? [],
           platformId,
         },
       });
@@ -154,6 +160,12 @@ builder.mutationField("updateGame", (t) =>
         title?: string;
         description?: string | null;
         coverUrl?: string | null;
+        releaseDate?: Date | null;
+        developer?: string | null;
+        publisher?: string | null;
+        genre?: string | null;
+        esrbRating?: string | null;
+        screenshots?: string[];
         platformId?: string | null;
       } = {};
 
@@ -226,6 +238,30 @@ builder.mutationField("updateGame", (t) =>
 
       if (input.coverUrl !== undefined) {
         updateData.coverUrl = input.coverUrl?.trim() || null;
+      }
+
+      if (input.releaseDate !== undefined) {
+        updateData.releaseDate = input.releaseDate ?? null;
+      }
+
+      if (input.developer !== undefined) {
+        updateData.developer = input.developer?.trim() || null;
+      }
+
+      if (input.publisher !== undefined) {
+        updateData.publisher = input.publisher?.trim() || null;
+      }
+
+      if (input.genre !== undefined) {
+        updateData.genre = input.genre?.trim() || null;
+      }
+
+      if (input.esrbRating !== undefined) {
+        updateData.esrbRating = input.esrbRating?.trim() || null;
+      }
+
+      if (input.screenshots !== undefined) {
+        updateData.screenshots = input.screenshots ?? [];
       }
 
       if (input.platformId !== undefined) {
