@@ -1,5 +1,68 @@
 import { builder } from "../builder.js";
 
+// Public user profile by ID
+builder.queryField("user", (t) =>
+  t.prismaField({
+    type: "User",
+    nullable: true,
+    args: {
+      id: t.arg.id({ required: true }),
+    },
+    resolve: async (query, _root, args, ctx) => {
+      return ctx.prisma.user.findUnique({
+        ...query,
+        where: { id: args.id },
+      });
+    },
+  })
+);
+
+// Public user achievements (paginated)
+builder.queryField("userAchievements", (t) =>
+  t.prismaConnection({
+    type: "UserAchievement",
+    cursor: "id",
+    args: {
+      userId: t.arg.id({ required: true }),
+    },
+    totalCount: (_connection, args, ctx) => {
+      return ctx.prisma.userAchievement.count({
+        where: { userId: args.userId },
+      });
+    },
+    resolve: async (query, _root, args, ctx) => {
+      return ctx.prisma.userAchievement.findMany({
+        ...query,
+        where: { userId: args.userId },
+        orderBy: { createdAt: "desc" },
+      });
+    },
+  })
+);
+
+// Public user trophies (paginated)
+builder.queryField("userTrophies", (t) =>
+  t.prismaConnection({
+    type: "Trophy",
+    cursor: "id",
+    args: {
+      userId: t.arg.id({ required: true }),
+    },
+    totalCount: (_connection, args, ctx) => {
+      return ctx.prisma.trophy.count({
+        where: { userId: args.userId },
+      });
+    },
+    resolve: async (query, _root, args, ctx) => {
+      return ctx.prisma.trophy.findMany({
+        ...query,
+        where: { userId: args.userId },
+        orderBy: { createdAt: "desc" },
+      });
+    },
+  })
+);
+
 // Current authenticated user
 builder.queryField("me", (t) =>
   t.prismaField({
