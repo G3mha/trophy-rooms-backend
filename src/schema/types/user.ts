@@ -1,8 +1,29 @@
 import { builder } from "../builder.js";
-import { UserRole } from "@prisma/client";
+import { UserRole, AchievementTier } from "@prisma/client";
 
 builder.enumType(UserRole, {
   name: "UserRole",
+});
+
+// User stats object for detailed statistics
+const UserStats = builder.objectRef<{
+  totalPoints: number;
+  goldCount: number;
+  silverCount: number;
+  bronzeCount: number;
+  completionRate: number;
+  averagePointsPerGame: number;
+}>("UserStats");
+
+UserStats.implement({
+  fields: (t) => ({
+    totalPoints: t.exposeInt("totalPoints"),
+    goldCount: t.exposeInt("goldCount"),
+    silverCount: t.exposeInt("silverCount"),
+    bronzeCount: t.exposeInt("bronzeCount"),
+    completionRate: t.exposeFloat("completionRate"),
+    averagePointsPerGame: t.exposeFloat("averagePointsPerGame"),
+  }),
 });
 
 builder.prismaObject("User", {
@@ -42,6 +63,79 @@ builder.prismaObject("User", {
           result.map((r) => r.achievement.achievementSet.gameId)
         );
         return uniqueGameIds.size;
+      },
+    }),
+    // Detailed user statistics
+    stats: t.field({
+      type: UserStats,
+      resolve: async (user, _args, ctx) => {
+        const userAchievements = await ctx.prisma.userAchievement.findMany({
+          where: { userId: user.id },
+          select: {
+            achievement: {
+              select: {
+                points: true,
+                tier: true,
+                achievementSet: {
+                  select: { gameId: true },
+                },
+              },
+            },
+          },
+        });
+
+        let totalPoints = 0;
+        let goldCount = 0;
+        let silverCount = 0;
+        let bronzeCount = 0;
+        const gameIds = new Set<string>();
+
+        for (const ua of userAchievements) {
+          totalPoints += ua.achievement.points;
+          gameIds.add(ua.achievement.achievementSet.gameId);
+
+          switch (ua.achievement.tier) {
+            case AchievementTier.GOLD:
+              goldCount++;
+              break;
+            case AchievementTier.SILVER:
+              silverCount++;
+              break;
+            case AchievementTier.BRONZE:
+            default:
+              bronzeCount++;
+              break;
+          }
+        }
+
+        const trophyCount = await ctx.prisma.trophy.count({
+          where: { userId: user.id },
+        });
+
+        const gamesPlayed = gameIds.size;
+        const completionRate = gamesPlayed > 0 ? (trophyCount / gamesPlayed) * 100 : 0;
+        const averagePointsPerGame = gamesPlayed > 0 ? totalPoints / gamesPlayed : 0;
+
+        return {
+          totalPoints,
+          goldCount,
+          silverCount,
+          bronzeCount,
+          completionRate: Math.round(completionRate * 10) / 10,
+          averagePointsPerGame: Math.round(averagePointsPerGame),
+        };
+      },
+    }),
+    // Recent activity (last 10 achievements)
+    recentAchievements: t.prismaField({
+      type: ["UserAchievement"],
+      resolve: async (query, user, _args, ctx) => {
+        return ctx.prisma.userAchievement.findMany({
+          ...query,
+          where: { userId: user.id },
+          orderBy: { createdAt: "desc" },
+          take: 10,
+        });
       },
     }),
     createdAt: t.expose("createdAt", { type: "DateTime" }),
