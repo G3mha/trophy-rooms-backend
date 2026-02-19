@@ -1,4 +1,4 @@
-import { builder } from "../builder.js";
+import { builder, MutationErrorRef } from "../builder.js";
 import { ErrorCode, MutationError } from "../../lib/errors.js";
 import { requireAuth } from "../../context.js";
 
@@ -13,9 +13,10 @@ WishlistMutationResult.implement({
   fields: (t) => ({
     success: t.exposeBoolean("success"),
     wishlistId: t.exposeString("wishlistId", { nullable: true }),
-    error: t.expose("error", {
-      type: builder.objectRef<MutationError>("MutationError"),
+    error: t.field({
+      type: MutationErrorRef,
       nullable: true,
+      resolve: (result) => result.error,
     }),
   }),
 });
@@ -29,9 +30,10 @@ const WishlistDeleteResult = builder.objectRef<{
 WishlistDeleteResult.implement({
   fields: (t) => ({
     success: t.exposeBoolean("success"),
-    error: t.expose("error", {
-      type: builder.objectRef<MutationError>("MutationError"),
+    error: t.field({
+      type: MutationErrorRef,
       nullable: true,
+      resolve: (result) => result.error,
     }),
   }),
 });
