@@ -6,3 +6,4 @@ export * from "./user-achievement.js";
 export * from "./trophy.js";
 export * from "./platform.js";
 export * from "./achievement-set.js";
+export * from "./user-game.js";
