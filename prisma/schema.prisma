@@ -37,6 +37,15 @@ enum AchievementTier {
   GOLD
 }
 
+enum GameStatus {
+  WISHLIST
+  BACKLOG
+  PLAYING
+  PAUSED
+  COMPLETED
+  DROPPED
+}
+
 model User {
   id           String            @id @default(cuid())
   clerkId      String            @unique
@@ -45,7 +54,7 @@ model User {
   role         UserRole          @default(USER)
   achievements UserAchievement[]
   trophies     Trophy[]
-  wishlist     Wishlist[]
+  userGames    UserGame[]
   achievementSets AchievementSet[] @relation("AchievementSetCreator")
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
@@ -77,7 +86,7 @@ model Game {
   platformId      String?
   achievementSets AchievementSet[]
   trophies        Trophy[]
-  wishlistedBy    Wishlist[]
+  userGames       UserGame[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
@@ -146,15 +155,18 @@ model Trophy {
   @@index([gameId])
 }
 
-model Wishlist {
-  id        String   @id @default(cuid())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+model UserGame {
+  id        String     @id @default(cuid())
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    String
-  game      Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  game      Game       @relation(fields: [gameId], references: [id], onDelete: Cascade)
   gameId    String
-  createdAt DateTime @default(now())
+  status    GameStatus
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
 
   @@unique([userId, gameId])
   @@index([userId])
   @@index([gameId])
+  @@index([userId, status])
 }
