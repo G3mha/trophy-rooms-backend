@@ -1,17 +1,20 @@
 import { builder } from "../builder.js";
+import { GameStatusEnum } from "../types/user-game.js";
 
-// Wishlist item type (game with wishlist metadata)
-const WishlistItem = builder.objectRef<{
+// UserGame item type with game info (for listing)
+const UserGameItem = builder.objectRef<{
   id: string;
   gameId: string;
   gameTitle: string;
   gameCoverUrl: string | null;
   gameDescription: string | null;
   achievementCount: number;
+  status: "WISHLIST" | "BACKLOG" | "PLAYING" | "PAUSED" | "COMPLETED" | "DROPPED";
   addedAt: Date;
-}>("WishlistItem");
+  updatedAt: Date;
+}>("UserGameItem");
 
-WishlistItem.implement({
+UserGameItem.implement({
   fields: (t) => ({
     id: t.exposeString("id"),
     gameId: t.exposeString("gameId"),
@@ -19,22 +22,57 @@ WishlistItem.implement({
     gameCoverUrl: t.exposeString("gameCoverUrl", { nullable: true }),
     gameDescription: t.exposeString("gameDescription", { nullable: true }),
     achievementCount: t.exposeInt("achievementCount"),
+    status: t.expose("status", { type: GameStatusEnum }),
     addedAt: t.expose("addedAt", { type: "DateTime" }),
+    updatedAt: t.expose("updatedAt", { type: "DateTime" }),
   }),
 });
 
-// Get current user's wishlist
-builder.queryField("myWishlist", (t) =>
+// Get game status for a specific game
+builder.queryField("getGameStatus", (t) =>
   t.field({
-    type: [WishlistItem],
-    resolve: async (_root, _args, ctx) => {
+    type: GameStatusEnum,
+    nullable: true,
+    args: {
+      gameId: t.arg.id({ required: true }),
+    },
+    resolve: async (_root, args, ctx) => {
+      if (!ctx.user) {
+        return null;
+      }
+
+      const userGame = await ctx.prisma.userGame.findUnique({
+        where: {
+          userId_gameId: {
+            userId: ctx.user.id,
+            gameId: args.gameId,
+          },
+        },
+      });
+
+      return userGame?.status ?? null;
+    },
+  })
+);
+
+// Get all games in the user's library (optionally filtered by status)
+builder.queryField("myGamesByStatus", (t) =>
+  t.field({
+    type: [UserGameItem],
+    args: {
+      status: t.arg({ type: GameStatusEnum, required: false }),
+    },
+    resolve: async (_root, args, ctx) => {
       if (!ctx.user) {
         return [];
       }
 
-      const wishlistItems = await ctx.prisma.wishlist.findMany({
-        where: { userId: ctx.user.id },
-        orderBy: { createdAt: "desc" },
+      const userGames = await ctx.prisma.userGame.findMany({
+        where: {
+          userId: ctx.user.id,
+          ...(args.status ? { status: args.status } : {}),
+        },
+        orderBy: { updatedAt: "desc" },
         include: {
           game: {
             select: {
@@ -42,18 +80,14 @@ builder.queryField("myWishlist", (t) =>
               title: true,
               coverUrl: true,
               description: true,
-              _count: {
-                select: {
-                  achievementSets: true,
-                },
-              },
             },
           },
         },
       });
 
       // Get achievement counts for each game
-      const gameIds = wishlistItems.map((item) => item.game.id);
+      const gameIds = userGames.map((item) => item.game.id);
+
       const achievementCounts = await ctx.prisma.achievement.groupBy({
         by: ["achievementSetId"],
         where: {
@@ -83,47 +117,23 @@ builder.queryField("myWishlist", (t) =>
         }
       }
 
-      return wishlistItems.map((item) => ({
+      return userGames.map((item) => ({
         id: item.id,
         gameId: item.game.id,
         gameTitle: item.game.title,
         gameCoverUrl: item.game.coverUrl,
         gameDescription: item.game.description,
         achievementCount: gameAchievementMap.get(item.game.id) || 0,
+        status: item.status,
         addedAt: item.createdAt,
+        updatedAt: item.updatedAt,
       }));
     },
   })
 );
 
-// Check if a game is in the current user's wishlist
-builder.queryField("isGameInWishlist", (t) =>
-  t.field({
-    type: "Boolean",
-    args: {
-      gameId: t.arg.id({ required: true }),
-    },
-    resolve: async (_root, args, ctx) => {
-      if (!ctx.user) {
-        return false;
-      }
-
-      const existing = await ctx.prisma.wishlist.findUnique({
-        where: {
-          userId_gameId: {
-            userId: ctx.user.id,
-            gameId: args.gameId,
-          },
-        },
-      });
-
-      return existing !== null;
-    },
-  })
-);
-
-// Get wishlist count for current user
-builder.queryField("wishlistCount", (t) =>
+// Get library count (total games in library)
+builder.queryField("libraryCount", (t) =>
   t.field({
     type: "Int",
     resolve: async (_root, _args, ctx) => {
@@ -131,8 +141,30 @@ builder.queryField("wishlistCount", (t) =>
         return 0;
       }
 
-      return ctx.prisma.wishlist.count({
+      return ctx.prisma.userGame.count({
         where: { userId: ctx.user.id },
+      });
+    },
+  })
+);
+
+// Get count by status
+builder.queryField("libraryCountByStatus", (t) =>
+  t.field({
+    type: "Int",
+    args: {
+      status: t.arg({ type: GameStatusEnum, required: true }),
+    },
+    resolve: async (_root, args, ctx) => {
+      if (!ctx.user) {
+        return 0;
+      }
+
+      return ctx.prisma.userGame.count({
+        where: {
+          userId: ctx.user.id,
+          status: args.status,
+        },
       });
     },
   })
