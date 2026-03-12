@@ -5,4 +5,4 @@ import "./user-achievements.js";
 import "./platforms.js";
 import "./achievement-sets.js";
 import "./users.js";
-import "./wishlist.js";
+import "./user-game.js";
