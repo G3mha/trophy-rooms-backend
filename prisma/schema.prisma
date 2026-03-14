@@ -46,29 +46,38 @@ enum GameStatus {
   DROPPED
 }
 
+enum GameRegion {
+  NTSC_U    // North America
+  PAL       // Europe/Australia
+  NTSC_J    // Japan
+  OTHER
+}
+
 model User {
-  id           String            @id @default(cuid())
-  clerkId      String            @unique
-  email        String            @unique
-  name         String?
-  role         UserRole          @default(USER)
-  achievements UserAchievement[]
-  trophies     Trophy[]
-  userGames    UserGame[]
+  id              String            @id @default(cuid())
+  clerkId         String            @unique
+  email           String            @unique
+  name            String?
+  role            UserRole          @default(USER)
+  achievements    UserAchievement[]
+  trophies        Trophy[]
+  userGames       UserGame[]
+  collectionItems CollectionItem[]
   achievementSets AchievementSet[] @relation("AchievementSetCreator")
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
 
   @@index([clerkId])
 }
 
 model Platform {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  slug      String   @unique
-  games     Game[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String           @id @default(cuid())
+  name            String           @unique
+  slug            String           @unique
+  games           Game[]
+  collectionItems CollectionItem[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 }
 
 model Game {
@@ -87,6 +96,7 @@ model Game {
   achievementSets AchievementSet[]
   trophies        Trophy[]
   userGames       UserGame[]
+  collectionItems CollectionItem[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
@@ -169,4 +179,32 @@ model UserGame {
   @@index([userId])
   @@index([gameId])
   @@index([userId, status])
+}
+
+model CollectionItem {
+  id         String     @id @default(cuid())
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+  game       Game       @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  gameId     String
+  platform   Platform?  @relation(fields: [platformId], references: [id])
+  platformId String?
+
+  // Physical components
+  hasDisc   Boolean    @default(false)
+  hasBox    Boolean    @default(false)
+  hasManual Boolean    @default(false)
+  hasExtras Boolean    @default(false)
+
+  // Status
+  isSealed  Boolean    @default(false)
+  region    GameRegion @default(NTSC_U)
+  notes     String?
+
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@index([userId])
+  @@index([gameId])
+  @@index([userId, gameId])
 }
