@@ -6,3 +6,4 @@ import "./platforms.js";
 import "./achievement-sets.js";
 import "./users.js";
 import "./user-game.js";
+import "./collection-items.js";
