@@ -13,6 +13,8 @@ builder.prismaObject("UserGame", {
     userId: t.exposeString("userId"),
     game: t.relation("game"),
     gameId: t.exposeString("gameId"),
+    platform: t.relation("platform", { nullable: true }),
+    platformId: t.exposeString("platformId", { nullable: true }),
     status: t.expose("status", { type: GameStatusEnum }),
     createdAt: t.expose("createdAt", { type: "DateTime" }),
     updatedAt: t.expose("updatedAt", { type: "DateTime" }),
