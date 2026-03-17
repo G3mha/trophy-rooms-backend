@@ -9,6 +9,9 @@ const UserGameItem = builder.objectRef<{
   gameCoverUrl: string | null;
   gameDescription: string | null;
   achievementCount: number;
+  platformId: string | null;
+  platformName: string | null;
+  platformSlug: string | null;
   status: "WISHLIST" | "BACKLOG" | "PLAYING" | "PAUSED" | "COMPLETED" | "DROPPED";
   addedAt: Date;
   updatedAt: Date;
@@ -22,16 +25,32 @@ UserGameItem.implement({
     gameCoverUrl: t.exposeString("gameCoverUrl", { nullable: true }),
     gameDescription: t.exposeString("gameDescription", { nullable: true }),
     achievementCount: t.exposeInt("achievementCount"),
+    platformId: t.exposeString("platformId", { nullable: true }),
+    platformName: t.exposeString("platformName", { nullable: true }),
+    platformSlug: t.exposeString("platformSlug", { nullable: true }),
     status: t.expose("status", { type: GameStatusEnum }),
     addedAt: t.expose("addedAt", { type: "DateTime" }),
     updatedAt: t.expose("updatedAt", { type: "DateTime" }),
   }),
 });
 
+// GameStatusInfo type for getGameStatus query
+const GameStatusInfo = builder.objectRef<{
+  status: "WISHLIST" | "BACKLOG" | "PLAYING" | "PAUSED" | "COMPLETED" | "DROPPED";
+  platformId: string | null;
+}>("GameStatusInfo");
+
+GameStatusInfo.implement({
+  fields: (t) => ({
+    status: t.expose("status", { type: GameStatusEnum }),
+    platformId: t.exposeString("platformId", { nullable: true }),
+  }),
+});
+
 // Get game status for a specific game
 builder.queryField("getGameStatus", (t) =>
   t.field({
-    type: GameStatusEnum,
+    type: GameStatusInfo,
     nullable: true,
     args: {
       gameId: t.arg.id({ required: true }),
@@ -50,7 +69,14 @@ builder.queryField("getGameStatus", (t) =>
         },
       });
 
-      return userGame?.status ?? null;
+      if (!userGame) {
+        return null;
+      }
+
+      return {
+        status: userGame.status,
+        platformId: userGame.platformId,
+      };
     },
   })
 );
@@ -80,6 +106,13 @@ builder.queryField("myGamesByStatus", (t) =>
               title: true,
               coverUrl: true,
               description: true,
+            },
+          },
+          platform: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
             },
           },
         },
@@ -124,6 +157,9 @@ builder.queryField("myGamesByStatus", (t) =>
         gameCoverUrl: item.game.coverUrl,
         gameDescription: item.game.description,
         achievementCount: gameAchievementMap.get(item.game.id) || 0,
+        platformId: item.platform?.id ?? null,
+        platformName: item.platform?.name ?? null,
+        platformSlug: item.platform?.slug ?? null,
         status: item.status,
         addedAt: item.createdAt,
         updatedAt: item.updatedAt,
