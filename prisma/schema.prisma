@@ -76,6 +76,7 @@ model Platform {
   slug            String           @unique
   games           Game[]
   collectionItems CollectionItem[]
+  userGames       UserGame[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 }
@@ -166,18 +167,21 @@ model Trophy {
 }
 
 model UserGame {
-  id        String     @id @default(cuid())
-  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId    String
-  game      Game       @relation(fields: [gameId], references: [id], onDelete: Cascade)
-  gameId    String
-  status    GameStatus
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  id         String     @id @default(cuid())
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+  game       Game       @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  gameId     String
+  platform   Platform?  @relation(fields: [platformId], references: [id])
+  platformId String?
+  status     GameStatus
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
 
   @@unique([userId, gameId])
   @@index([userId])
   @@index([gameId])
+  @@index([platformId])
   @@index([userId, status])
 }
 
