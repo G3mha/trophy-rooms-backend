@@ -9,6 +9,7 @@ const UserGameMutationResult = builder.objectRef<{
   success: boolean;
   userGameId: string | null;
   status: GameStatus | null;
+  platformId: string | null;
   error: { code: ErrorCode; message: string; field: string | null } | null;
 }>("UserGameMutationResult");
 
@@ -21,6 +22,7 @@ UserGameMutationResult.implement({
       nullable: true,
       resolve: (result) => result.status,
     }),
+    platformId: t.exposeString("platformId", { nullable: true }),
     error: t.field({
       type: MutationErrorRef,
       nullable: true,
@@ -53,6 +55,7 @@ builder.mutationField("setGameStatus", (t) =>
     args: {
       gameId: t.arg.id({ required: true }),
       status: t.arg({ type: GameStatusEnum, required: true }),
+      platformId: t.arg.id({ required: false }),
     },
     resolve: async (_root, args, ctx) => {
       // Require authentication
@@ -64,6 +67,7 @@ builder.mutationField("setGameStatus", (t) =>
           success: false,
           userGameId: null,
           status: null,
+          platformId: null,
           error: {
             code: ErrorCode.UNAUTHORIZED,
             message: "You must be logged in to set game status",
@@ -72,7 +76,7 @@ builder.mutationField("setGameStatus", (t) =>
         };
       }
 
-      const { gameId, status } = args;
+      const { gameId, status, platformId } = args;
 
       // Check if game exists
       const game = await ctx.prisma.game.findUnique({
@@ -84,12 +88,34 @@ builder.mutationField("setGameStatus", (t) =>
           success: false,
           userGameId: null,
           status: null,
+          platformId: null,
           error: {
             code: ErrorCode.NOT_FOUND,
             message: `Game with id "${gameId}" not found`,
             field: "gameId",
           },
         };
+      }
+
+      // Validate platform if provided
+      if (platformId) {
+        const platform = await ctx.prisma.platform.findUnique({
+          where: { id: platformId },
+        });
+
+        if (!platform) {
+          return {
+            success: false,
+            userGameId: null,
+            status: null,
+            platformId: null,
+            error: {
+              code: ErrorCode.NOT_FOUND,
+              message: `Platform with id "${platformId}" not found`,
+              field: "platformId",
+            },
+          };
+        }
       }
 
       // Upsert the user game entry
@@ -102,11 +128,13 @@ builder.mutationField("setGameStatus", (t) =>
         },
         update: {
           status,
+          platformId: platformId ?? null,
         },
         create: {
           userId: user.id,
           gameId,
           status,
+          platformId: platformId ?? null,
         },
       });
 
@@ -114,6 +142,7 @@ builder.mutationField("setGameStatus", (t) =>
         success: true,
         userGameId: userGame.id,
         status: userGame.status,
+        platformId: userGame.platformId,
         error: null,
       };
     },
