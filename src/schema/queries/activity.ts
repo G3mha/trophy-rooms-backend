@@ -67,6 +67,8 @@ const CombinedActivityEntry = builder.objectRef<{
   achievementPoints?: number;
   gameId: string;
   gameTitle: string;
+  platformName?: string;
+  platformSlug?: string;
   earnedAt: Date;
 }>("CombinedActivityEntry");
 
@@ -83,6 +85,8 @@ CombinedActivityEntry.implement({
     achievementPoints: t.exposeInt("achievementPoints", { nullable: true }),
     gameId: t.exposeString("gameId"),
     gameTitle: t.exposeString("gameTitle"),
+    platformName: t.exposeString("platformName", { nullable: true }),
+    platformSlug: t.exposeString("platformSlug", { nullable: true }),
     earnedAt: t.expose("earnedAt", { type: "DateTime" }),
   }),
 });
@@ -113,7 +117,13 @@ builder.queryField("recentAchievementActivity", (t) =>
               achievementSet: {
                 select: {
                   game: {
-                    select: { id: true, title: true },
+                    select: {
+                      id: true,
+                      title: true,
+                      platform: {
+                        select: { name: true, slug: true },
+                      },
+                    },
                   },
                 },
               },
@@ -203,7 +213,13 @@ builder.queryField("activityFeed", (t) =>
                 achievementSet: {
                   select: {
                     game: {
-                      select: { id: true, title: true },
+                      select: {
+                        id: true,
+                        title: true,
+                        platform: {
+                          select: { name: true, slug: true },
+                        },
+                      },
                     },
                   },
                 },
@@ -219,7 +235,13 @@ builder.queryField("activityFeed", (t) =>
               select: { id: true, name: true, email: true },
             },
             game: {
-              select: { id: true, title: true },
+              select: {
+                id: true,
+                title: true,
+                platform: {
+                  select: { name: true, slug: true },
+                },
+              },
             },
           },
         }),
@@ -238,6 +260,8 @@ builder.queryField("activityFeed", (t) =>
         achievementPoints?: number;
         gameId: string;
         gameTitle: string;
+        platformName?: string;
+        platformSlug?: string;
         earnedAt: Date;
       }> = achievements.map((ua) => ({
         id: `achievement-${ua.id}`,
@@ -251,6 +275,8 @@ builder.queryField("activityFeed", (t) =>
         achievementPoints: ua.achievement.points,
         gameId: ua.achievement.achievementSet.game.id,
         gameTitle: ua.achievement.achievementSet.game.title,
+        platformName: ua.achievement.achievementSet.game.platform?.name,
+        platformSlug: ua.achievement.achievementSet.game.platform?.slug,
         earnedAt: ua.createdAt,
       }));
 
@@ -266,6 +292,8 @@ builder.queryField("activityFeed", (t) =>
         achievementPoints?: number;
         gameId: string;
         gameTitle: string;
+        platformName?: string;
+        platformSlug?: string;
         earnedAt: Date;
       }> = trophies.map((t) => ({
         id: `trophy-${t.id}`,
@@ -275,6 +303,8 @@ builder.queryField("activityFeed", (t) =>
         userEmail: t.user.email,
         gameId: t.game.id,
         gameTitle: t.game.title,
+        platformName: t.game.platform?.name,
+        platformSlug: t.game.platform?.slug,
         earnedAt: t.createdAt,
       }));
 
