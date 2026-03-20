@@ -98,6 +98,7 @@ model Game {
   trophies        Trophy[]
   userGames       UserGame[]
   collectionItems CollectionItem[]
+  versions        GameVersion[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
@@ -105,20 +106,47 @@ model Game {
   @@index([platformId])
 }
 
+model GameVersion {
+  id              String           @id @default(cuid())
+  name            String           // "Standard", "Deluxe Edition"
+  slug            String           // "standard", "deluxe"
+  description     String?
+  coverUrl        String?          // Fallback to game.coverUrl if null
+  releaseDate     DateTime?
+  includedDlc     String[]         // DLC names included
+  isDefault       Boolean          @default(false)
+
+  game            Game             @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  gameId          String
+
+  achievementSets AchievementSet[]
+  userGames       UserGame[]
+  collectionItems CollectionItem[]
+
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@unique([gameId, slug])
+  @@index([gameId])
+}
+
 model AchievementSet {
-  id           String             @id @default(cuid())
-  title        String
-  type         AchievementSetType @default(OFFICIAL)
-  visibility   AchievementSetVisibility @default(PRIVATE)
-  game         Game               @relation(fields: [gameId], references: [id], onDelete: Cascade)
-  gameId       String
-  createdBy    User?              @relation("AchievementSetCreator", fields: [createdByUserId], references: [id])
+  id              String             @id @default(cuid())
+  title           String
+  type            AchievementSetType @default(OFFICIAL)
+  visibility      AchievementSetVisibility @default(PRIVATE)
+  game            Game               @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  gameId          String
+  gameVersion     GameVersion?       @relation(fields: [gameVersionId], references: [id], onDelete: SetNull)
+  gameVersionId   String?
+  createdBy       User?              @relation("AchievementSetCreator", fields: [createdByUserId], references: [id])
   createdByUserId String?
-  achievements Achievement[]
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
+  achievements    Achievement[]
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
 
   @@index([gameId])
+  @@index([gameVersionId])
   @@index([createdByUserId])
   @@unique([gameId, title, type, createdByUserId])
 }
@@ -167,32 +195,37 @@ model Trophy {
 }
 
 model UserGame {
-  id         String     @id @default(cuid())
-  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId     String
-  game       Game       @relation(fields: [gameId], references: [id], onDelete: Cascade)
-  gameId     String
-  platform   Platform?  @relation(fields: [platformId], references: [id])
-  platformId String?
-  status     GameStatus
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
+  id            String       @id @default(cuid())
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId        String
+  game          Game         @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  gameId        String
+  platform      Platform?    @relation(fields: [platformId], references: [id])
+  platformId    String?
+  gameVersion   GameVersion? @relation(fields: [gameVersionId], references: [id], onDelete: SetNull)
+  gameVersionId String?
+  status        GameStatus
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 
   @@unique([userId, gameId])
   @@index([userId])
   @@index([gameId])
   @@index([platformId])
+  @@index([gameVersionId])
   @@index([userId, status])
 }
 
 model CollectionItem {
-  id         String     @id @default(cuid())
-  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId     String
-  game       Game       @relation(fields: [gameId], references: [id], onDelete: Cascade)
-  gameId     String
-  platform   Platform?  @relation(fields: [platformId], references: [id])
-  platformId String?
+  id            String       @id @default(cuid())
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId        String
+  game          Game         @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  gameId        String
+  platform      Platform?    @relation(fields: [platformId], references: [id])
+  platformId    String?
+  gameVersion   GameVersion? @relation(fields: [gameVersionId], references: [id], onDelete: SetNull)
+  gameVersionId String?
 
   // Physical components
   hasDisc   Boolean    @default(false)
@@ -210,5 +243,6 @@ model CollectionItem {
 
   @@index([userId])
   @@index([gameId])
+  @@index([gameVersionId])
   @@index([userId, gameId])
 }
