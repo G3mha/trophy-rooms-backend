@@ -19,6 +19,8 @@ builder.prismaObject("AchievementSet", {
     visibility: t.expose("visibility", { type: AchievementSetVisibility }),
     game: t.relation("game"),
     gameId: t.exposeString("gameId"),
+    gameVersion: t.relation("gameVersion", { nullable: true }),
+    gameVersionId: t.exposeString("gameVersionId", { nullable: true }),
     createdBy: t.relation("createdBy", { nullable: true }),
     createdByUserId: t.exposeString("createdByUserId", { nullable: true }),
     achievements: t.relation("achievements", {
@@ -39,6 +41,7 @@ export const CreateAchievementSetInput = builder.inputType(
       title: t.string({ required: true }),
       type: t.field({ type: AchievementSetType, required: true }),
       gameId: t.id({ required: true }),
+      gameVersionId: t.id(),
     }),
   }
 );

@@ -15,6 +15,8 @@ builder.prismaObject("CollectionItem", {
     gameId: t.exposeString("gameId"),
     platform: t.relation("platform", { nullable: true }),
     platformId: t.exposeString("platformId", { nullable: true }),
+    gameVersion: t.relation("gameVersion", { nullable: true }),
+    gameVersionId: t.exposeString("gameVersionId", { nullable: true }),
     hasDisc: t.exposeBoolean("hasDisc"),
     hasBox: t.exposeBoolean("hasBox"),
     hasManual: t.exposeBoolean("hasManual"),

@@ -25,6 +25,22 @@ builder.prismaObject("Game", {
         orderBy: { createdAt: "desc" },
       },
     }),
+    versions: t.relation("versions", {
+      query: {
+        orderBy: [{ isDefault: "desc" }, { name: "asc" }],
+      },
+    }),
+    versionCount: t.relationCount("versions"),
+    defaultVersion: t.prismaField({
+      type: "GameVersion",
+      nullable: true,
+      resolve: async (query, game, _args, ctx) => {
+        return ctx.prisma.gameVersion.findFirst({
+          ...query,
+          where: { gameId: game.id, isDefault: true },
+        });
+      },
+    }),
     // Return 0 for now to avoid N+1 performance issues
     achievementSetCount: t.int({
       resolve: () => 0,
