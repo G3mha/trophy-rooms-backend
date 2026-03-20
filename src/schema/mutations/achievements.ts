@@ -1,4 +1,4 @@
-import { builder } from "../builder.js";
+import { builder, BulkDeleteResultRef } from "../builder.js";
 import { ErrorCode } from "../../lib/errors.js";
 import {
   CreateAchievementInput,
@@ -447,6 +447,62 @@ builder.mutationField("bulkCreateAchievements", (t) =>
         success: true,
         createdCount: result.count,
         skippedCount: normalized.length - result.count,
+        error: null,
+      };
+    },
+  })
+);
+
+builder.mutationField("bulkDeleteAchievements", (t) =>
+  t.field({
+    type: BulkDeleteResultRef,
+    args: {
+      ids: t.arg.idList({ required: true }),
+    },
+    resolve: async (_root, { ids }, ctx) => {
+      if (!ctx.user) {
+        return {
+          success: false,
+          deletedCount: 0,
+          error: {
+            code: ErrorCode.UNAUTHORIZED,
+            message: "You must be logged in to delete achievements",
+            field: null,
+          },
+        };
+      }
+
+      if (!hasRequiredRole(ctx.user, UserRole.TRUSTED)) {
+        return {
+          success: false,
+          deletedCount: 0,
+          error: {
+            code: ErrorCode.FORBIDDEN,
+            message: "You do not have permission to delete achievements",
+            field: null,
+          },
+        };
+      }
+
+      if (ids.length === 0) {
+        return {
+          success: false,
+          deletedCount: 0,
+          error: {
+            code: ErrorCode.VALIDATION_ERROR,
+            message: "At least one achievement ID is required",
+            field: "ids",
+          },
+        };
+      }
+
+      const result = await ctx.prisma.achievement.deleteMany({
+        where: { id: { in: ids } },
+      });
+
+      return {
+        success: true,
+        deletedCount: result.count,
         error: null,
       };
     },

@@ -1,4 +1,4 @@
-import { builder } from "../builder.js";
+import { builder, BulkDeleteResultRef } from "../builder.js";
 import {
   CreateAchievementSetInput,
   UpdateAchievementSetInput,
@@ -504,6 +504,62 @@ builder.mutationField("setAchievementSetType", (t) =>
       return {
         success: true,
         achievementSetId: updated.id,
+        error: null,
+      };
+    },
+  })
+);
+
+builder.mutationField("bulkDeleteAchievementSets", (t) =>
+  t.field({
+    type: BulkDeleteResultRef,
+    args: {
+      ids: t.arg.idList({ required: true }),
+    },
+    resolve: async (_root, { ids }, ctx) => {
+      if (!ctx.user) {
+        return {
+          success: false,
+          deletedCount: 0,
+          error: {
+            code: ErrorCode.UNAUTHORIZED,
+            message: "You must be logged in to delete achievement sets",
+            field: null,
+          },
+        };
+      }
+
+      if (!hasRequiredRole(ctx.user, UserRole.TRUSTED)) {
+        return {
+          success: false,
+          deletedCount: 0,
+          error: {
+            code: ErrorCode.FORBIDDEN,
+            message: "You do not have permission to delete achievement sets",
+            field: null,
+          },
+        };
+      }
+
+      if (ids.length === 0) {
+        return {
+          success: false,
+          deletedCount: 0,
+          error: {
+            code: ErrorCode.VALIDATION_ERROR,
+            message: "At least one achievement set ID is required",
+            field: "ids",
+          },
+        };
+      }
+
+      const result = await ctx.prisma.achievementSet.deleteMany({
+        where: { id: { in: ids } },
+      });
+
+      return {
+        success: true,
+        deletedCount: result.count,
         error: null,
       };
     },

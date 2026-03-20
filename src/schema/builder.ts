@@ -65,6 +65,25 @@ MutationErrorRef.implement({
   }),
 });
 
+// Bulk delete result type for admin operations
+export const BulkDeleteResultRef = builder.objectRef<{
+  success: boolean;
+  deletedCount: number;
+  error: { code: ErrorCode; message: string; field: string | null } | null;
+}>("BulkDeleteResult");
+
+BulkDeleteResultRef.implement({
+  fields: (t) => ({
+    success: t.exposeBoolean("success"),
+    deletedCount: t.exposeInt("deletedCount"),
+    error: t.field({
+      type: MutationErrorRef,
+      nullable: true,
+      resolve: (result) => result.error,
+    }),
+  }),
+});
+
 // Initialize query and mutation types
 builder.queryType({});
 builder.mutationType({});
