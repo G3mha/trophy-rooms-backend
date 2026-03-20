@@ -66,6 +66,7 @@ const AddToCollectionInput = builder.inputType("AddToCollectionInput", {
   fields: (t) => ({
     gameId: t.id({ required: true }),
     platformId: t.id({ required: false }),
+    gameVersionId: t.id({ required: false }),
     hasDisc: t.boolean({ required: false, defaultValue: false }),
     hasBox: t.boolean({ required: false, defaultValue: false }),
     hasManual: t.boolean({ required: false, defaultValue: false }),
@@ -80,6 +81,7 @@ const AddToCollectionInput = builder.inputType("AddToCollectionInput", {
 const UpdateCollectionItemInput = builder.inputType("UpdateCollectionItemInput", {
   fields: (t) => ({
     platformId: t.id({ required: false }),
+    gameVersionId: t.id({ required: false }),
     hasDisc: t.boolean({ required: false }),
     hasBox: t.boolean({ required: false }),
     hasManual: t.boolean({ required: false }),
@@ -114,7 +116,7 @@ builder.mutationField("addToCollection", (t) =>
         };
       }
 
-      const { gameId, platformId, hasDisc, hasBox, hasManual, hasExtras, isSealed, region, notes } = args.input;
+      const { gameId, platformId, gameVersionId, hasDisc, hasBox, hasManual, hasExtras, isSealed, region, notes } = args.input;
 
       // Check if game exists
       const game = await ctx.prisma.game.findUnique({
@@ -152,12 +154,45 @@ builder.mutationField("addToCollection", (t) =>
         }
       }
 
+      // Check if game version exists (if provided)
+      if (gameVersionId) {
+        const version = await ctx.prisma.gameVersion.findUnique({
+          where: { id: gameVersionId },
+        });
+
+        if (!version) {
+          return {
+            success: false,
+            collectionItem: null,
+            error: {
+              code: ErrorCode.NOT_FOUND,
+              message: `Game version with id "${gameVersionId}" not found`,
+              field: "gameVersionId",
+            },
+          };
+        }
+
+        // Ensure version belongs to the specified game
+        if (version.gameId !== gameId) {
+          return {
+            success: false,
+            collectionItem: null,
+            error: {
+              code: ErrorCode.VALIDATION_ERROR,
+              message: "Game version does not belong to the specified game",
+              field: "gameVersionId",
+            },
+          };
+        }
+      }
+
       // Create the collection item
       const collectionItem = await ctx.prisma.collectionItem.create({
         data: {
           userId: user.id,
           gameId,
           platformId: platformId ?? null,
+          gameVersionId: gameVersionId ?? null,
           hasDisc: hasDisc ?? false,
           hasBox: hasBox ?? false,
           hasManual: hasManual ?? false,
@@ -252,9 +287,42 @@ builder.mutationField("updateCollectionItem", (t) =>
         }
       }
 
+      // Check if game version exists (if provided)
+      if (input.gameVersionId) {
+        const version = await ctx.prisma.gameVersion.findUnique({
+          where: { id: input.gameVersionId },
+        });
+
+        if (!version) {
+          return {
+            success: false,
+            collectionItem: null,
+            error: {
+              code: ErrorCode.NOT_FOUND,
+              message: `Game version with id "${input.gameVersionId}" not found`,
+              field: "gameVersionId",
+            },
+          };
+        }
+
+        // Ensure version belongs to the specified game
+        if (version.gameId !== existing.gameId) {
+          return {
+            success: false,
+            collectionItem: null,
+            error: {
+              code: ErrorCode.VALIDATION_ERROR,
+              message: "Game version does not belong to this game",
+              field: "gameVersionId",
+            },
+          };
+        }
+      }
+
       // Build update data
       const updateData: {
         platformId?: string | null;
+        gameVersionId?: string | null;
         hasDisc?: boolean;
         hasBox?: boolean;
         hasManual?: boolean;
@@ -266,6 +334,9 @@ builder.mutationField("updateCollectionItem", (t) =>
 
       if (input.platformId !== undefined) {
         updateData.platformId = input.platformId;
+      }
+      if (input.gameVersionId !== undefined) {
+        updateData.gameVersionId = input.gameVersionId;
       }
       if (input.hasDisc !== undefined && input.hasDisc !== null) {
         updateData.hasDisc = input.hasDisc;

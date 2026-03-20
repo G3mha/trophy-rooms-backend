@@ -10,6 +10,7 @@ const UserGameMutationResult = builder.objectRef<{
   userGameId: string | null;
   status: GameStatus | null;
   platformId: string | null;
+  gameVersionId: string | null;
   error: { code: ErrorCode; message: string; field: string | null } | null;
 }>("UserGameMutationResult");
 
@@ -23,6 +24,7 @@ UserGameMutationResult.implement({
       resolve: (result) => result.status,
     }),
     platformId: t.exposeString("platformId", { nullable: true }),
+    gameVersionId: t.exposeString("gameVersionId", { nullable: true }),
     error: t.field({
       type: MutationErrorRef,
       nullable: true,
@@ -56,6 +58,7 @@ builder.mutationField("setGameStatus", (t) =>
       gameId: t.arg.id({ required: true }),
       status: t.arg({ type: GameStatusEnum, required: true }),
       platformId: t.arg.id({ required: false }),
+      gameVersionId: t.arg.id({ required: false }),
     },
     resolve: async (_root, args, ctx) => {
       // Require authentication
@@ -68,6 +71,7 @@ builder.mutationField("setGameStatus", (t) =>
           userGameId: null,
           status: null,
           platformId: null,
+          gameVersionId: null,
           error: {
             code: ErrorCode.UNAUTHORIZED,
             message: "You must be logged in to set game status",
@@ -76,7 +80,7 @@ builder.mutationField("setGameStatus", (t) =>
         };
       }
 
-      const { gameId, status, platformId } = args;
+      const { gameId, status, platformId, gameVersionId } = args;
 
       // Check if game exists
       const game = await ctx.prisma.game.findUnique({
@@ -89,6 +93,7 @@ builder.mutationField("setGameStatus", (t) =>
           userGameId: null,
           status: null,
           platformId: null,
+          gameVersionId: null,
           error: {
             code: ErrorCode.NOT_FOUND,
             message: `Game with id "${gameId}" not found`,
@@ -109,10 +114,49 @@ builder.mutationField("setGameStatus", (t) =>
             userGameId: null,
             status: null,
             platformId: null,
+            gameVersionId: null,
             error: {
               code: ErrorCode.NOT_FOUND,
               message: `Platform with id "${platformId}" not found`,
               field: "platformId",
+            },
+          };
+        }
+      }
+
+      // Validate gameVersionId if provided
+      if (gameVersionId) {
+        const version = await ctx.prisma.gameVersion.findUnique({
+          where: { id: gameVersionId },
+        });
+
+        if (!version) {
+          return {
+            success: false,
+            userGameId: null,
+            status: null,
+            platformId: null,
+            gameVersionId: null,
+            error: {
+              code: ErrorCode.NOT_FOUND,
+              message: `Game version with id "${gameVersionId}" not found`,
+              field: "gameVersionId",
+            },
+          };
+        }
+
+        // Ensure version belongs to the specified game
+        if (version.gameId !== gameId) {
+          return {
+            success: false,
+            userGameId: null,
+            status: null,
+            platformId: null,
+            gameVersionId: null,
+            error: {
+              code: ErrorCode.VALIDATION_ERROR,
+              message: "Game version does not belong to the specified game",
+              field: "gameVersionId",
             },
           };
         }
@@ -129,12 +173,14 @@ builder.mutationField("setGameStatus", (t) =>
         update: {
           status,
           platformId: platformId ?? null,
+          gameVersionId: gameVersionId ?? null,
         },
         create: {
           userId: user.id,
           gameId,
           status,
           platformId: platformId ?? null,
+          gameVersionId: gameVersionId ?? null,
         },
       });
 
@@ -143,6 +189,7 @@ builder.mutationField("setGameStatus", (t) =>
         userGameId: userGame.id,
         status: userGame.status,
         platformId: userGame.platformId,
+        gameVersionId: userGame.gameVersionId,
         error: null,
       };
     },

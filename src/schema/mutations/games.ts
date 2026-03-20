@@ -78,20 +78,34 @@ builder.mutationField("createGame", (t) =>
         };
       }
 
-      // Create game
-      const game = await ctx.prisma.game.create({
-        data: {
-          title: trimmedTitle,
-          description: description?.trim() || null,
-          coverUrl: coverUrl?.trim() || null,
-          releaseDate: releaseDate ?? null,
-          developer: developer?.trim() || null,
-          publisher: publisher?.trim() || null,
-          genre: genre?.trim() || null,
-          esrbRating: esrbRating?.trim() || null,
-          screenshots: screenshots ?? [],
-          platformId,
-        },
+      // Create game with default version in a transaction
+      const game = await ctx.prisma.$transaction(async (tx) => {
+        const newGame = await tx.game.create({
+          data: {
+            title: trimmedTitle,
+            description: description?.trim() || null,
+            coverUrl: coverUrl?.trim() || null,
+            releaseDate: releaseDate ?? null,
+            developer: developer?.trim() || null,
+            publisher: publisher?.trim() || null,
+            genre: genre?.trim() || null,
+            esrbRating: esrbRating?.trim() || null,
+            screenshots: screenshots ?? [],
+            platformId,
+          },
+        });
+
+        // Auto-create default "Standard" version
+        await tx.gameVersion.create({
+          data: {
+            name: "Standard",
+            slug: "standard",
+            isDefault: true,
+            gameId: newGame.id,
+          },
+        });
+
+        return newGame;
       });
 
       return {

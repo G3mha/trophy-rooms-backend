@@ -110,12 +110,45 @@ builder.mutationField("createAchievementSet", (t) =>
           ? AchievementSetVisibility.PRIVATE
           : AchievementSetVisibility.PUBLIC;
 
+      // Validate gameVersionId if provided
+      if (input.gameVersionId) {
+        const version = await ctx.prisma.gameVersion.findUnique({
+          where: { id: input.gameVersionId },
+        });
+
+        if (!version) {
+          return {
+            success: false,
+            achievementSetId: null,
+            error: {
+              code: ErrorCode.NOT_FOUND,
+              message: `Game version with id "${input.gameVersionId}" not found`,
+              field: "gameVersionId",
+            },
+          };
+        }
+
+        // Ensure version belongs to the specified game
+        if (version.gameId !== input.gameId) {
+          return {
+            success: false,
+            achievementSetId: null,
+            error: {
+              code: ErrorCode.VALIDATION_ERROR,
+              message: "Game version does not belong to the specified game",
+              field: "gameVersionId",
+            },
+          };
+        }
+      }
+
       const achievementSet = await ctx.prisma.achievementSet.create({
         data: {
           title: trimmedTitle,
           type: input.type,
           visibility,
           gameId: input.gameId,
+          gameVersionId: input.gameVersionId ?? null,
           createdByUserId: ctx.user.id,
         },
       });
