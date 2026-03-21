@@ -31,6 +31,17 @@ builder.prismaObject("Game", {
       },
     }),
     versionCount: t.relationCount("versions"),
+    dlcs: t.relation("dlcs", {
+      query: {
+        orderBy: [{ type: "asc" }, { name: "asc" }],
+      },
+    }),
+    dlcCount: t.relationCount("dlcs"),
+    bundles: t.relation("bundles", {
+      query: {
+        orderBy: { name: "asc" },
+      },
+    }),
     defaultVersion: t.prismaField({
       type: "GameVersion",
       nullable: true,
