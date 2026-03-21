@@ -242,6 +242,215 @@ builder.queryField("adminGames", (t) =>
   })
 );
 
+// User-facing games list with offset-based pagination
+const GamePagePlatform = builder.objectRef<{
+  id: string;
+  name: string;
+  slug: string;
+}>("GamePagePlatform");
+
+GamePagePlatform.implement({
+  fields: (t) => ({
+    id: t.exposeString("id"),
+    name: t.exposeString("name"),
+    slug: t.exposeString("slug"),
+  }),
+});
+
+const GamePageItem = builder.objectRef<{
+  id: string;
+  title: string;
+  description: string | null;
+  coverUrl: string | null;
+  platformId: string | null;
+  platformName: string | null;
+  platformSlug: string | null;
+  achievementSetCount: number;
+  achievementCount: number;
+  trophyCount: number;
+}>("GamePageItem");
+
+GamePageItem.implement({
+  fields: (t) => ({
+    id: t.exposeString("id"),
+    title: t.exposeString("title"),
+    description: t.exposeString("description", { nullable: true }),
+    coverUrl: t.exposeString("coverUrl", { nullable: true }),
+    platform: t.field({
+      type: GamePagePlatform,
+      nullable: true,
+      resolve: (game) => {
+        if (!game.platformId || !game.platformName || !game.platformSlug) return null;
+        return {
+          id: game.platformId,
+          name: game.platformName,
+          slug: game.platformSlug,
+        };
+      },
+    }),
+    achievementSetCount: t.exposeInt("achievementSetCount"),
+    achievementCount: t.exposeInt("achievementCount"),
+    trophyCount: t.exposeInt("trophyCount"),
+  }),
+});
+
+const GamesPage = builder.objectRef<{
+  items: {
+    id: string;
+    title: string;
+    description: string | null;
+    coverUrl: string | null;
+    platformId: string | null;
+    platformName: string | null;
+    platformSlug: string | null;
+    achievementSetCount: number;
+    achievementCount: number;
+    trophyCount: number;
+  }[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}>("GamesPage");
+
+GamesPage.implement({
+  fields: (t) => ({
+    items: t.field({
+      type: [GamePageItem],
+      resolve: (page) => page.items,
+    }),
+    totalCount: t.exposeInt("totalCount"),
+    page: t.exposeInt("page"),
+    pageSize: t.exposeInt("pageSize"),
+    totalPages: t.exposeInt("totalPages"),
+  }),
+});
+
+builder.queryField("gamesPage", (t) =>
+  t.field({
+    type: GamesPage,
+    args: {
+      page: t.arg.int({ required: false, defaultValue: 1 }),
+      pageSize: t.arg.int({ required: false, defaultValue: 25 }),
+      filter: t.arg({ type: GamesFilterInput }),
+      orderBy: t.arg({ type: GameOrderBy }),
+    },
+    resolve: async (_root, args, ctx) => {
+      const page = Math.max(1, args.page ?? 1);
+      const pageSize = Math.min(100, Math.max(1, args.pageSize ?? 25));
+      const skip = (page - 1) * pageSize;
+      const { filter, orderBy } = args;
+
+      // Build where clause
+      const where: Prisma.GameWhereInput = {};
+
+      if (filter?.search) {
+        where.OR = [
+          { title: { contains: filter.search, mode: "insensitive" } },
+          { description: { contains: filter.search, mode: "insensitive" } },
+        ];
+      }
+
+      if (filter?.platformId) {
+        where.platformId = filter.platformId;
+      }
+
+      if (filter?.hasAchievements !== undefined) {
+        const visibilityFilter = !ctx.user
+          ? { visibility: AchievementSetVisibility.PUBLIC }
+          : hasRequiredRole(ctx.user, UserRole.TRUSTED)
+            ? {}
+            : {
+                OR: [
+                  { visibility: AchievementSetVisibility.PUBLIC },
+                  { createdByUserId: ctx.user.id },
+                ],
+              };
+
+        where.achievementSets =
+          filter.hasAchievements === true
+            ? { some: visibilityFilter }
+            : { none: visibilityFilter };
+      }
+
+      // Build order by clause
+      let orderByClause: Prisma.GameOrderByWithRelationInput;
+
+      switch (orderBy) {
+        case "TITLE_DESC":
+          orderByClause = { title: "desc" };
+          break;
+        case "CREATED_AT_ASC":
+          orderByClause = { createdAt: "asc" };
+          break;
+        case "CREATED_AT_DESC":
+          orderByClause = { createdAt: "desc" };
+          break;
+        case "ACHIEVEMENT_COUNT_DESC":
+          orderByClause = { achievementSets: { _count: "desc" } };
+          break;
+        case "TROPHY_COUNT_DESC":
+          orderByClause = { trophies: { _count: "desc" } };
+          break;
+        case "TITLE_ASC":
+        default:
+          orderByClause = { title: "asc" };
+          break;
+      }
+
+      const [games, totalCount] = await Promise.all([
+        ctx.prisma.game.findMany({
+          where,
+          skip,
+          take: pageSize,
+          orderBy: orderByClause,
+          include: {
+            platform: true,
+            _count: {
+              select: {
+                achievementSets: true,
+                trophies: true,
+              },
+            },
+            achievementSets: {
+              select: {
+                _count: {
+                  select: { achievements: true },
+                },
+              },
+            },
+          },
+        }),
+        ctx.prisma.game.count({ where }),
+      ]);
+
+      const totalPages = Math.ceil(totalCount / pageSize);
+
+      return {
+        items: games.map((game) => ({
+          id: game.id,
+          title: game.title,
+          description: game.description,
+          coverUrl: game.coverUrl,
+          platformId: game.platform?.id ?? null,
+          platformName: game.platform?.name ?? null,
+          platformSlug: game.platform?.slug ?? null,
+          achievementSetCount: game._count.achievementSets,
+          achievementCount: game.achievementSets.reduce(
+            (sum, set) => sum + set._count.achievements,
+            0
+          ),
+          trophyCount: game._count.trophies,
+        })),
+        totalCount,
+        page,
+        pageSize,
+        totalPages,
+      };
+    },
+  })
+);
+
 // Single game query
 builder.queryField("game", (t) =>
   t.prismaField({
