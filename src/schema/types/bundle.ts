@@ -1,9 +1,9 @@
 import { builder, MutationErrorRef } from "../builder.js";
-import { BundleType } from "@prisma/client";
+import { BundleType as PrismaBundleType } from "@prisma/client";
 import { ErrorCode } from "../../lib/errors.js";
 
-// Register the BundleType enum
-builder.enumType(BundleType, {
+// Register the BundleType enum and export the reference
+export const BundleType = builder.enumType(PrismaBundleType, {
   name: "BundleType",
 });
 
@@ -12,7 +12,7 @@ builder.prismaObject("Bundle", {
     id: t.exposeID("id"),
     name: t.exposeString("name"),
     slug: t.exposeString("slug"),
-    type: t.expose("type", { type: BundleType }),
+    type: t.expose("type", { type: PrismaBundleType }),
     description: t.exposeString("description", { nullable: true }),
     coverUrl: t.exposeString("coverUrl", { nullable: true }),
     releaseDate: t.expose("releaseDate", { type: "DateTime", nullable: true }),

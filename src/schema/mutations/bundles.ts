@@ -5,9 +5,10 @@ import {
   UpdateBundleInput,
   BundleMutationResult,
   DeleteBundleResult,
+  BundleType,
 } from "../types/bundle.js";
 import { hasRequiredRole } from "../../context.js";
-import { UserRole, BundleType } from "@prisma/client";
+import { UserRole, BundleType as PrismaBundleType } from "@prisma/client";
 
 // Helper to generate slug from name
 function slugify(name: string): string {
@@ -156,7 +157,7 @@ builder.mutationField("createBundle", (t) =>
         data: {
           name: trimmedName,
           slug: trimmedSlug,
-          type: type ?? BundleType.BUNDLE,
+          type: type ?? PrismaBundleType.BUNDLE,
           description: description?.trim() || null,
           coverUrl: coverUrl?.trim() || null,
           releaseDate: releaseDate ?? null,
@@ -235,7 +236,7 @@ builder.mutationField("updateBundle", (t) =>
       const updateData: {
         name?: string;
         slug?: string;
-        type?: BundleType;
+        type?: PrismaBundleType;
         description?: string | null;
         coverUrl?: string | null;
         releaseDate?: Date | null;
