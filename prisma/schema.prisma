@@ -53,6 +53,19 @@ enum GameRegion {
   OTHER
 }
 
+enum DLCType {
+  DLC
+  EXPANSION
+  FREE_UPDATE
+}
+
+enum BundleType {
+  BUNDLE
+  SEASON_PASS
+  COLLECTION
+  SUBSCRIPTION
+}
+
 model User {
   id              String            @id @default(cuid())
   clerkId         String            @unique
@@ -64,6 +77,8 @@ model User {
   userGames       UserGame[]
   collectionItems CollectionItem[]
   achievementSets AchievementSet[] @relation("AchievementSetCreator")
+  ownedDlcs       UserDLC[]
+  ownedBundles    UserBundle[]
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
@@ -99,6 +114,8 @@ model Game {
   userGames       UserGame[]
   collectionItems CollectionItem[]
   versions        GameVersion[]
+  dlcs            DLC[]
+  bundles         Bundle[]         @relation("BundleGames")
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
@@ -113,12 +130,12 @@ model GameVersion {
   description     String?
   coverUrl        String?          // Fallback to game.coverUrl if null
   releaseDate     DateTime?
-  includedDlc     String[]         // DLC names included
   isDefault       Boolean          @default(false)
 
   game            Game             @relation(fields: [gameId], references: [id], onDelete: Cascade)
   gameId          String
 
+  dlcs            DLC[]            @relation("GameVersionDLCs")
   achievementSets AchievementSet[]
   userGames       UserGame[]
   collectionItems CollectionItem[]
@@ -139,6 +156,8 @@ model AchievementSet {
   gameId          String
   gameVersion     GameVersion?       @relation(fields: [gameVersionId], references: [id], onDelete: SetNull)
   gameVersionId   String?
+  dlc             DLC?               @relation(fields: [dlcId], references: [id], onDelete: SetNull)
+  dlcId           String?
   createdBy       User?              @relation("AchievementSetCreator", fields: [createdByUserId], references: [id])
   createdByUserId String?
   achievements    Achievement[]
@@ -147,6 +166,7 @@ model AchievementSet {
 
   @@index([gameId])
   @@index([gameVersionId])
+  @@index([dlcId])
   @@index([createdByUserId])
   @@unique([gameId, title, type, createdByUserId])
 }
@@ -245,4 +265,88 @@ model CollectionItem {
   @@index([gameId])
   @@index([gameVersionId])
   @@index([userId, gameId])
+}
+
+model DLC {
+  id              String           @id @default(cuid())
+  name            String           // "Shadow of the Erdtree"
+  slug            String           // "shadow-of-the-erdtree"
+  type            DLCType          @default(DLC)
+  description     String?
+  coverUrl        String?          // Fallback to game.coverUrl if null
+  releaseDate     DateTime?
+  price           Float?           // null for free updates
+
+  game            Game             @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  gameId          String
+
+  achievementSets AchievementSet[]
+  gameVersions    GameVersion[]    @relation("GameVersionDLCs")
+  bundles         Bundle[]         @relation("BundleDLCs")
+  userDlcs        UserDLC[]
+
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@unique([gameId, slug])
+  @@index([gameId])
+}
+
+model UserDLC {
+  id        String   @id @default(cuid())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+
+  dlc       DLC      @relation(fields: [dlcId], references: [id], onDelete: Cascade)
+  dlcId     String
+
+  ownedAt   DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, dlcId])
+  @@index([userId])
+  @@index([dlcId])
+}
+
+model Bundle {
+  id              String           @id @default(cuid())
+  name            String           // "Elden Ring + Shadow of the Erdtree Bundle"
+  slug            String           @unique
+  type            BundleType       @default(BUNDLE)
+  description     String?
+  coverUrl        String?
+  releaseDate     DateTime?
+  price           Float?
+
+  // Many-to-many with games and DLCs
+  games           Game[]           @relation("BundleGames")
+  dlcs            DLC[]            @relation("BundleDLCs")
+  userBundles     UserBundle[]
+
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([type])
+}
+
+model UserBundle {
+  id        String   @id @default(cuid())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+
+  bundle    Bundle   @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+  bundleId  String
+
+  ownedAt   DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, bundleId])
+  @@index([userId])
+  @@index([bundleId])
 }
