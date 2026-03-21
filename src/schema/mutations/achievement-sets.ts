@@ -142,6 +142,38 @@ builder.mutationField("createAchievementSet", (t) =>
         }
       }
 
+      // Validate dlcId if provided
+      if (input.dlcId) {
+        const dlc = await ctx.prisma.dLC.findUnique({
+          where: { id: input.dlcId },
+        });
+
+        if (!dlc) {
+          return {
+            success: false,
+            achievementSetId: null,
+            error: {
+              code: ErrorCode.NOT_FOUND,
+              message: `DLC with id "${input.dlcId}" not found`,
+              field: "dlcId",
+            },
+          };
+        }
+
+        // Ensure DLC belongs to the specified game
+        if (dlc.gameId !== input.gameId) {
+          return {
+            success: false,
+            achievementSetId: null,
+            error: {
+              code: ErrorCode.VALIDATION_ERROR,
+              message: "DLC does not belong to the specified game",
+              field: "dlcId",
+            },
+          };
+        }
+      }
+
       const achievementSet = await ctx.prisma.achievementSet.create({
         data: {
           title: trimmedTitle,
@@ -149,6 +181,7 @@ builder.mutationField("createAchievementSet", (t) =>
           visibility,
           gameId: input.gameId,
           gameVersionId: input.gameVersionId ?? null,
+          dlcId: input.dlcId ?? null,
           createdByUserId: ctx.user.id,
         },
       });
