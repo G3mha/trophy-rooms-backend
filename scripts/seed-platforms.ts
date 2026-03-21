@@ -12,6 +12,7 @@ const platforms = [
   { name: "Wii", slug: "wii" },
   { name: "Wii U", slug: "wii-u" },
   { name: "Nintendo Switch", slug: "switch" },
+  { name: "Nintendo Switch 2", slug: "switch-2" },
 
   // Nintendo Handhelds
   { name: "Game Boy", slug: "game-boy" },

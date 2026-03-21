@@ -31,7 +31,8 @@ export const IGDB_PLATFORM_MAP: Record<string, number[]> = {
   "gamecube": [21],
   "wii": [5],
   "wii-u": [41],
-  "switch": [130, 508], // Switch and Switch 2
+  "switch": [130],
+  "switch-2": [508],
 
   // Nintendo Handhelds
   "game-boy": [33],
