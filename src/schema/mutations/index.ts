@@ -8,3 +8,7 @@ import "./achievement-sets.js";
 import "./users.js";
 import "./user-game.js";
 import "./collection-items.js";
+import "./dlcs.js";
+import "./user-dlc.js";
+import "./bundles.js";
+import "./user-bundle.js";

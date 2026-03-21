@@ -9,3 +9,5 @@ export * from "./platform.js";
 export * from "./achievement-set.js";
 export * from "./user-game.js";
 export * from "./collection-item.js";
+export * from "./dlc.js";
+export * from "./bundle.js";
