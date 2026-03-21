@@ -127,6 +127,121 @@ builder.queryField("games", (t) =>
   })
 );
 
+// Admin games list with offset-based pagination (for page jumping)
+const AdminGameItem = builder.objectRef<{
+  id: string;
+  title: string;
+  description: string | null;
+  coverUrl: string | null;
+  platformId: string | null;
+  platformName: string | null;
+  platformSlug: string | null;
+  achievementSetCount: number;
+}>("AdminGameItem");
+
+AdminGameItem.implement({
+  fields: (t) => ({
+    id: t.exposeString("id"),
+    title: t.exposeString("title"),
+    description: t.exposeString("description", { nullable: true }),
+    coverUrl: t.exposeString("coverUrl", { nullable: true }),
+    platformId: t.exposeString("platformId", { nullable: true }),
+    platformName: t.exposeString("platformName", { nullable: true }),
+    platformSlug: t.exposeString("platformSlug", { nullable: true }),
+    achievementSetCount: t.exposeInt("achievementSetCount"),
+  }),
+});
+
+const AdminGamesPage = builder.objectRef<{
+  items: {
+    id: string;
+    title: string;
+    description: string | null;
+    coverUrl: string | null;
+    platformId: string | null;
+    platformName: string | null;
+    platformSlug: string | null;
+    achievementSetCount: number;
+  }[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}>("AdminGamesPage");
+
+AdminGamesPage.implement({
+  fields: (t) => ({
+    items: t.field({
+      type: [AdminGameItem],
+      resolve: (page) => page.items,
+    }),
+    totalCount: t.exposeInt("totalCount"),
+    page: t.exposeInt("page"),
+    pageSize: t.exposeInt("pageSize"),
+    totalPages: t.exposeInt("totalPages"),
+  }),
+});
+
+builder.queryField("adminGames", (t) =>
+  t.field({
+    type: AdminGamesPage,
+    args: {
+      page: t.arg.int({ required: false, defaultValue: 1 }),
+      pageSize: t.arg.int({ required: false, defaultValue: 50 }),
+      search: t.arg.string({ required: false }),
+    },
+    resolve: async (_root, args, ctx) => {
+      const page = Math.max(1, args.page ?? 1);
+      const pageSize = Math.min(100, Math.max(1, args.pageSize ?? 50));
+      const skip = (page - 1) * pageSize;
+
+      const where: Prisma.GameWhereInput = {};
+
+      if (args.search) {
+        where.OR = [
+          { title: { contains: args.search, mode: "insensitive" } },
+          { description: { contains: args.search, mode: "insensitive" } },
+        ];
+      }
+
+      const [games, totalCount] = await Promise.all([
+        ctx.prisma.game.findMany({
+          where,
+          skip,
+          take: pageSize,
+          orderBy: { title: "asc" },
+          include: {
+            platform: true,
+            _count: {
+              select: { achievementSets: true },
+            },
+          },
+        }),
+        ctx.prisma.game.count({ where }),
+      ]);
+
+      const totalPages = Math.ceil(totalCount / pageSize);
+
+      return {
+        items: games.map((game) => ({
+          id: game.id,
+          title: game.title,
+          description: game.description,
+          coverUrl: game.coverUrl,
+          platformId: game.platform?.id ?? null,
+          platformName: game.platform?.name ?? null,
+          platformSlug: game.platform?.slug ?? null,
+          achievementSetCount: game._count.achievementSets,
+        })),
+        totalCount,
+        page,
+        pageSize,
+        totalPages,
+      };
+    },
+  })
+);
+
 // Single game query
 builder.queryField("game", (t) =>
   t.prismaField({
