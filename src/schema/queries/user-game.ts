@@ -12,6 +12,8 @@ const UserGameItem = builder.objectRef<{
   platformId: string | null;
   platformName: string | null;
   platformSlug: string | null;
+  gameVersionId: string | null;
+  gameVersionName: string | null;
   status: "WISHLIST" | "BACKLOG" | "PLAYING" | "PAUSED" | "COMPLETED" | "DROPPED";
   addedAt: Date;
   updatedAt: Date;
@@ -28,6 +30,8 @@ UserGameItem.implement({
     platformId: t.exposeString("platformId", { nullable: true }),
     platformName: t.exposeString("platformName", { nullable: true }),
     platformSlug: t.exposeString("platformSlug", { nullable: true }),
+    gameVersionId: t.exposeString("gameVersionId", { nullable: true }),
+    gameVersionName: t.exposeString("gameVersionName", { nullable: true }),
     status: t.expose("status", { type: GameStatusEnum }),
     addedAt: t.expose("addedAt", { type: "DateTime" }),
     updatedAt: t.expose("updatedAt", { type: "DateTime" }),
@@ -38,12 +42,14 @@ UserGameItem.implement({
 const GameStatusInfo = builder.objectRef<{
   status: "WISHLIST" | "BACKLOG" | "PLAYING" | "PAUSED" | "COMPLETED" | "DROPPED";
   platformId: string | null;
+  gameVersionId: string | null;
 }>("GameStatusInfo");
 
 GameStatusInfo.implement({
   fields: (t) => ({
     status: t.expose("status", { type: GameStatusEnum }),
     platformId: t.exposeString("platformId", { nullable: true }),
+    gameVersionId: t.exposeString("gameVersionId", { nullable: true }),
   }),
 });
 
@@ -76,6 +82,7 @@ builder.queryField("getGameStatus", (t) =>
       return {
         status: userGame.status,
         platformId: userGame.platformId,
+        gameVersionId: userGame.gameVersionId,
       };
     },
   })
@@ -113,6 +120,12 @@ builder.queryField("myGamesByStatus", (t) =>
               id: true,
               name: true,
               slug: true,
+            },
+          },
+          gameVersion: {
+            select: {
+              id: true,
+              name: true,
             },
           },
         },
@@ -160,6 +173,8 @@ builder.queryField("myGamesByStatus", (t) =>
         platformId: item.platform?.id ?? null,
         platformName: item.platform?.name ?? null,
         platformSlug: item.platform?.slug ?? null,
+        gameVersionId: item.gameVersion?.id ?? null,
+        gameVersionName: item.gameVersion?.name ?? null,
         status: item.status,
         addedAt: item.createdAt,
         updatedAt: item.updatedAt,
