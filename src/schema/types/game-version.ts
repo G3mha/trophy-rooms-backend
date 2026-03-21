@@ -9,8 +9,13 @@ builder.prismaObject("GameVersion", {
     description: t.exposeString("description", { nullable: true }),
     coverUrl: t.exposeString("coverUrl", { nullable: true }),
     releaseDate: t.expose("releaseDate", { type: "DateTime", nullable: true }),
-    includedDlc: t.exposeStringList("includedDlc"),
     isDefault: t.exposeBoolean("isDefault"),
+    dlcs: t.relation("dlcs", {
+      query: {
+        orderBy: [{ type: "asc" }, { name: "asc" }],
+      },
+    }),
+    dlcCount: t.relationCount("dlcs"),
     game: t.relation("game"),
     gameId: t.exposeString("gameId"),
     achievementSets: t.relation("achievementSets", {
@@ -47,7 +52,7 @@ export const CreateGameVersionInput = builder.inputType("CreateGameVersionInput"
     description: t.string(),
     coverUrl: t.string(),
     releaseDate: t.field({ type: "DateTime" }),
-    includedDlc: t.stringList(),
+    dlcIds: t.idList(),
     isDefault: t.boolean(),
   }),
 });
@@ -59,7 +64,7 @@ export const UpdateGameVersionInput = builder.inputType("UpdateGameVersionInput"
     description: t.string(),
     coverUrl: t.string(),
     releaseDate: t.field({ type: "DateTime" }),
-    includedDlc: t.stringList(),
+    dlcIds: t.idList(),
   }),
 });
 

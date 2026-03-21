@@ -85,7 +85,7 @@ builder.mutationField("createGameVersion", (t) =>
         };
       }
 
-      const { gameId, name, slug, description, coverUrl, releaseDate, includedDlc, isDefault } = args.input;
+      const { gameId, name, slug, description, coverUrl, releaseDate, dlcIds, isDefault } = args.input;
 
       // Validate name
       const trimmedName = name.trim();
@@ -170,9 +170,11 @@ builder.mutationField("createGameVersion", (t) =>
           description: description?.trim() || null,
           coverUrl: coverUrl?.trim() || null,
           releaseDate: releaseDate ?? null,
-          includedDlc: includedDlc ?? [],
           isDefault: isDefault ?? false,
           gameId,
+          dlcs: dlcIds && dlcIds.length > 0 ? {
+            connect: dlcIds.map((id) => ({ id })),
+          } : undefined,
         },
       });
 
@@ -244,7 +246,7 @@ builder.mutationField("updateGameVersion", (t) =>
         description?: string | null;
         coverUrl?: string | null;
         releaseDate?: Date | null;
-        includedDlc?: string[];
+        dlcs?: { set: { id: string }[] };
       } = {};
 
       if (input.name !== undefined && input.name !== null) {
@@ -315,8 +317,10 @@ builder.mutationField("updateGameVersion", (t) =>
         updateData.releaseDate = input.releaseDate ?? null;
       }
 
-      if (input.includedDlc !== undefined) {
-        updateData.includedDlc = input.includedDlc ?? [];
+      if (input.dlcIds !== undefined) {
+        updateData.dlcs = {
+          set: (input.dlcIds ?? []).map((id) => ({ id })),
+        };
       }
 
       // Update version
