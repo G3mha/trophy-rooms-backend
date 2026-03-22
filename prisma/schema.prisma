@@ -66,6 +66,12 @@ enum BundleType {
   SUBSCRIPTION
 }
 
+enum GameType {
+  BASE_GAME
+  FANGAME
+  ROM_HACK
+}
+
 model User {
   id              String            @id @default(cuid())
   clerkId         String            @unique
@@ -107,6 +113,15 @@ model Game {
   genre           String?
   esrbRating      String?
   screenshots     String[]
+
+  // Game type categorization (fangames, ROM hacks)
+  type            GameType         @default(BASE_GAME)
+
+  // Self-referencing relation for derivatives (fangames/ROM hacks based on this game)
+  baseGame        Game?            @relation("GameDerivatives", fields: [baseGameId], references: [id], onDelete: SetNull)
+  baseGameId      String?
+  derivatives     Game[]           @relation("GameDerivatives")
+
   platform        Platform?        @relation(fields: [platformId], references: [id])
   platformId      String?
   achievementSets AchievementSet[]
@@ -121,6 +136,8 @@ model Game {
 
   @@unique([title, platformId])
   @@index([platformId])
+  @@index([type])
+  @@index([baseGameId])
 }
 
 model GameVersion {
