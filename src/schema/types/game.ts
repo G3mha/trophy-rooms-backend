@@ -1,6 +1,11 @@
 import { builder, MutationErrorRef } from "../builder.js";
 import { ErrorCode } from "../../lib/errors.js";
 
+// GameType enum for categorizing games (base games, fangames, ROM hacks)
+export const GameTypeEnum = builder.enumType("GameType", {
+  values: ["BASE_GAME", "FANGAME", "ROM_HACK"] as const,
+});
+
 builder.prismaObject("Game", {
   fields: (t) => ({
     id: t.exposeID("id"),
@@ -13,6 +18,15 @@ builder.prismaObject("Game", {
     genre: t.exposeString("genre", { nullable: true }),
     esrbRating: t.exposeString("esrbRating", { nullable: true }),
     screenshots: t.exposeStringList("screenshots"),
+    type: t.expose("type", { type: GameTypeEnum }),
+    baseGameId: t.exposeString("baseGameId", { nullable: true }),
+    baseGame: t.relation("baseGame", { nullable: true }),
+    derivatives: t.relation("derivatives", {
+      query: {
+        orderBy: { title: "asc" },
+      },
+    }),
+    derivativeCount: t.relationCount("derivatives"),
     platform: t.relation("platform", { nullable: true }),
     platformId: t.exposeString("platformId", { nullable: true }),
     achievementSets: t.relation("achievementSets", {
@@ -78,6 +92,8 @@ export const CreateGameInput = builder.inputType("CreateGameInput", {
     esrbRating: t.string(),
     screenshots: t.stringList(),
     platformId: t.id(),
+    type: t.field({ type: GameTypeEnum }),
+    baseGameId: t.id(),
   }),
 });
 
@@ -93,6 +109,8 @@ export const UpdateGameInput = builder.inputType("UpdateGameInput", {
     esrbRating: t.string(),
     screenshots: t.stringList(),
     platformId: t.id(),
+    type: t.field({ type: GameTypeEnum }),
+    baseGameId: t.id(),
   }),
 });
 
@@ -102,6 +120,8 @@ export const GamesFilterInput = builder.inputType("GamesFilterInput", {
     search: t.string(),
     hasAchievements: t.boolean(),
     platformId: t.id(),
+    type: t.field({ type: GameTypeEnum }),
+    isDerivative: t.boolean(), // true = has baseGameId, false = no baseGameId
   }),
 });
 
