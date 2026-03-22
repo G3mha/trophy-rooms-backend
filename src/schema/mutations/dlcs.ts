@@ -19,6 +19,22 @@ function slugify(name: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
+// Query: Get all DLCs (for admin use)
+builder.queryField("allDlcs", (t) =>
+  t.prismaField({
+    type: ["DLC"],
+    resolve: async (query, _root, _args, ctx) => {
+      return ctx.prisma.dLC.findMany({
+        ...query,
+        orderBy: [{ game: { title: "asc" } }, { name: "asc" }],
+        include: {
+          game: true,
+        },
+      });
+    },
+  })
+);
+
 // Query: Get all DLCs for a game
 builder.queryField("dlcs", (t) =>
   t.prismaField({
