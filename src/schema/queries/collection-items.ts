@@ -75,10 +75,17 @@ builder.queryField("myCollection", (t) =>
         where.hasManual = true;
       }
 
+      // Merge query includes with our explicit includes to ensure eager loading
       return ctx.prisma.collectionItem.findMany({
         ...query,
         where,
         orderBy: { createdAt: "desc" },
+        include: {
+          ...query.include,
+          game: true,
+          platform: true,
+          gameVersion: true,
+        },
       });
     },
   })
@@ -124,32 +131,28 @@ builder.queryField("collectionStats", (t) =>
 
       const userId = ctx.user.id;
 
-      // Get total items
-      const totalItems = await ctx.prisma.collectionItem.count({
-        where: { userId },
-      });
-
-      // Get sealed count
-      const sealedCount = await ctx.prisma.collectionItem.count({
-        where: { userId, isSealed: true },
-      });
-
-      // Get complete count (has disc, box, and manual)
-      const completeCount = await ctx.prisma.collectionItem.count({
-        where: {
-          userId,
-          hasDisc: true,
-          hasBox: true,
-          hasManual: true,
-        },
-      });
-
-      // Get counts by region
-      const regionCounts = await ctx.prisma.collectionItem.groupBy({
-        by: ["region"],
-        where: { userId },
-        _count: { id: true },
-      });
+      // Run all queries in parallel for better performance
+      const [totalItems, sealedCount, completeCount, regionCounts] = await Promise.all([
+        ctx.prisma.collectionItem.count({
+          where: { userId },
+        }),
+        ctx.prisma.collectionItem.count({
+          where: { userId, isSealed: true },
+        }),
+        ctx.prisma.collectionItem.count({
+          where: {
+            userId,
+            hasDisc: true,
+            hasBox: true,
+            hasManual: true,
+          },
+        }),
+        ctx.prisma.collectionItem.groupBy({
+          by: ["region"],
+          where: { userId },
+          _count: { id: true },
+        }),
+      ]);
 
       const byRegion = regionCounts.map((rc) => ({
         region: rc.region,
