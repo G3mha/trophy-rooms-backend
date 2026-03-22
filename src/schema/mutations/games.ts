@@ -7,7 +7,7 @@ import {
   DeleteGameResult,
 } from "../types/game.js";
 import { hasRequiredRole } from "../../context.js";
-import { UserRole } from "@prisma/client";
+import { UserRole, GameType } from "@prisma/client";
 
 // Create game mutation
 builder.mutationField("createGame", (t) =>
@@ -41,8 +41,9 @@ builder.mutationField("createGame", (t) =>
         };
       }
 
-      const { title, description, coverUrl, releaseDate, developer, publisher, genre, esrbRating, screenshots } = args.input;
+      const { title, description, coverUrl, releaseDate, developer, publisher, genre, esrbRating, screenshots, type, baseGameId } = args.input;
       const platformId = args.input.platformId ?? null;
+      const gameType = type ?? GameType.BASE_GAME;
 
       // Validate title
       const trimmedTitle = title.trim();
@@ -78,6 +79,25 @@ builder.mutationField("createGame", (t) =>
         };
       }
 
+      // Validate baseGameId if provided
+      if (baseGameId) {
+        const baseGame = await ctx.prisma.game.findUnique({
+          where: { id: baseGameId },
+        });
+
+        if (!baseGame) {
+          return {
+            success: false,
+            gameId: null,
+            error: {
+              code: ErrorCode.NOT_FOUND,
+              message: `Base game with id "${baseGameId}" not found`,
+              field: "baseGameId",
+            },
+          };
+        }
+      }
+
       // Create game with default version in a transaction
       const game = await ctx.prisma.$transaction(async (tx) => {
         const newGame = await tx.game.create({
@@ -92,6 +112,8 @@ builder.mutationField("createGame", (t) =>
             esrbRating: esrbRating?.trim() || null,
             screenshots: screenshots ?? [],
             platformId,
+            type: gameType,
+            baseGameId: baseGameId ?? null,
           },
         });
 
@@ -181,6 +203,8 @@ builder.mutationField("updateGame", (t) =>
         esrbRating?: string | null;
         screenshots?: string[];
         platformId?: string | null;
+        type?: GameType;
+        baseGameId?: string | null;
       } = {};
 
       if (input.title !== undefined && input.title !== null) {
@@ -280,6 +304,45 @@ builder.mutationField("updateGame", (t) =>
 
       if (input.platformId !== undefined) {
         updateData.platformId = input.platformId ?? null;
+      }
+
+      if (input.type !== undefined && input.type !== null) {
+        updateData.type = input.type;
+      }
+
+      if (input.baseGameId !== undefined) {
+        // Validate baseGameId if it's not null
+        if (input.baseGameId !== null) {
+          // Prevent self-reference
+          if (input.baseGameId === id) {
+            return {
+              success: false,
+              gameId: null,
+              error: {
+                code: ErrorCode.VALIDATION_ERROR,
+                message: "A game cannot be its own base game",
+                field: "baseGameId",
+              },
+            };
+          }
+
+          const baseGame = await ctx.prisma.game.findUnique({
+            where: { id: input.baseGameId },
+          });
+
+          if (!baseGame) {
+            return {
+              success: false,
+              gameId: null,
+              error: {
+                code: ErrorCode.NOT_FOUND,
+                message: `Base game with id "${input.baseGameId}" not found`,
+                field: "baseGameId",
+              },
+            };
+          }
+        }
+        updateData.baseGameId = input.baseGameId ?? null;
       }
 
       // Update game
