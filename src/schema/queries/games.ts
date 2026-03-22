@@ -1,6 +1,6 @@
-import { Prisma, AchievementSetVisibility, UserRole } from "@prisma/client";
+import { Prisma, AchievementSetVisibility, UserRole, GameType } from "@prisma/client";
 import { builder } from "../builder.js";
-import { GamesFilterInput, GameOrderBy } from "../types/game.js";
+import { GamesFilterInput, GameOrderBy, GameTypeEnum } from "../types/game.js";
 import { hasRequiredRole } from "../../context.js";
 
 // Games connection with cursor-based pagination
@@ -25,6 +25,14 @@ builder.queryField("games", (t) =>
 
       if (filter?.platformId) {
         where.platformId = filter.platformId;
+      }
+
+      if (filter?.type) {
+        where.type = filter.type;
+      }
+
+      if (filter?.isDerivative !== undefined) {
+        where.baseGameId = filter.isDerivative ? { not: null } : null;
       }
 
       if (filter?.hasAchievements !== undefined) {
@@ -92,6 +100,14 @@ builder.queryField("games", (t) =>
         where.platformId = filter.platformId;
       }
 
+      if (filter?.type) {
+        where.type = filter.type;
+      }
+
+      if (filter?.isDerivative !== undefined) {
+        where.baseGameId = filter.isDerivative ? { not: null } : null;
+      }
+
       // Build order by clause
       let orderByClause: Prisma.GameOrderByWithRelationInput;
 
@@ -133,6 +149,8 @@ const AdminGameItem = builder.objectRef<{
   title: string;
   description: string | null;
   coverUrl: string | null;
+  type: GameType;
+  baseGameId: string | null;
   platformId: string | null;
   platformName: string | null;
   platformSlug: string | null;
@@ -145,6 +163,11 @@ AdminGameItem.implement({
     title: t.exposeString("title"),
     description: t.exposeString("description", { nullable: true }),
     coverUrl: t.exposeString("coverUrl", { nullable: true }),
+    type: t.field({
+      type: GameTypeEnum,
+      resolve: (game) => game.type,
+    }),
+    baseGameId: t.exposeString("baseGameId", { nullable: true }),
     platformId: t.exposeString("platformId", { nullable: true }),
     platformName: t.exposeString("platformName", { nullable: true }),
     platformSlug: t.exposeString("platformSlug", { nullable: true }),
@@ -158,6 +181,8 @@ const AdminGamesPage = builder.objectRef<{
     title: string;
     description: string | null;
     coverUrl: string | null;
+    type: GameType;
+    baseGameId: string | null;
     platformId: string | null;
     platformName: string | null;
     platformSlug: string | null;
@@ -228,6 +253,8 @@ builder.queryField("adminGames", (t) =>
           title: game.title,
           description: game.description,
           coverUrl: game.coverUrl,
+          type: game.type,
+          baseGameId: game.baseGameId,
           platformId: game.platform?.id ?? null,
           platformName: game.platform?.name ?? null,
           platformSlug: game.platform?.slug ?? null,
@@ -262,6 +289,8 @@ const GamePageItem = builder.objectRef<{
   title: string;
   description: string | null;
   coverUrl: string | null;
+  type: GameType;
+  baseGameId: string | null;
   platformId: string | null;
   platformName: string | null;
   platformSlug: string | null;
@@ -276,6 +305,11 @@ GamePageItem.implement({
     title: t.exposeString("title"),
     description: t.exposeString("description", { nullable: true }),
     coverUrl: t.exposeString("coverUrl", { nullable: true }),
+    type: t.field({
+      type: GameTypeEnum,
+      resolve: (game) => game.type,
+    }),
+    baseGameId: t.exposeString("baseGameId", { nullable: true }),
     platform: t.field({
       type: GamePagePlatform,
       nullable: true,
@@ -300,6 +334,8 @@ const GamesPage = builder.objectRef<{
     title: string;
     description: string | null;
     coverUrl: string | null;
+    type: GameType;
+    baseGameId: string | null;
     platformId: string | null;
     platformName: string | null;
     platformSlug: string | null;
@@ -353,6 +389,14 @@ builder.queryField("gamesPage", (t) =>
 
       if (filter?.platformId) {
         where.platformId = filter.platformId;
+      }
+
+      if (filter?.type) {
+        where.type = filter.type;
+      }
+
+      if (filter?.isDerivative !== undefined) {
+        where.baseGameId = filter.isDerivative ? { not: null } : null;
       }
 
       if (filter?.hasAchievements !== undefined) {
@@ -432,6 +476,8 @@ builder.queryField("gamesPage", (t) =>
           title: game.title,
           description: game.description,
           coverUrl: game.coverUrl,
+          type: game.type,
+          baseGameId: game.baseGameId,
           platformId: game.platform?.id ?? null,
           platformName: game.platform?.name ?? null,
           platformSlug: game.platform?.slug ?? null,
