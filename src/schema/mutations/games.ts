@@ -229,6 +229,7 @@ builder.mutationField("updateGame", (t) =>
             where: {
               title: trimmedTitle,
               platformId: nextPlatformId,
+              id: { not: id }, // Exclude the current game
             },
           });
 
@@ -254,6 +255,7 @@ builder.mutationField("updateGame", (t) =>
           where: {
             title: existing.title,
             platformId: nextPlatformId,
+            id: { not: id }, // Exclude the current game
           },
         });
 
