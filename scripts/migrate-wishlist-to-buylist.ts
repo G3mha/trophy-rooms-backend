@@ -2,17 +2,25 @@ import { BuylistPriority, PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
+interface WishlistItem {
+  id: string;
+  userId: string;
+  gameId: string;
+  gameVersionId: string | null;
+  createdAt: Date;
+  gameTitle: string;
+}
+
 async function main() {
   console.log("Starting Wishlist to Buylist migration...");
 
-  // Find all UserGame entries with WISHLIST status
-  const wishlistItems = await prisma.userGame.findMany({
-    where: { status: "WISHLIST" },
-    include: {
-      game: true,
-      gameVersion: true,
-    },
-  });
+  // Use raw SQL to find WISHLIST items since it's been removed from the enum
+  const wishlistItems = await prisma.$queryRaw<WishlistItem[]>`
+    SELECT ug.id, ug."userId", ug."gameId", ug."gameVersionId", ug."createdAt", g.title as "gameTitle"
+    FROM "UserGame" ug
+    JOIN "Game" g ON ug."gameId" = g.id
+    WHERE ug.status = 'WISHLIST'
+  `;
 
   console.log(`Found ${wishlistItems.length} wishlist items to migrate.`);
 
@@ -34,7 +42,7 @@ async function main() {
       });
 
       if (existing) {
-        console.log(`Skipping game "${item.game.title}" - already in buylist`);
+        console.log(`Skipping game "${item.gameTitle}" - already in buylist`);
         skipped++;
         continue;
       }
@@ -54,10 +62,10 @@ async function main() {
         },
       });
 
-      console.log(`Migrated game "${item.game.title}" to buylist`);
+      console.log(`Migrated game "${item.gameTitle}" to buylist`);
       migrated++;
     } catch (error) {
-      console.error(`Error migrating game "${item.game.title}":`, error);
+      console.error(`Error migrating game "${item.gameTitle}":`, error);
       errors++;
     }
   }
@@ -67,11 +75,11 @@ async function main() {
   console.log(`  Skipped: ${skipped}`);
   console.log(`  Errors: ${errors}`);
 
-  // Delete the migrated wishlist items
-  const deleteResult = await prisma.userGame.deleteMany({
-    where: { status: "WISHLIST" },
-  });
-  console.log(`\nDeleted ${deleteResult.count} wishlist entries from UserGame.`);
+  // Delete the migrated wishlist items using raw SQL
+  const deleteResult = await prisma.$executeRaw`
+    DELETE FROM "UserGame" WHERE status = 'WISHLIST'
+  `;
+  console.log(`\nDeleted ${deleteResult} wishlist entries from UserGame.`);
 
   await prisma.$disconnect();
 }
