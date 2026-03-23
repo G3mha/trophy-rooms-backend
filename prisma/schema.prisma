@@ -38,7 +38,6 @@ enum AchievementTier {
 }
 
 enum GameStatus {
-  WISHLIST
   BACKLOG
   PLAYING
   PAUSED

@@ -14,7 +14,7 @@ const UserGameItem = builder.objectRef<{
   platformSlug: string | null;
   gameVersionId: string | null;
   gameVersionName: string | null;
-  status: "WISHLIST" | "BACKLOG" | "PLAYING" | "PAUSED" | "COMPLETED" | "DROPPED";
+  status: "BACKLOG" | "PLAYING" | "PAUSED" | "COMPLETED" | "DROPPED";
   addedAt: Date;
   updatedAt: Date;
 }>("UserGameItem");
@@ -40,7 +40,7 @@ UserGameItem.implement({
 
 // GameStatusInfo type for getGameStatus query
 const GameStatusInfo = builder.objectRef<{
-  status: "WISHLIST" | "BACKLOG" | "PLAYING" | "PAUSED" | "COMPLETED" | "DROPPED";
+  status: "BACKLOG" | "PLAYING" | "PAUSED" | "COMPLETED" | "DROPPED";
   platformId: string | null;
   gameVersionId: string | null;
 }>("GameStatusInfo");

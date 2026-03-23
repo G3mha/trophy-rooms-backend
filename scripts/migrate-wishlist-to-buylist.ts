@@ -67,12 +67,11 @@ async function main() {
   console.log(`  Skipped: ${skipped}`);
   console.log(`  Errors: ${errors}`);
 
-  // Optionally delete the migrated wishlist items
-  // Uncomment the following lines to delete after successful migration
-  // const deleteResult = await prisma.userGame.deleteMany({
-  //   where: { status: "WISHLIST" },
-  // });
-  // console.log(`\nDeleted ${deleteResult.count} wishlist entries from UserGame.`);
+  // Delete the migrated wishlist items
+  const deleteResult = await prisma.userGame.deleteMany({
+    where: { status: "WISHLIST" },
+  });
+  console.log(`\nDeleted ${deleteResult.count} wishlist entries from UserGame.`);
 
   await prisma.$disconnect();
 }
