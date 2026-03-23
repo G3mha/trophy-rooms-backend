@@ -1,0 +1,226 @@
+import { builder, MutationErrorRef } from "../builder.js";
+import { BuylistPriority as PrismaBuylistPriority } from "@prisma/client";
+import { ErrorCode } from "../../lib/errors.js";
+
+// Register the BuylistPriority enum
+export const BuylistPriority = builder.enumType(PrismaBuylistPriority, {
+  name: "BuylistPriority",
+});
+
+// Enum for filtering by item type
+export const BuylistItemType = builder.enumType("BuylistItemType", {
+  values: ["GAME", "DLC", "BUNDLE"] as const,
+});
+
+builder.prismaObject("BuylistItem", {
+  fields: (t) => ({
+    id: t.exposeID("id"),
+    userId: t.exposeString("userId"),
+    user: t.relation("user"),
+
+    // Item references (only one will be set)
+    gameId: t.exposeString("gameId", { nullable: true }),
+    game: t.relation("game", { nullable: true }),
+    gameVersionId: t.exposeString("gameVersionId", { nullable: true }),
+    gameVersion: t.relation("gameVersion", { nullable: true }),
+    dlcId: t.exposeString("dlcId", { nullable: true }),
+    dlc: t.relation("dlc", { nullable: true }),
+    bundleId: t.exposeString("bundleId", { nullable: true }),
+    bundle: t.relation("bundle", { nullable: true }),
+
+    // Metadata
+    priority: t.expose("priority", { type: BuylistPriority }),
+    notes: t.exposeString("notes", { nullable: true }),
+    estimatedPrice: t.exposeFloat("estimatedPrice", { nullable: true }),
+
+    // Timestamps
+    addedAt: t.expose("addedAt", { type: "DateTime" }),
+    updatedAt: t.expose("updatedAt", { type: "DateTime" }),
+
+    // Computed fields
+    itemType: t.field({
+      type: BuylistItemType,
+      resolve: (item) => {
+        if (item.bundleId) return "BUNDLE";
+        if (item.dlcId) return "DLC";
+        return "GAME";
+      },
+    }),
+
+    // Computed: Get the display title for this buylist item
+    displayTitle: t.string({
+      resolve: async (item, _args, ctx) => {
+        if (item.bundleId) {
+          const bundle = await ctx.prisma.bundle.findUnique({
+            where: { id: item.bundleId },
+            select: { name: true },
+          });
+          return bundle?.name ?? "Unknown Bundle";
+        }
+        if (item.dlcId) {
+          const dlc = await ctx.prisma.dLC.findUnique({
+            where: { id: item.dlcId },
+            select: { name: true },
+          });
+          return dlc?.name ?? "Unknown DLC";
+        }
+        if (item.gameId) {
+          const game = await ctx.prisma.game.findUnique({
+            where: { id: item.gameId },
+            select: { title: true },
+          });
+          const baseTitle = game?.title ?? "Unknown Game";
+          if (item.gameVersionId) {
+            const version = await ctx.prisma.gameVersion.findUnique({
+              where: { id: item.gameVersionId },
+              select: { name: true },
+            });
+            if (version) {
+              return `${baseTitle} (${version.name})`;
+            }
+          }
+          return baseTitle;
+        }
+        return "Unknown Item";
+      },
+    }),
+
+    // Computed: Get the cover URL for this buylist item
+    displayCoverUrl: t.string({
+      nullable: true,
+      resolve: async (item, _args, ctx) => {
+        if (item.bundleId) {
+          const bundle = await ctx.prisma.bundle.findUnique({
+            where: { id: item.bundleId },
+            select: { coverUrl: true },
+          });
+          return bundle?.coverUrl ?? null;
+        }
+        if (item.dlcId) {
+          const dlc = await ctx.prisma.dLC.findUnique({
+            where: { id: item.dlcId },
+            select: { coverUrl: true, game: { select: { coverUrl: true } } },
+          });
+          return dlc?.coverUrl ?? dlc?.game?.coverUrl ?? null;
+        }
+        if (item.gameVersionId) {
+          const version = await ctx.prisma.gameVersion.findUnique({
+            where: { id: item.gameVersionId },
+            select: { coverUrl: true, game: { select: { coverUrl: true } } },
+          });
+          return version?.coverUrl ?? version?.game?.coverUrl ?? null;
+        }
+        if (item.gameId) {
+          const game = await ctx.prisma.game.findUnique({
+            where: { id: item.gameId },
+            select: { coverUrl: true },
+          });
+          return game?.coverUrl ?? null;
+        }
+        return null;
+      },
+    }),
+  }),
+});
+
+// Input type for adding items to buylist
+export const AddToBuylistInput = builder.inputType("AddToBuylistInput", {
+  fields: (t) => ({
+    // One of these must be provided
+    gameId: t.id(),
+    gameVersionId: t.id(), // Only valid when gameId is also provided
+    dlcId: t.id(),
+    bundleId: t.id(),
+    // Metadata
+    priority: t.field({ type: BuylistPriority }),
+    notes: t.string(),
+    estimatedPrice: t.float(),
+  }),
+});
+
+// Input type for updating buylist items
+export const UpdateBuylistItemInput = builder.inputType(
+  "UpdateBuylistItemInput",
+  {
+    fields: (t) => ({
+      priority: t.field({ type: BuylistPriority }),
+      notes: t.string(),
+      estimatedPrice: t.float(),
+      gameVersionId: t.id(), // Can update version for game items
+    }),
+  }
+);
+
+// Filter input for querying buylist
+export const BuylistFilterInput = builder.inputType("BuylistFilterInput", {
+  fields: (t) => ({
+    priority: t.field({ type: BuylistPriority }),
+    itemType: t.field({ type: BuylistItemType }),
+  }),
+});
+
+// Sorting options for buylist
+export const BuylistOrderBy = builder.enumType("BuylistOrderBy", {
+  values: [
+    "ADDED_AT_ASC",
+    "ADDED_AT_DESC",
+    "PRIORITY_ASC",
+    "PRIORITY_DESC",
+    "PRICE_ASC",
+    "PRICE_DESC",
+  ] as const,
+});
+
+// BuylistItem mutation result type
+export const BuylistMutationResult = builder.objectRef<{
+  success: boolean;
+  buylistItemId: string | null;
+  error: { code: ErrorCode; message: string; field: string | null } | null;
+}>("BuylistMutationResult");
+
+BuylistMutationResult.implement({
+  fields: (t) => ({
+    success: t.exposeBoolean("success"),
+    buylistItem: t.prismaField({
+      type: "BuylistItem",
+      nullable: true,
+      resolve: async (query, result, _args, ctx) => {
+        if (!result.buylistItemId) return null;
+        return ctx.prisma.buylistItem.findUnique({
+          ...query,
+          where: { id: result.buylistItemId },
+        });
+      },
+    }),
+    error: t.field({
+      type: MutationErrorRef,
+      nullable: true,
+      resolve: (result) => result.error,
+    }),
+  }),
+});
+
+// Stats type for buylist summary
+export const BuylistStats = builder.objectRef<{
+  totalItems: number;
+  totalEstimatedCost: number;
+  highPriorityCount: number;
+  mediumPriorityCount: number;
+  lowPriorityCount: number;
+  gameCount: number;
+  dlcCount: number;
+  bundleCount: number;
+}>("BuylistStats");
+
+BuylistStats.implement({
+  fields: (t) => ({
+    totalItems: t.exposeInt("totalItems"),
+    totalEstimatedCost: t.exposeFloat("totalEstimatedCost"),
+    highPriorityCount: t.exposeInt("highPriorityCount"),
+    mediumPriorityCount: t.exposeInt("mediumPriorityCount"),
+    lowPriorityCount: t.exposeInt("lowPriorityCount"),
+    gameCount: t.exposeInt("gameCount"),
+    dlcCount: t.exposeInt("dlcCount"),
+    bundleCount: t.exposeInt("bundleCount"),
+  }),
+});
