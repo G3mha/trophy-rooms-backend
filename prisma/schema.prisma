@@ -72,6 +72,12 @@ enum GameType {
   ROM_HACK
 }
 
+enum BuylistPriority {
+  HIGH
+  MEDIUM
+  LOW
+}
+
 model User {
   id              String            @id @default(cuid())
   clerkId         String            @unique
@@ -85,6 +91,7 @@ model User {
   achievementSets AchievementSet[] @relation("AchievementSetCreator")
   ownedDlcs       UserDLC[]
   ownedBundles    UserBundle[]
+  buylistItems    BuylistItem[]
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
@@ -131,6 +138,7 @@ model Game {
   versions        GameVersion[]
   dlcs            DLC[]
   bundles         Bundle[]         @relation("BundleGames")
+  buylistItems    BuylistItem[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
@@ -156,6 +164,7 @@ model GameVersion {
   achievementSets AchievementSet[]
   userGames       UserGame[]
   collectionItems CollectionItem[]
+  buylistItems    BuylistItem[]
 
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
@@ -301,6 +310,7 @@ model DLC {
   gameVersions    GameVersion[]    @relation("GameVersionDLCs")
   bundles         Bundle[]         @relation("BundleDLCs")
   userDlcs        UserDLC[]
+  buylistItems    BuylistItem[]
 
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
@@ -342,6 +352,7 @@ model Bundle {
   games           Game[]           @relation("BundleGames")
   dlcs            DLC[]            @relation("BundleDLCs")
   userBundles     UserBundle[]
+  buylistItems    BuylistItem[]
 
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
@@ -366,4 +377,34 @@ model UserBundle {
   @@unique([userId, bundleId])
   @@index([userId])
   @@index([bundleId])
+}
+
+model BuylistItem {
+  id              String          @id @default(cuid())
+  userId          String
+
+  // Item type - one of these must be set
+  gameId          String?         // For games (with optional version)
+  gameVersionId   String?         // Specific edition (Standard, Deluxe, etc.)
+  dlcId           String?         // Standalone DLC
+  bundleId        String?         // Bundle/Season Pass
+
+  // Metadata
+  priority        BuylistPriority @default(MEDIUM)
+  notes           String?         // Gift notes, links, etc.
+  estimatedPrice  Float?          // Expected price in user's currency
+
+  // Timestamps
+  addedAt         DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  // Relations
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  game            Game?           @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  gameVersion     GameVersion?    @relation(fields: [gameVersionId], references: [id], onDelete: SetNull)
+  dlc             DLC?            @relation(fields: [dlcId], references: [id], onDelete: Cascade)
+  bundle          Bundle?         @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, gameId, gameVersionId, dlcId, bundleId])
+  @@index([userId])
 }
