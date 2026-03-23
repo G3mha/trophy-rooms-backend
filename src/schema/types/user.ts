@@ -138,6 +138,13 @@ builder.prismaObject("User", {
         });
       },
     }),
+    // Buylist relation
+    buylistItems: t.relation("buylistItems", {
+      query: {
+        orderBy: { addedAt: "desc" },
+      },
+    }),
+    buylistCount: t.relationCount("buylistItems"),
     createdAt: t.expose("createdAt", { type: "DateTime" }),
     updatedAt: t.expose("updatedAt", { type: "DateTime" }),
   }),
