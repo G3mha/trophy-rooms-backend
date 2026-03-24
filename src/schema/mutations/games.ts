@@ -427,6 +427,174 @@ builder.mutationField("deleteGame", (t) =>
   })
 );
 
+// Clone game to another platform
+builder.mutationField("cloneGameToPlatform", (t) =>
+  t.field({
+    type: GameMutationResult,
+    args: {
+      gameId: t.arg.id({ required: true }),
+      targetPlatformId: t.arg.id({ required: true }),
+      copyAchievementSets: t.arg.boolean({ required: false, defaultValue: false }),
+    },
+    resolve: async (_root, args, ctx) => {
+      if (!ctx.user) {
+        return {
+          success: false,
+          gameId: null,
+          error: {
+            code: ErrorCode.UNAUTHORIZED,
+            message: "You must be logged in to clone a game",
+            field: null,
+          },
+        };
+      }
+
+      if (!hasRequiredRole(ctx.user, UserRole.TRUSTED)) {
+        return {
+          success: false,
+          gameId: null,
+          error: {
+            code: ErrorCode.FORBIDDEN,
+            message: "You do not have permission to clone games",
+            field: null,
+          },
+        };
+      }
+
+      const { gameId, targetPlatformId, copyAchievementSets } = args;
+
+      // Get source game with all data
+      const sourceGame = await ctx.prisma.game.findUnique({
+        where: { id: gameId },
+        include: {
+          achievementSets: {
+            include: {
+              achievements: true,
+            },
+          },
+          versions: true,
+        },
+      });
+
+      if (!sourceGame) {
+        return {
+          success: false,
+          gameId: null,
+          error: {
+            code: ErrorCode.NOT_FOUND,
+            message: `Game with id "${gameId}" not found`,
+            field: "gameId",
+          },
+        };
+      }
+
+      // Verify target platform exists
+      const targetPlatform = await ctx.prisma.platform.findUnique({
+        where: { id: targetPlatformId },
+      });
+
+      if (!targetPlatform) {
+        return {
+          success: false,
+          gameId: null,
+          error: {
+            code: ErrorCode.NOT_FOUND,
+            message: `Platform with id "${targetPlatformId}" not found`,
+            field: "targetPlatformId",
+          },
+        };
+      }
+
+      // Check if game already exists on target platform
+      const existing = await ctx.prisma.game.findFirst({
+        where: {
+          title: sourceGame.title,
+          platformId: targetPlatformId,
+        },
+      });
+
+      if (existing) {
+        return {
+          success: false,
+          gameId: null,
+          error: {
+            code: ErrorCode.ALREADY_EXISTS,
+            message: `"${sourceGame.title}" already exists on ${targetPlatform.name}`,
+            field: "targetPlatformId",
+          },
+        };
+      }
+
+      // Clone game in a transaction
+      const clonedGame = await ctx.prisma.$transaction(async (tx) => {
+        // Create new game entry
+        const newGame = await tx.game.create({
+          data: {
+            title: sourceGame.title,
+            description: sourceGame.description,
+            coverUrl: sourceGame.coverUrl,
+            releaseDate: sourceGame.releaseDate,
+            developer: sourceGame.developer,
+            publisher: sourceGame.publisher,
+            genre: sourceGame.genre,
+            esrbRating: sourceGame.esrbRating,
+            screenshots: sourceGame.screenshots,
+            platformId: targetPlatformId,
+            type: sourceGame.type,
+            baseGameId: sourceGame.baseGameId,
+          },
+        });
+
+        // Create default version
+        await tx.gameVersion.create({
+          data: {
+            name: "Standard",
+            slug: "standard",
+            isDefault: true,
+            gameId: newGame.id,
+          },
+        });
+
+        // Optionally copy achievement sets
+        if (copyAchievementSets && sourceGame.achievementSets) {
+          for (const set of sourceGame.achievementSets) {
+            const newSet = await tx.achievementSet.create({
+              data: {
+                title: set.title,
+                type: set.type,
+                visibility: set.visibility,
+                gameId: newGame.id,
+              },
+            });
+
+            // Copy achievements
+            if (set.achievements && set.achievements.length > 0) {
+              await tx.achievement.createMany({
+                data: set.achievements.map((achievement) => ({
+                  title: achievement.title,
+                  description: achievement.description,
+                  iconUrl: achievement.iconUrl,
+                  points: achievement.points,
+                  tier: achievement.tier,
+                  achievementSetId: newSet.id,
+                })),
+              });
+            }
+          }
+        }
+
+        return newGame;
+      });
+
+      return {
+        success: true,
+        gameId: clonedGame.id,
+        error: null,
+      };
+    },
+  })
+);
+
 // Bulk delete games mutation
 builder.mutationField("bulkDeleteGames", (t) =>
   t.field({
