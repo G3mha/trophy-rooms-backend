@@ -513,3 +513,58 @@ builder.queryField("game", (t) =>
     },
   })
 );
+
+// Games by title query - returns all games with matching title (case-insensitive)
+builder.queryField("gamesByTitle", (t) =>
+  t.field({
+    type: [GamePageItem],
+    args: {
+      title: t.arg.string({ required: true }),
+    },
+    resolve: async (_root, args, ctx) => {
+      const games = await ctx.prisma.game.findMany({
+        where: {
+          title: {
+            equals: args.title,
+            mode: "insensitive",
+          },
+        },
+        include: {
+          platform: true,
+          _count: {
+            select: {
+              achievementSets: true,
+              trophies: true,
+            },
+          },
+          achievementSets: {
+            select: {
+              _count: {
+                select: { achievements: true },
+              },
+            },
+          },
+        },
+        orderBy: { platform: { name: "asc" } },
+      });
+
+      return games.map((game) => ({
+        id: game.id,
+        title: game.title,
+        description: game.description,
+        coverUrl: game.coverUrl,
+        type: game.type,
+        baseGameId: game.baseGameId,
+        platformId: game.platform?.id ?? null,
+        platformName: game.platform?.name ?? null,
+        platformSlug: game.platform?.slug ?? null,
+        achievementSetCount: game._count.achievementSets,
+        achievementCount: game.achievementSets.reduce(
+          (sum, set) => sum + set._count.achievements,
+          0
+        ),
+        trophyCount: game._count.trophies,
+      }));
+    },
+  })
+);
