@@ -102,6 +102,7 @@ model Platform {
   name            String           @unique
   slug            String           @unique
   games           Game[]
+  bundles         Bundle[]
   collectionItems CollectionItem[]
   userGames       UserGame[]
   createdAt       DateTime         @default(now())
@@ -347,6 +348,10 @@ model Bundle {
   releaseDate     DateTime?
   price           Float?
 
+  // Platform association
+  platform        Platform?        @relation(fields: [platformId], references: [id])
+  platformId      String?
+
   // Many-to-many with games and DLCs
   games           Game[]           @relation("BundleGames")
   dlcs            DLC[]            @relation("BundleDLCs")
@@ -357,6 +362,7 @@ model Bundle {
   updatedAt       DateTime         @updatedAt
 
   @@index([type])
+  @@index([platformId])
 }
 
 model UserBundle {
