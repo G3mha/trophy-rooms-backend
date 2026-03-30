@@ -105,7 +105,7 @@ builder.mutationField("createBundle", (t) =>
         };
       }
 
-      const { name, slug, type, description, coverUrl, releaseDate, price, gameIds, dlcIds } = args.input;
+      const { name, slug, type, description, coverUrl, releaseDate, price, platformId, gameIds, dlcIds } = args.input;
 
       // Validate name
       const trimmedName = name.trim();
@@ -162,6 +162,7 @@ builder.mutationField("createBundle", (t) =>
           coverUrl: coverUrl?.trim() || null,
           releaseDate: releaseDate ?? null,
           price: price ?? null,
+          platformId: platformId ?? null,
           games: gameIds && gameIds.length > 0 ? {
             connect: gameIds.map((id) => ({ id })),
           } : undefined,
@@ -241,6 +242,7 @@ builder.mutationField("updateBundle", (t) =>
         coverUrl?: string | null;
         releaseDate?: Date | null;
         price?: number | null;
+        platformId?: string | null;
         games?: { set: { id: string }[] };
         dlcs?: { set: { id: string }[] };
       } = {};
@@ -314,6 +316,10 @@ builder.mutationField("updateBundle", (t) =>
 
       if (input.price !== undefined) {
         updateData.price = input.price ?? null;
+      }
+
+      if (input.platformId !== undefined) {
+        updateData.platformId = input.platformId ?? null;
       }
 
       if (input.gameIds !== undefined) {
