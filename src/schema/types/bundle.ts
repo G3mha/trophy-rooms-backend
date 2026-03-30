@@ -17,6 +17,8 @@ builder.prismaObject("Bundle", {
     coverUrl: t.exposeString("coverUrl", { nullable: true }),
     releaseDate: t.expose("releaseDate", { type: "DateTime", nullable: true }),
     price: t.exposeFloat("price", { nullable: true }),
+    platform: t.relation("platform", { nullable: true }),
+    platformId: t.exposeString("platformId", { nullable: true }),
     games: t.relation("games", {
       query: {
         orderBy: { title: "asc" },
@@ -73,6 +75,7 @@ export const CreateBundleInput = builder.inputType("CreateBundleInput", {
     coverUrl: t.string(),
     releaseDate: t.field({ type: "DateTime" }),
     price: t.float(),
+    platformId: t.id(),
     gameIds: t.idList(),
     dlcIds: t.idList(),
   }),
@@ -87,6 +90,7 @@ export const UpdateBundleInput = builder.inputType("UpdateBundleInput", {
     coverUrl: t.string(),
     releaseDate: t.field({ type: "DateTime" }),
     price: t.float(),
+    platformId: t.id(),
     gameIds: t.idList(),
     dlcIds: t.idList(),
   }),
