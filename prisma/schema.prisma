@@ -69,6 +69,8 @@ enum GameType {
   BASE_GAME
   FANGAME
   ROM_HACK
+  DLC
+  EXPANSION
 }
 
 enum BuylistPriority {
