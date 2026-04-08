@@ -11,3 +11,4 @@ import "./game-progress.js";
 import "./user-game.js";
 import "./collection-items.js";
 import "./buylist.js";
+import "./autocomplete.js";
