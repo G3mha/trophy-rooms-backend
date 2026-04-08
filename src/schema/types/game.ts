@@ -23,10 +23,13 @@ builder.prismaObject("Game", {
     baseGame: t.relation("baseGame", { nullable: true }),
     derivatives: t.relation("derivatives", {
       query: {
+        where: { type: { in: ["FANGAME", "ROM_HACK", "MOD"] } },
         orderBy: { title: "asc" },
       },
     }),
-    derivativeCount: t.relationCount("derivatives"),
+    derivativeCount: t.relationCount("derivatives", {
+      where: { type: { in: ["FANGAME", "ROM_HACK", "MOD"] } },
+    }),
     platform: t.relation("platform", { nullable: true }),
     platformId: t.exposeString("platformId", { nullable: true }),
     achievementSets: t.relation("achievementSets", {
