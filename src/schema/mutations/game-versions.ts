@@ -19,17 +19,19 @@ function slugify(name: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
-// Query: Get all versions for a game
+// Query: Get all versions (optionally filtered by game)
 builder.queryField("gameVersions", (t) =>
   t.prismaField({
     type: ["GameVersion"],
     args: {
-      gameId: t.arg.id({ required: true }),
+      gameId: t.arg.id(), // Now optional - filter by game
     },
     resolve: async (query, _root, args, ctx) => {
       return ctx.prisma.gameVersion.findMany({
         ...query,
-        where: { gameId: args.gameId },
+        where: args.gameId
+          ? { games: { some: { id: args.gameId } } }
+          : undefined,
         orderBy: [{ isDefault: "desc" }, { name: "asc" }],
       });
     },
@@ -85,7 +87,20 @@ builder.mutationField("createGameVersion", (t) =>
         };
       }
 
-      const { gameId, name, slug, description, coverUrl, releaseDate, dlcIds, isDefault } = args.input;
+      const { gameIds, name, slug, description, coverUrl, releaseDate, dlcIds, isDefault } = args.input;
+
+      // Validate gameIds
+      if (!gameIds || gameIds.length === 0) {
+        return {
+          success: false,
+          gameVersionId: null,
+          error: {
+            code: ErrorCode.VALIDATION_ERROR,
+            message: "At least one game must be specified",
+            field: "gameIds",
+          },
+        };
+      }
 
       // Validate name
       const trimmedName = name.trim();
@@ -115,31 +130,29 @@ builder.mutationField("createGameVersion", (t) =>
         };
       }
 
-      // Check if game exists
-      const game = await ctx.prisma.game.findUnique({
-        where: { id: gameId },
+      // Check if all games exist
+      const games = await ctx.prisma.game.findMany({
+        where: { id: { in: gameIds } },
+        select: { id: true },
       });
 
-      if (!game) {
+      if (games.length !== gameIds.length) {
+        const foundIds = new Set(games.map(g => g.id));
+        const missingIds = gameIds.filter(id => !foundIds.has(id));
         return {
           success: false,
           gameVersionId: null,
           error: {
             code: ErrorCode.NOT_FOUND,
-            message: `Game with id "${gameId}" not found`,
-            field: "gameId",
+            message: `Game(s) not found: ${missingIds.join(", ")}`,
+            field: "gameIds",
           },
         };
       }
 
-      // Check for duplicate slug
+      // Check for duplicate slug (now globally unique)
       const existing = await ctx.prisma.gameVersion.findUnique({
-        where: {
-          gameId_slug: {
-            gameId,
-            slug: trimmedSlug,
-          },
-        },
+        where: { slug: trimmedSlug },
       });
 
       if (existing) {
@@ -148,21 +161,21 @@ builder.mutationField("createGameVersion", (t) =>
           gameVersionId: null,
           error: {
             code: ErrorCode.ALREADY_EXISTS,
-            message: `A version with slug "${trimmedSlug}" already exists for this game`,
+            message: `A version with slug "${trimmedSlug}" already exists`,
             field: "slug",
           },
         };
       }
 
-      // If setting as default, unset other defaults first
+      // If setting as default, unset other defaults globally
       if (isDefault) {
         await ctx.prisma.gameVersion.updateMany({
-          where: { gameId, isDefault: true },
+          where: { isDefault: true },
           data: { isDefault: false },
         });
       }
 
-      // Create version
+      // Create version with many-to-many connection to games
       const version = await ctx.prisma.gameVersion.create({
         data: {
           name: trimmedName,
@@ -171,7 +184,9 @@ builder.mutationField("createGameVersion", (t) =>
           coverUrl: coverUrl?.trim() || null,
           releaseDate: releaseDate ?? null,
           isDefault: isDefault ?? false,
-          gameId,
+          games: {
+            connect: gameIds.map((id) => ({ id })),
+          },
           dlcs: dlcIds && dlcIds.length > 0 ? {
             connect: dlcIds.map((id) => ({ id })),
           } : undefined,
@@ -247,6 +262,7 @@ builder.mutationField("updateGameVersion", (t) =>
         coverUrl?: string | null;
         releaseDate?: Date | null;
         dlcs?: { set: { id: string }[] };
+        games?: { set: { id: string }[] };
       } = {};
 
       if (input.name !== undefined && input.name !== null) {
@@ -279,15 +295,10 @@ builder.mutationField("updateGameVersion", (t) =>
           };
         }
 
-        // Check for duplicate slug (excluding current version)
+        // Check for duplicate slug (excluding current version) - now globally unique
         if (trimmedSlug !== existing.slug) {
           const duplicate = await ctx.prisma.gameVersion.findUnique({
-            where: {
-              gameId_slug: {
-                gameId: existing.gameId,
-                slug: trimmedSlug,
-              },
-            },
+            where: { slug: trimmedSlug },
           });
 
           if (duplicate) {
@@ -296,7 +307,7 @@ builder.mutationField("updateGameVersion", (t) =>
               gameVersionId: null,
               error: {
                 code: ErrorCode.ALREADY_EXISTS,
-                message: `A version with slug "${trimmedSlug}" already exists for this game`,
+                message: `A version with slug "${trimmedSlug}" already exists`,
                 field: "slug",
               },
             };
@@ -320,6 +331,44 @@ builder.mutationField("updateGameVersion", (t) =>
       if (input.dlcIds !== undefined) {
         updateData.dlcs = {
           set: (input.dlcIds ?? []).map((id) => ({ id })),
+        };
+      }
+
+      // Handle gameIds update - validate all games exist if provided
+      if (input.gameIds !== undefined && input.gameIds !== null) {
+        if (input.gameIds.length === 0) {
+          return {
+            success: false,
+            gameVersionId: null,
+            error: {
+              code: ErrorCode.VALIDATION_ERROR,
+              message: "At least one game must be linked",
+              field: "gameIds",
+            },
+          };
+        }
+
+        const games = await ctx.prisma.game.findMany({
+          where: { id: { in: input.gameIds } },
+          select: { id: true },
+        });
+
+        if (games.length !== input.gameIds.length) {
+          const foundIds = new Set(games.map(g => g.id));
+          const missingIds = input.gameIds.filter(id => !foundIds.has(id));
+          return {
+            success: false,
+            gameVersionId: null,
+            error: {
+              code: ErrorCode.NOT_FOUND,
+              message: `Game(s) not found: ${missingIds.join(", ")}`,
+              field: "gameIds",
+            },
+          };
+        }
+
+        updateData.games = {
+          set: input.gameIds.map((id) => ({ id })),
         };
       }
 
@@ -467,11 +516,11 @@ builder.mutationField("setDefaultVersion", (t) =>
         };
       }
 
-      // Use transaction to ensure atomicity
+      // Use transaction to ensure atomicity - now globally unset/set default
       await ctx.prisma.$transaction([
-        // Unset current default
+        // Unset all current defaults globally
         ctx.prisma.gameVersion.updateMany({
-          where: { gameId: existing.gameId, isDefault: true },
+          where: { isDefault: true },
           data: { isDefault: false },
         }),
         // Set new default
