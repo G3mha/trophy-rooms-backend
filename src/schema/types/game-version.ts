@@ -16,26 +16,41 @@ builder.prismaObject("GameVersion", {
       },
     }),
     dlcCount: t.relationCount("dlcs"),
-    game: t.relation("game"),
-    gameId: t.exposeString("gameId"),
+    // Many-to-many: games instead of game
+    games: t.relation("games", {
+      query: {
+        orderBy: { title: "asc" },
+      },
+    }),
+    gameCount: t.relationCount("games"),
+    // Convenience field: array of game IDs
+    gameIds: t.stringList({
+      resolve: async (version, _args, ctx) => {
+        const games = await ctx.prisma.game.findMany({
+          where: { versions: { some: { id: version.id } } },
+          select: { id: true },
+        });
+        return games.map(g => g.id);
+      },
+    }),
     achievementSets: t.relation("achievementSets", {
       query: {
         orderBy: { title: "asc" },
       },
     }),
     achievementSetCount: t.relationCount("achievementSets"),
-    // Computed field: returns version coverUrl if set, otherwise falls back to game.coverUrl
+    // Computed field: returns version coverUrl if set, otherwise falls back to first game's coverUrl
     effectiveCoverUrl: t.string({
       nullable: true,
       resolve: async (version, _args, ctx) => {
         if (version.coverUrl) {
           return version.coverUrl;
         }
-        const game = await ctx.prisma.game.findUnique({
-          where: { id: version.gameId },
+        const firstGame = await ctx.prisma.game.findFirst({
+          where: { versions: { some: { id: version.id } } },
           select: { coverUrl: true },
         });
-        return game?.coverUrl ?? null;
+        return firstGame?.coverUrl ?? null;
       },
     }),
     createdAt: t.expose("createdAt", { type: "DateTime" }),
@@ -46,7 +61,7 @@ builder.prismaObject("GameVersion", {
 // Input types for game version mutations
 export const CreateGameVersionInput = builder.inputType("CreateGameVersionInput", {
   fields: (t) => ({
-    gameId: t.id({ required: true }),
+    gameIds: t.idList({ required: true }), // Now accepts array of game IDs
     name: t.string({ required: true }),
     slug: t.string({ required: true }),
     description: t.string(),
@@ -65,6 +80,7 @@ export const UpdateGameVersionInput = builder.inputType("UpdateGameVersionInput"
     coverUrl: t.string(),
     releaseDate: t.field({ type: "DateTime" }),
     dlcIds: t.idList(),
+    gameIds: t.idList(), // Optional: update linked games
   }),
 });
 
