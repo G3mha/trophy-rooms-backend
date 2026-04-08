@@ -69,6 +69,7 @@ enum GameType {
   BASE_GAME
   FANGAME
   ROM_HACK
+  MOD
   DLC
   EXPANSION
 }

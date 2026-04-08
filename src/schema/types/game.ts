@@ -1,9 +1,9 @@
 import { builder, MutationErrorRef } from "../builder.js";
 import { ErrorCode } from "../../lib/errors.js";
 
-// GameType enum for categorizing games (base games, fangames, ROM hacks, DLCs, expansions)
+// GameType enum for categorizing games (base games, fangames, ROM hacks, mods, DLCs, expansions)
 export const GameTypeEnum = builder.enumType("GameType", {
-  values: ["BASE_GAME", "FANGAME", "ROM_HACK", "DLC", "EXPANSION"] as const,
+  values: ["BASE_GAME", "FANGAME", "ROM_HACK", "MOD", "DLC", "EXPANSION"] as const,
 });
 
 builder.prismaObject("Game", {
