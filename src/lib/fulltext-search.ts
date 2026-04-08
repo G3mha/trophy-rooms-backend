@@ -1,4 +1,10 @@
 import { PrismaClient } from "@prisma/client";
+import {
+  CachePrefix,
+  CacheTTL,
+  cacheKey,
+  getCachedOrCompute,
+} from "./cache.js";
 
 /**
  * Convert a search string to a PostgreSQL tsquery format.
@@ -20,13 +26,13 @@ export function toTsQuery(search: string): string {
 }
 
 /**
- * Search games using PostgreSQL full-text search.
+ * Search games using PostgreSQL full-text search (uncached).
  * Returns game IDs ordered by relevance.
  */
-export async function searchGamesFullText(
+async function searchGamesFullTextUncached(
   prisma: PrismaClient,
   search: string,
-  limit: number = 1000
+  limit: number
 ): Promise<string[]> {
   const tsquery = toTsQuery(search);
   if (!tsquery) return [];
@@ -43,13 +49,13 @@ export async function searchGamesFullText(
 }
 
 /**
- * Search games with trigram similarity for fuzzy matching.
+ * Search games with trigram similarity for fuzzy matching (uncached).
  * Useful when full-text search returns no results.
  */
-export async function searchGamesFuzzy(
+async function searchGamesFuzzyUncached(
   prisma: PrismaClient,
   search: string,
-  limit: number = 100
+  limit: number
 ): Promise<string[]> {
   const results = await prisma.$queryRaw<{ id: string }[]>`
     SELECT id
@@ -64,85 +70,105 @@ export async function searchGamesFuzzy(
 
 /**
  * Combined search: tries full-text first, falls back to fuzzy if no results.
+ * Results are cached for performance.
  */
 export async function searchGames(
   prisma: PrismaClient,
   search: string,
   limit: number = 1000
 ): Promise<string[]> {
-  // Try full-text search first
-  const fullTextResults = await searchGamesFullText(prisma, search, limit);
+  const key = cacheKey(CachePrefix.GAME_SEARCH, { search: search.toLowerCase(), limit });
 
-  if (fullTextResults.length > 0) {
-    return fullTextResults;
-  }
+  return getCachedOrCompute(key, CacheTTL.SEARCH_RESULTS, async () => {
+    // Try full-text search first
+    const fullTextResults = await searchGamesFullTextUncached(prisma, search, limit);
 
-  // Fall back to fuzzy search for typos/partial matches
-  return searchGamesFuzzy(prisma, search, limit);
+    if (fullTextResults.length > 0) {
+      return fullTextResults;
+    }
+
+    // Fall back to fuzzy search for typos/partial matches
+    return searchGamesFuzzyUncached(prisma, search, limit);
+  });
 }
 
 /**
  * Search achievements using PostgreSQL full-text search.
+ * Results are cached for performance.
  */
 export async function searchAchievementsFullText(
   prisma: PrismaClient,
   search: string,
   limit: number = 1000
 ): Promise<string[]> {
-  const tsquery = toTsQuery(search);
-  if (!tsquery) return [];
+  const key = cacheKey(CachePrefix.ACHIEVEMENT_SEARCH, { search: search.toLowerCase(), limit });
 
-  const results = await prisma.$queryRaw<{ id: string }[]>`
-    SELECT id
-    FROM "Achievement"
-    WHERE search_vector @@ to_tsquery('english', ${tsquery})
-    ORDER BY ts_rank(search_vector, to_tsquery('english', ${tsquery})) DESC
-    LIMIT ${limit}
-  `;
+  return getCachedOrCompute(key, CacheTTL.SEARCH_RESULTS, async () => {
+    const tsquery = toTsQuery(search);
+    if (!tsquery) return [];
 
-  return results.map((r) => r.id);
+    const results = await prisma.$queryRaw<{ id: string }[]>`
+      SELECT id
+      FROM "Achievement"
+      WHERE search_vector @@ to_tsquery('english', ${tsquery})
+      ORDER BY ts_rank(search_vector, to_tsquery('english', ${tsquery})) DESC
+      LIMIT ${limit}
+    `;
+
+    return results.map((r) => r.id);
+  });
 }
 
 /**
  * Search game versions using PostgreSQL full-text search.
+ * Results are cached for performance.
  */
 export async function searchGameVersionsFullText(
   prisma: PrismaClient,
   search: string,
   limit: number = 1000
 ): Promise<string[]> {
-  const tsquery = toTsQuery(search);
-  if (!tsquery) return [];
+  const key = cacheKey(CachePrefix.GAME_VERSION_SEARCH, { search: search.toLowerCase(), limit });
 
-  const results = await prisma.$queryRaw<{ id: string }[]>`
-    SELECT id
-    FROM "GameVersion"
-    WHERE search_vector @@ to_tsquery('english', ${tsquery})
-    ORDER BY ts_rank(search_vector, to_tsquery('english', ${tsquery})) DESC
-    LIMIT ${limit}
-  `;
+  return getCachedOrCompute(key, CacheTTL.SEARCH_RESULTS, async () => {
+    const tsquery = toTsQuery(search);
+    if (!tsquery) return [];
 
-  return results.map((r) => r.id);
+    const results = await prisma.$queryRaw<{ id: string }[]>`
+      SELECT id
+      FROM "GameVersion"
+      WHERE search_vector @@ to_tsquery('english', ${tsquery})
+      ORDER BY ts_rank(search_vector, to_tsquery('english', ${tsquery})) DESC
+      LIMIT ${limit}
+    `;
+
+    return results.map((r) => r.id);
+  });
 }
 
 /**
  * Search DLCs using PostgreSQL full-text search.
+ * Results are cached for performance.
  */
 export async function searchDLCsFullText(
   prisma: PrismaClient,
   search: string,
   limit: number = 1000
 ): Promise<string[]> {
-  const tsquery = toTsQuery(search);
-  if (!tsquery) return [];
+  const key = cacheKey(CachePrefix.DLC_SEARCH, { search: search.toLowerCase(), limit });
 
-  const results = await prisma.$queryRaw<{ id: string }[]>`
-    SELECT id
-    FROM "DLC"
-    WHERE search_vector @@ to_tsquery('english', ${tsquery})
-    ORDER BY ts_rank(search_vector, to_tsquery('english', ${tsquery})) DESC
-    LIMIT ${limit}
-  `;
+  return getCachedOrCompute(key, CacheTTL.SEARCH_RESULTS, async () => {
+    const tsquery = toTsQuery(search);
+    if (!tsquery) return [];
 
-  return results.map((r) => r.id);
+    const results = await prisma.$queryRaw<{ id: string }[]>`
+      SELECT id
+      FROM "DLC"
+      WHERE search_vector @@ to_tsquery('english', ${tsquery})
+      ORDER BY ts_rank(search_vector, to_tsquery('english', ${tsquery})) DESC
+      LIMIT ${limit}
+    `;
+
+    return results.map((r) => r.id);
+  });
 }
