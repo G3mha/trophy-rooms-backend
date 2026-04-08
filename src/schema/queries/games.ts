@@ -2,6 +2,7 @@ import { Prisma, AchievementSetVisibility, UserRole, GameType } from "@prisma/cl
 import { builder } from "../builder.js";
 import { GamesFilterInput, GameOrderBy, GameTypeEnum } from "../types/game.js";
 import { hasRequiredRole } from "../../context.js";
+import { searchGames } from "../../lib/fulltext-search.js";
 
 // Games connection with cursor-based pagination
 builder.queryField("games", (t) =>
@@ -16,11 +17,13 @@ builder.queryField("games", (t) =>
       const { filter } = args;
       const where: Prisma.GameWhereInput = {};
 
+      // Use full-text search for better performance and relevance
       if (filter?.search) {
-        where.OR = [
-          { title: { contains: filter.search, mode: "insensitive" } },
-          { description: { contains: filter.search, mode: "insensitive" } },
-        ];
+        const matchingIds = await searchGames(ctx.prisma, filter.search);
+        if (matchingIds.length === 0) {
+          return 0; // No matches found
+        }
+        where.id = { in: matchingIds };
       }
 
       if (filter?.platformId) {
@@ -61,11 +64,13 @@ builder.queryField("games", (t) =>
       // Build where clause
       const where: Prisma.GameWhereInput = {};
 
+      // Use full-text search for better performance and relevance
       if (filter?.search) {
-        where.OR = [
-          { title: { contains: filter.search, mode: "insensitive" } },
-          { description: { contains: filter.search, mode: "insensitive" } },
-        ];
+        const matchingIds = await searchGames(ctx.prisma, filter.search);
+        if (matchingIds.length === 0) {
+          return []; // No matches found
+        }
+        where.id = { in: matchingIds };
       }
 
       if (filter?.hasAchievements === true) {
@@ -222,11 +227,19 @@ builder.queryField("adminGames", (t) =>
 
       const where: Prisma.GameWhereInput = {};
 
+      // Use full-text search for better performance and relevance
       if (args.search) {
-        where.OR = [
-          { title: { contains: args.search, mode: "insensitive" } },
-          { description: { contains: args.search, mode: "insensitive" } },
-        ];
+        const matchingIds = await searchGames(ctx.prisma, args.search);
+        if (matchingIds.length === 0) {
+          return {
+            items: [],
+            totalCount: 0,
+            page,
+            pageSize,
+            totalPages: 0,
+          };
+        }
+        where.id = { in: matchingIds };
       }
 
       const [games, totalCount] = await Promise.all([
@@ -234,7 +247,7 @@ builder.queryField("adminGames", (t) =>
           where,
           skip,
           take: pageSize,
-          orderBy: { title: "asc" },
+          orderBy: args.search ? undefined : { title: "asc" }, // When searching, order by relevance (ID order from search)
           include: {
             platform: true,
             _count: {
@@ -379,12 +392,21 @@ builder.queryField("gamesPage", (t) =>
 
       // Build where clause
       const where: Prisma.GameWhereInput = {};
+      let searchMatchingIds: string[] | null = null;
 
+      // Use full-text search for better performance and relevance
       if (filter?.search) {
-        where.OR = [
-          { title: { contains: filter.search, mode: "insensitive" } },
-          { description: { contains: filter.search, mode: "insensitive" } },
-        ];
+        searchMatchingIds = await searchGames(ctx.prisma, filter.search);
+        if (searchMatchingIds.length === 0) {
+          return {
+            items: [],
+            totalCount: 0,
+            page,
+            pageSize,
+            totalPages: 0,
+          };
+        }
+        where.id = { in: searchMatchingIds };
       }
 
       if (filter?.platformId) {
@@ -418,28 +440,31 @@ builder.queryField("gamesPage", (t) =>
       }
 
       // Build order by clause
-      let orderByClause: Prisma.GameOrderByWithRelationInput;
+      let orderByClause: Prisma.GameOrderByWithRelationInput | undefined;
 
-      switch (orderBy) {
-        case "TITLE_DESC":
-          orderByClause = { title: "desc" };
-          break;
-        case "CREATED_AT_ASC":
-          orderByClause = { createdAt: "asc" };
-          break;
-        case "CREATED_AT_DESC":
-          orderByClause = { createdAt: "desc" };
-          break;
-        case "ACHIEVEMENT_COUNT_DESC":
-          orderByClause = { achievementSets: { _count: "desc" } };
-          break;
-        case "TROPHY_COUNT_DESC":
-          orderByClause = { trophies: { _count: "desc" } };
-          break;
-        case "TITLE_ASC":
-        default:
-          orderByClause = { title: "asc" };
-          break;
+      // When searching without explicit orderBy, preserve relevance order
+      if (!searchMatchingIds || orderBy) {
+        switch (orderBy) {
+          case "TITLE_DESC":
+            orderByClause = { title: "desc" };
+            break;
+          case "CREATED_AT_ASC":
+            orderByClause = { createdAt: "asc" };
+            break;
+          case "CREATED_AT_DESC":
+            orderByClause = { createdAt: "desc" };
+            break;
+          case "ACHIEVEMENT_COUNT_DESC":
+            orderByClause = { achievementSets: { _count: "desc" } };
+            break;
+          case "TROPHY_COUNT_DESC":
+            orderByClause = { trophies: { _count: "desc" } };
+            break;
+          case "TITLE_ASC":
+          default:
+            orderByClause = { title: "asc" };
+            break;
+        }
       }
 
       const [games, totalCount] = await Promise.all([
