@@ -5,6 +5,7 @@ import {
   AchievementOrderBy,
 } from "../types/achievement.js";
 import { hasRequiredRole } from "../../context.js";
+import { searchAchievementsFullText } from "../../lib/fulltext-search.js";
 
 // Achievements connection with cursor-based pagination
 builder.queryField("achievements", (t) =>
@@ -19,11 +20,13 @@ builder.queryField("achievements", (t) =>
       const { filter } = args;
       const where: Prisma.AchievementWhereInput = {};
 
+      // Use full-text search for better performance and relevance
       if (filter?.search) {
-        where.OR = [
-          { title: { contains: filter.search, mode: "insensitive" } },
-          { description: { contains: filter.search, mode: "insensitive" } },
-        ];
+        const matchingIds = await searchAchievementsFullText(ctx.prisma, filter.search);
+        if (matchingIds.length === 0) {
+          return 0;
+        }
+        where.id = { in: matchingIds };
       }
 
       const achievementSetWhere: Prisma.AchievementSetWhereInput = {};
@@ -75,11 +78,13 @@ builder.queryField("achievements", (t) =>
       // Build where clause
       const where: Prisma.AchievementWhereInput = {};
 
+      // Use full-text search for better performance and relevance
       if (filter?.search) {
-        where.OR = [
-          { title: { contains: filter.search, mode: "insensitive" } },
-          { description: { contains: filter.search, mode: "insensitive" } },
-        ];
+        const matchingIds = await searchAchievementsFullText(ctx.prisma, filter.search);
+        if (matchingIds.length === 0) {
+          return [];
+        }
+        where.id = { in: matchingIds };
       }
 
       const achievementSetWhere: Prisma.AchievementSetWhereInput = {};
