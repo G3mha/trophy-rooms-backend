@@ -62,7 +62,7 @@ builder.prismaObject("Game", {
       resolve: async (query, game, _args, ctx) => {
         return ctx.prisma.gameVersion.findFirst({
           ...query,
-          where: { gameId: game.id, isDefault: true },
+          where: { games: { some: { id: game.id } }, isDefault: true },
         });
       },
     }),

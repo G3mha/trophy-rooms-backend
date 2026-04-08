@@ -117,15 +117,31 @@ builder.mutationField("createGame", (t) =>
           },
         });
 
-        // Auto-create default "Standard" version
-        await tx.gameVersion.create({
-          data: {
-            name: "Standard",
-            slug: "standard",
-            isDefault: true,
-            gameId: newGame.id,
-          },
+        // Auto-create default "Standard" version linked to this game
+        // First check if a "Standard" version already exists (shared)
+        const existingStandard = await tx.gameVersion.findUnique({
+          where: { slug: "standard" },
         });
+
+        if (existingStandard) {
+          // Link the existing Standard version to this game
+          await tx.gameVersion.update({
+            where: { id: existingStandard.id },
+            data: {
+              games: { connect: { id: newGame.id } },
+            },
+          });
+        } else {
+          // Create a new Standard version linked to this game
+          await tx.gameVersion.create({
+            data: {
+              name: "Standard",
+              slug: "standard",
+              isDefault: true,
+              games: { connect: { id: newGame.id } },
+            },
+          });
+        }
 
         return newGame;
       });
@@ -545,15 +561,30 @@ builder.mutationField("cloneGameToPlatform", (t) =>
           },
         });
 
-        // Create default version
-        await tx.gameVersion.create({
-          data: {
-            name: "Standard",
-            slug: "standard",
-            isDefault: true,
-            gameId: newGame.id,
-          },
+        // Link to existing "Standard" version or create one
+        const existingStandard = await tx.gameVersion.findUnique({
+          where: { slug: "standard" },
         });
+
+        if (existingStandard) {
+          // Link the existing Standard version to the new game
+          await tx.gameVersion.update({
+            where: { id: existingStandard.id },
+            data: {
+              games: { connect: { id: newGame.id } },
+            },
+          });
+        } else {
+          // Create a new Standard version linked to this game
+          await tx.gameVersion.create({
+            data: {
+              name: "Standard",
+              slug: "standard",
+              isDefault: true,
+              games: { connect: { id: newGame.id } },
+            },
+          });
+        }
 
         // Optionally copy achievement sets
         if (copyAchievementSets && sourceGame.achievementSets) {
