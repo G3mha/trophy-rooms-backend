@@ -8,6 +8,7 @@ import {
 } from "../types/game-version.js";
 import { hasRequiredRole } from "../../context.js";
 import { UserRole } from "@prisma/client";
+import { invalidateGameVersionCaches } from "../../lib/cache.js";
 
 // Helper to generate slug from name
 function slugify(name: string): string {
@@ -192,6 +193,9 @@ builder.mutationField("createGameVersion", (t) =>
           } : undefined,
         },
       });
+
+      // Invalidate game version caches after successful creation
+      invalidateGameVersionCaches().catch(() => {});
 
       return {
         success: true,
@@ -378,6 +382,9 @@ builder.mutationField("updateGameVersion", (t) =>
         data: updateData,
       });
 
+      // Invalidate game version caches after successful update
+      invalidateGameVersionCaches().catch(() => {});
+
       return {
         success: true,
         gameVersionId: version.id,
@@ -456,6 +463,9 @@ builder.mutationField("deleteGameVersion", (t) =>
         where: { id },
       });
 
+      // Invalidate game version caches after successful deletion
+      invalidateGameVersionCaches().catch(() => {});
+
       return {
         success: true,
         deletedId: id,
@@ -530,6 +540,9 @@ builder.mutationField("setDefaultVersion", (t) =>
         }),
       ]);
 
+      // Invalidate game version caches after successful update
+      invalidateGameVersionCaches().catch(() => {});
+
       return {
         success: true,
         gameVersionId: id,
@@ -603,6 +616,9 @@ builder.mutationField("bulkDeleteGameVersions", (t) =>
       const result = await ctx.prisma.gameVersion.deleteMany({
         where: { id: { in: ids } },
       });
+
+      // Invalidate game version caches after successful bulk deletion
+      invalidateGameVersionCaches().catch(() => {});
 
       return {
         success: true,

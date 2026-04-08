@@ -8,6 +8,7 @@ import {
 } from "../types/game.js";
 import { hasRequiredRole } from "../../context.js";
 import { UserRole, GameType } from "@prisma/client";
+import { invalidateGameCaches } from "../../lib/cache.js";
 
 // Create game mutation
 builder.mutationField("createGame", (t) =>
@@ -145,6 +146,9 @@ builder.mutationField("createGame", (t) =>
 
         return newGame;
       });
+
+      // Invalidate game caches after successful creation
+      invalidateGameCaches().catch(() => {});
 
       return {
         success: true,
@@ -369,6 +373,9 @@ builder.mutationField("updateGame", (t) =>
         data: updateData,
       });
 
+      // Invalidate game caches after successful update
+      invalidateGameCaches().catch(() => {});
+
       return {
         success: true,
         gameId: game.id,
@@ -433,6 +440,9 @@ builder.mutationField("deleteGame", (t) =>
       await ctx.prisma.game.delete({
         where: { id },
       });
+
+      // Invalidate game caches after successful deletion
+      invalidateGameCaches().catch(() => {});
 
       return {
         success: true,
@@ -617,6 +627,9 @@ builder.mutationField("cloneGameToPlatform", (t) =>
         return newGame;
       });
 
+      // Invalidate game caches after successful clone
+      invalidateGameCaches().catch(() => {});
+
       return {
         success: true,
         gameId: clonedGame.id,
@@ -673,6 +686,9 @@ builder.mutationField("bulkDeleteGames", (t) =>
       const result = await ctx.prisma.game.deleteMany({
         where: { id: { in: ids } },
       });
+
+      // Invalidate game caches after successful bulk delete
+      invalidateGameCaches().catch(() => {});
 
       return {
         success: true,

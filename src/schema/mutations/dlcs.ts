@@ -8,6 +8,7 @@ import {
 } from "../types/dlc.js";
 import { hasRequiredRole } from "../../context.js";
 import { UserRole, DLCType } from "@prisma/client";
+import { invalidateDLCCaches } from "../../lib/cache.js";
 
 // Helper to generate slug from name
 function slugify(name: string): string {
@@ -203,6 +204,9 @@ builder.mutationField("createDLC", (t) =>
         },
       });
 
+      // Invalidate DLC caches after successful creation
+      invalidateDLCCaches().catch(() => {});
+
       return {
         success: true,
         dlcId: dlc.id,
@@ -357,6 +361,9 @@ builder.mutationField("updateDLC", (t) =>
         data: updateData,
       });
 
+      // Invalidate DLC caches after successful update
+      invalidateDLCCaches().catch(() => {});
+
       return {
         success: true,
         dlcId: dlc.id,
@@ -422,6 +429,9 @@ builder.mutationField("deleteDLC", (t) =>
         where: { id },
       });
 
+      // Invalidate DLC caches after successful deletion
+      invalidateDLCCaches().catch(() => {});
+
       return {
         success: true,
         deletedId: id,
@@ -478,6 +488,9 @@ builder.mutationField("bulkDeleteDLCs", (t) =>
       const result = await ctx.prisma.dLC.deleteMany({
         where: { id: { in: ids } },
       });
+
+      // Invalidate DLC caches after successful bulk deletion
+      invalidateDLCCaches().catch(() => {});
 
       return {
         success: true,

@@ -9,6 +9,7 @@ import {
 } from "../types/achievement.js";
 import { hasRequiredRole } from "../../context.js";
 import { AchievementSetType, UserRole } from "@prisma/client";
+import { invalidateAchievementCaches } from "../../lib/cache.js";
 
 builder.mutationField("createAchievement", (t) =>
   t.field({
@@ -123,6 +124,9 @@ builder.mutationField("createAchievement", (t) =>
           achievementSetId,
         },
       });
+
+      // Invalidate achievement caches after successful creation
+      invalidateAchievementCaches().catch(() => {});
 
       return {
         success: true,
@@ -247,6 +251,9 @@ builder.mutationField("updateAchievement", (t) =>
         },
       });
 
+      // Invalidate achievement caches after successful update
+      invalidateAchievementCaches().catch(() => {});
+
       return {
         success: true,
         achievementId: updated.id,
@@ -321,6 +328,9 @@ builder.mutationField("deleteAchievement", (t) =>
       }
 
       await ctx.prisma.achievement.delete({ where: { id } });
+
+      // Invalidate achievement caches after successful deletion
+      invalidateAchievementCaches().catch(() => {});
 
       return {
         success: true,
@@ -443,6 +453,9 @@ builder.mutationField("bulkCreateAchievements", (t) =>
         skipDuplicates: true,
       });
 
+      // Invalidate achievement caches after successful bulk creation
+      invalidateAchievementCaches().catch(() => {});
+
       return {
         success: true,
         createdCount: result.count,
@@ -499,6 +512,9 @@ builder.mutationField("bulkDeleteAchievements", (t) =>
       const result = await ctx.prisma.achievement.deleteMany({
         where: { id: { in: ids } },
       });
+
+      // Invalidate achievement caches after successful bulk deletion
+      invalidateAchievementCaches().catch(() => {});
 
       return {
         success: true,
