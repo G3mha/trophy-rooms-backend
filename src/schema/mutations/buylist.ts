@@ -87,7 +87,10 @@ builder.mutationField("addToBuylist", (t) =>
         }
 
         if (gameVersionId) {
-          const version = await ctx.prisma.gameVersion.findUnique({ where: { id: gameVersionId } });
+          const version = await ctx.prisma.gameVersion.findUnique({
+            where: { id: gameVersionId },
+            include: { games: { select: { id: true } } },
+          });
           if (!version) {
             return {
               success: false,
@@ -99,13 +102,14 @@ builder.mutationField("addToBuylist", (t) =>
               },
             };
           }
-          if (version.gameId !== gameId) {
+          const isLinked = version.games.some((g) => g.id === gameId);
+          if (!isLinked) {
             return {
               success: false,
               buylistItemId: null,
               error: {
                 code: ErrorCode.VALIDATION_ERROR,
-                message: "Game version does not belong to the specified game",
+                message: "Game version is not linked to the specified game",
                 field: "gameVersionId",
               },
             };
@@ -322,6 +326,7 @@ builder.mutationField("updateBuylistItem", (t) =>
         if (gameVersionId) {
           const version = await ctx.prisma.gameVersion.findUnique({
             where: { id: gameVersionId },
+            include: { games: { select: { id: true } } },
           });
           if (!version) {
             return {
@@ -334,13 +339,14 @@ builder.mutationField("updateBuylistItem", (t) =>
               },
             };
           }
-          if (version.gameId !== item.gameId) {
+          const isLinked = item.gameId && version.games.some((g) => g.id === item.gameId);
+          if (!isLinked) {
             return {
               success: false,
               buylistItemId: null,
               error: {
                 code: ErrorCode.VALIDATION_ERROR,
-                message: "Game version does not belong to the specified game",
+                message: "Game version is not linked to the specified game",
                 field: "gameVersionId",
               },
             };

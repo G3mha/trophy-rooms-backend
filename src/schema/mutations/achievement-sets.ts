@@ -114,6 +114,7 @@ builder.mutationField("createAchievementSet", (t) =>
       if (input.gameVersionId) {
         const version = await ctx.prisma.gameVersion.findUnique({
           where: { id: input.gameVersionId },
+          include: { games: { select: { id: true } } },
         });
 
         if (!version) {
@@ -128,14 +129,15 @@ builder.mutationField("createAchievementSet", (t) =>
           };
         }
 
-        // Ensure version belongs to the specified game
-        if (version.gameId !== input.gameId) {
+        // Ensure version is linked to the specified game
+        const isLinked = version.games.some((g) => g.id === input.gameId);
+        if (!isLinked) {
           return {
             success: false,
             achievementSetId: null,
             error: {
               code: ErrorCode.VALIDATION_ERROR,
-              message: "Game version does not belong to the specified game",
+              message: "Game version is not linked to the specified game",
               field: "gameVersionId",
             },
           };

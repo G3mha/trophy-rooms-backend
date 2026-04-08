@@ -128,6 +128,7 @@ builder.mutationField("setGameStatus", (t) =>
       if (gameVersionId) {
         const version = await ctx.prisma.gameVersion.findUnique({
           where: { id: gameVersionId },
+          include: { games: { select: { id: true } } },
         });
 
         if (!version) {
@@ -145,8 +146,9 @@ builder.mutationField("setGameStatus", (t) =>
           };
         }
 
-        // Ensure version belongs to the specified game
-        if (version.gameId !== gameId) {
+        // Ensure version is linked to the specified game
+        const isLinked = version.games.some((g) => g.id === gameId);
+        if (!isLinked) {
           return {
             success: false,
             userGameId: null,
@@ -155,7 +157,7 @@ builder.mutationField("setGameStatus", (t) =>
             gameVersionId: null,
             error: {
               code: ErrorCode.VALIDATION_ERROR,
-              message: "Game version does not belong to the specified game",
+              message: "Game version is not linked to the specified game",
               field: "gameVersionId",
             },
           };

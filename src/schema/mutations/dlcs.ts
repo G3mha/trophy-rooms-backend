@@ -541,6 +541,7 @@ builder.mutationField("addDLCToVersion", (t) =>
       // Check if version exists
       const version = await ctx.prisma.gameVersion.findUnique({
         where: { id: versionId },
+        include: { games: { select: { id: true } } },
       });
 
       if (!version) {
@@ -555,14 +556,15 @@ builder.mutationField("addDLCToVersion", (t) =>
         };
       }
 
-      // Ensure DLC and version belong to the same game
-      if (dlc.gameId !== version.gameId) {
+      // Ensure DLC's game is linked to the version
+      const isLinked = version.games.some((g) => g.id === dlc.gameId);
+      if (!isLinked) {
         return {
           success: false,
           dlcId: null,
           error: {
             code: ErrorCode.VALIDATION_ERROR,
-            message: "DLC and game version must belong to the same game",
+            message: "DLC and game version must be linked to the same game",
             field: null,
           },
         };

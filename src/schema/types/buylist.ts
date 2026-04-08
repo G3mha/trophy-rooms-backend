@@ -106,9 +106,9 @@ builder.prismaObject("BuylistItem", {
         if (item.gameVersionId) {
           const version = await ctx.prisma.gameVersion.findUnique({
             where: { id: item.gameVersionId },
-            select: { coverUrl: true, game: { select: { coverUrl: true } } },
+            select: { coverUrl: true, games: { select: { coverUrl: true }, take: 1 } },
           });
-          return version?.coverUrl ?? version?.game?.coverUrl ?? null;
+          return version?.coverUrl ?? version?.games[0]?.coverUrl ?? null;
         }
         if (item.gameId) {
           const game = await ctx.prisma.game.findUnique({
