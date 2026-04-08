@@ -137,7 +137,7 @@ model Game {
   trophies        Trophy[]
   userGames       UserGame[]
   collectionItems CollectionItem[]
-  versions        GameVersion[]
+  versions        GameVersion[]    @relation("GameVersionGames")
   dlcs            DLC[]
   bundles         Bundle[]         @relation("BundleGames")
   buylistItems    BuylistItem[]
@@ -153,14 +153,13 @@ model Game {
 model GameVersion {
   id              String           @id @default(cuid())
   name            String           // "Standard", "Deluxe Edition"
-  slug            String           // "standard", "deluxe"
+  slug            String           @unique // "standard", "deluxe" - now globally unique
   description     String?
-  coverUrl        String?          // Fallback to game.coverUrl if null
+  coverUrl        String?          // Fallback to first game's coverUrl if null
   releaseDate     DateTime?
   isDefault       Boolean          @default(false)
 
-  game            Game             @relation(fields: [gameId], references: [id], onDelete: Cascade)
-  gameId          String
+  games           Game[]           @relation("GameVersionGames")
 
   dlcs            DLC[]            @relation("GameVersionDLCs")
   achievementSets AchievementSet[]
@@ -170,9 +169,6 @@ model GameVersion {
 
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
-
-  @@unique([gameId, slug])
-  @@index([gameId])
 }
 
 model AchievementSet {
