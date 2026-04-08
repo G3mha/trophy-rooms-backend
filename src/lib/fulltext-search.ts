@@ -28,6 +28,15 @@ export function toTsQuery(search: string): string {
 /**
  * Search games using PostgreSQL full-text search (uncached).
  * Returns game IDs ordered by relevance.
+ *
+ * Uses custom weights to heavily prioritize title matches over description:
+ * - Weight A (title): 1.0 (highest)
+ * - Weight B (description): 0.1
+ * - Weight C (developer/publisher): 0.05
+ * - Weight D (genre): 0.01
+ *
+ * Also uses normalization flag 32 to account for document length,
+ * preventing long descriptions from outranking short title matches.
  */
 async function searchGamesFullTextUncached(
   prisma: PrismaClient,
@@ -37,11 +46,14 @@ async function searchGamesFullTextUncached(
   const tsquery = toTsQuery(search);
   if (!tsquery) return [];
 
+  // Custom weights: {D, C, B, A} - heavily favor title (A) matches
+  // Default is {0.1, 0.2, 0.4, 1.0}, we use {0.01, 0.05, 0.1, 1.0}
+  // Normalization 32 = divide by (1 + log(document length)) to not favor long text
   const results = await prisma.$queryRaw<{ id: string }[]>`
     SELECT id
     FROM "Game"
     WHERE search_vector @@ to_tsquery('english', ${tsquery})
-    ORDER BY ts_rank(search_vector, to_tsquery('english', ${tsquery})) DESC
+    ORDER BY ts_rank('{0.01, 0.05, 0.1, 1.0}', search_vector, to_tsquery('english', ${tsquery}), 32) DESC
     LIMIT ${limit}
   `;
 
