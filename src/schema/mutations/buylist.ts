@@ -396,8 +396,10 @@ builder.mutationField("markAsPurchased", (t) =>
     args: {
       id: t.arg.id({ required: true }),
       platformId: t.arg.id({ required: false }), // Optional platform for games
+      purchasePrice: t.arg.float({ required: false }), // Actual purchase price
+      purchasedAt: t.arg({ type: "DateTime", required: false }), // When purchased
     },
-    resolve: async (_root, { id, platformId }, ctx) => {
+    resolve: async (_root, { id, platformId, purchasePrice, purchasedAt }, ctx) => {
       let user;
       try {
         user = requireAuth(ctx);
@@ -461,6 +463,9 @@ builder.mutationField("markAsPurchased", (t) =>
         }
       }
 
+      // Default purchasedAt to current time if not provided
+      const purchasedAtValue = purchasedAt ?? new Date();
+
       // Add to owned collection based on item type
       if (item.gameId) {
         // Add game to library with BACKLOG status
@@ -475,6 +480,9 @@ builder.mutationField("markAsPurchased", (t) =>
             // Don't overwrite existing status, just update version/platform if provided
             ...(item.gameVersionId && { gameVersionId: item.gameVersionId }),
             ...(platformId && { platformId }),
+            // Update purchase info if provided
+            ...(purchasePrice !== undefined && purchasePrice !== null && { purchasePrice }),
+            ...(purchasedAt !== undefined && { purchasedAt: purchasedAtValue }),
           },
           create: {
             userId: user.id,
@@ -482,6 +490,8 @@ builder.mutationField("markAsPurchased", (t) =>
             status: GameStatus.BACKLOG,
             gameVersionId: item.gameVersionId,
             platformId: platformId ?? null,
+            purchasePrice: purchasePrice ?? null,
+            purchasedAt: purchasedAtValue,
           },
         });
       } else if (item.dlcId) {
@@ -493,10 +503,16 @@ builder.mutationField("markAsPurchased", (t) =>
               dlcId: item.dlcId,
             },
           },
-          update: {},
+          update: {
+            // Update purchase info if provided
+            ...(purchasePrice !== undefined && purchasePrice !== null && { purchasePrice }),
+            ...(purchasedAt !== undefined && { purchasedAt: purchasedAtValue }),
+          },
           create: {
             userId: user.id,
             dlcId: item.dlcId,
+            purchasePrice: purchasePrice ?? null,
+            purchasedAt: purchasedAtValue,
           },
         });
       } else if (item.bundleId) {
@@ -508,10 +524,16 @@ builder.mutationField("markAsPurchased", (t) =>
               bundleId: item.bundleId,
             },
           },
-          update: {},
+          update: {
+            // Update purchase info if provided
+            ...(purchasePrice !== undefined && purchasePrice !== null && { purchasePrice }),
+            ...(purchasedAt !== undefined && { purchasedAt: purchasedAtValue }),
+          },
           create: {
             userId: user.id,
             bundleId: item.bundleId,
+            purchasePrice: purchasePrice ?? null,
+            purchasedAt: purchasedAtValue,
           },
         });
       }
