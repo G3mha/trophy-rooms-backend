@@ -250,6 +250,8 @@ model UserGame {
   gameVersion   GameVersion? @relation(fields: [gameVersionId], references: [id], onDelete: SetNull)
   gameVersionId String?
   status        GameStatus
+  purchasePrice Float?       // Actual purchase price
+  purchasedAt   DateTime?    // When the item was purchased
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 
@@ -319,18 +321,21 @@ model DLC {
 }
 
 model UserDLC {
-  id        String   @id @default(cuid())
+  id            String    @id @default(cuid())
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId    String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId        String
 
-  dlc       DLC      @relation(fields: [dlcId], references: [id], onDelete: Cascade)
-  dlcId     String
+  dlc           DLC       @relation(fields: [dlcId], references: [id], onDelete: Cascade)
+  dlcId         String
 
-  ownedAt   DateTime @default(now())
+  purchasePrice Float?    // Actual purchase price
+  purchasedAt   DateTime? // When the item was purchased
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  ownedAt       DateTime  @default(now())
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   @@unique([userId, dlcId])
   @@index([userId])
@@ -365,18 +370,21 @@ model Bundle {
 }
 
 model UserBundle {
-  id        String   @id @default(cuid())
+  id            String    @id @default(cuid())
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId    String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId        String
 
-  bundle    Bundle   @relation(fields: [bundleId], references: [id], onDelete: Cascade)
-  bundleId  String
+  bundle        Bundle    @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+  bundleId      String
 
-  ownedAt   DateTime @default(now())
+  purchasePrice Float?    // Actual purchase price
+  purchasedAt   DateTime? // When the item was purchased
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  ownedAt       DateTime  @default(now())
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   @@unique([userId, bundleId])
   @@index([userId])
