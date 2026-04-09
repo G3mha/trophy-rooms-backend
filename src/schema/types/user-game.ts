@@ -18,6 +18,8 @@ builder.prismaObject("UserGame", {
     gameVersion: t.relation("gameVersion", { nullable: true }),
     gameVersionId: t.exposeString("gameVersionId", { nullable: true }),
     status: t.expose("status", { type: GameStatusEnum }),
+    purchasePrice: t.exposeFloat("purchasePrice", { nullable: true }),
+    purchasedAt: t.expose("purchasedAt", { type: "DateTime", nullable: true }),
     createdAt: t.expose("createdAt", { type: "DateTime" }),
     updatedAt: t.expose("updatedAt", { type: "DateTime" }),
   }),

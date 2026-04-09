@@ -59,6 +59,8 @@ builder.prismaObject("UserBundle", {
     userId: t.exposeString("userId"),
     bundle: t.relation("bundle"),
     bundleId: t.exposeString("bundleId"),
+    purchasePrice: t.exposeFloat("purchasePrice", { nullable: true }),
+    purchasedAt: t.expose("purchasedAt", { type: "DateTime", nullable: true }),
     ownedAt: t.expose("ownedAt", { type: "DateTime" }),
     createdAt: t.expose("createdAt", { type: "DateTime" }),
     updatedAt: t.expose("updatedAt", { type: "DateTime" }),

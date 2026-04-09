@@ -77,6 +77,8 @@ builder.prismaObject("UserDLC", {
     userId: t.exposeString("userId"),
     dlc: t.relation("dlc"),
     dlcId: t.exposeString("dlcId"),
+    purchasePrice: t.exposeFloat("purchasePrice", { nullable: true }),
+    purchasedAt: t.expose("purchasedAt", { type: "DateTime", nullable: true }),
     ownedAt: t.expose("ownedAt", { type: "DateTime" }),
     createdAt: t.expose("createdAt", { type: "DateTime" }),
     updatedAt: t.expose("updatedAt", { type: "DateTime" }),
