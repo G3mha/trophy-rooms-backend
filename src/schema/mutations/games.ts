@@ -101,6 +101,12 @@ builder.mutationField("createGame", (t) =>
 
       // Create game with default version in a transaction
       const game = await ctx.prisma.$transaction(async (tx) => {
+        // First check if a "Standard" version already exists (shared)
+        const existingStandard = await tx.gameVersion.findUnique({
+          where: { slug: "standard" },
+        });
+
+        // Create game with version connection in a single operation
         const newGame = await tx.game.create({
           data: {
             title: trimmedTitle,
@@ -115,34 +121,11 @@ builder.mutationField("createGame", (t) =>
             platformId,
             type: gameType,
             baseGameId: baseGameId ?? null,
+            versions: existingStandard
+              ? { connect: { id: existingStandard.id } }
+              : { create: { name: "Standard", slug: "standard", isDefault: true } },
           },
         });
-
-        // Auto-create default "Standard" version linked to this game
-        // First check if a "Standard" version already exists (shared)
-        const existingStandard = await tx.gameVersion.findUnique({
-          where: { slug: "standard" },
-        });
-
-        if (existingStandard) {
-          // Link the existing Standard version to this game
-          await tx.gameVersion.update({
-            where: { id: existingStandard.id },
-            data: {
-              games: { connect: { id: newGame.id } },
-            },
-          });
-        } else {
-          // Create a new Standard version linked to this game
-          await tx.gameVersion.create({
-            data: {
-              name: "Standard",
-              slug: "standard",
-              isDefault: true,
-              games: { connect: { id: newGame.id } },
-            },
-          });
-        }
 
         return newGame;
       });
@@ -553,7 +536,12 @@ builder.mutationField("cloneGameToPlatform", (t) =>
 
       // Clone game in a transaction
       const clonedGame = await ctx.prisma.$transaction(async (tx) => {
-        // Create new game entry
+        // First check if a "Standard" version already exists
+        const existingStandard = await tx.gameVersion.findUnique({
+          where: { slug: "standard" },
+        });
+
+        // Create new game entry with version connection in a single operation
         const newGame = await tx.game.create({
           data: {
             title: sourceGame.title,
@@ -568,33 +556,11 @@ builder.mutationField("cloneGameToPlatform", (t) =>
             platformId: targetPlatformId,
             type: sourceGame.type,
             baseGameId: sourceGame.baseGameId,
+            versions: existingStandard
+              ? { connect: { id: existingStandard.id } }
+              : { create: { name: "Standard", slug: "standard", isDefault: true } },
           },
         });
-
-        // Link to existing "Standard" version or create one
-        const existingStandard = await tx.gameVersion.findUnique({
-          where: { slug: "standard" },
-        });
-
-        if (existingStandard) {
-          // Link the existing Standard version to the new game
-          await tx.gameVersion.update({
-            where: { id: existingStandard.id },
-            data: {
-              games: { connect: { id: newGame.id } },
-            },
-          });
-        } else {
-          // Create a new Standard version linked to this game
-          await tx.gameVersion.create({
-            data: {
-              name: "Standard",
-              slug: "standard",
-              isDefault: true,
-              games: { connect: { id: newGame.id } },
-            },
-          });
-        }
 
         // Optionally copy achievement sets
         if (copyAchievementSets && sourceGame.achievementSets) {
