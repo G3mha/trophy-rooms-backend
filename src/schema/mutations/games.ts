@@ -99,36 +99,51 @@ builder.mutationField("createGame", (t) =>
         }
       }
 
-      // Create game with default version in a transaction
-      const game = await ctx.prisma.$transaction(async (tx) => {
-        // First check if a "Standard" version already exists (shared)
-        const existingStandard = await tx.gameVersion.findUnique({
-          where: { slug: "standard" },
-        });
+      // Check if a "Standard" version already exists (shared)
+      const existingStandard = await ctx.prisma.gameVersion.findUnique({
+        where: { slug: "standard" },
+      });
 
-        // Create game with version connection in a single operation
-        const newGame = await tx.game.create({
+      // Create game (without version connection to avoid FK issues with pooler)
+      const game = await ctx.prisma.game.create({
+        data: {
+          title: trimmedTitle,
+          description: description?.trim() || null,
+          coverUrl: coverUrl?.trim() || null,
+          releaseDate: releaseDate ?? null,
+          developer: developer?.trim() || null,
+          publisher: publisher?.trim() || null,
+          genre: genre?.trim() || null,
+          esrbRating: esrbRating?.trim() || null,
+          screenshots: screenshots ?? [],
+          platformId,
+          type: gameType,
+          baseGameId: baseGameId ?? null,
+        },
+      });
+
+      // Connect to Standard version using raw SQL to avoid transaction/pooler issues
+      if (existingStandard) {
+        await ctx.prisma.$executeRaw`
+          INSERT INTO "_GameVersionGames" ("A", "B")
+          VALUES (${game.id}, ${existingStandard.id})
+          ON CONFLICT DO NOTHING
+        `;
+      } else {
+        // Create new Standard version and connect via raw SQL
+        const newVersion = await ctx.prisma.gameVersion.create({
           data: {
-            title: trimmedTitle,
-            description: description?.trim() || null,
-            coverUrl: coverUrl?.trim() || null,
-            releaseDate: releaseDate ?? null,
-            developer: developer?.trim() || null,
-            publisher: publisher?.trim() || null,
-            genre: genre?.trim() || null,
-            esrbRating: esrbRating?.trim() || null,
-            screenshots: screenshots ?? [],
-            platformId,
-            type: gameType,
-            baseGameId: baseGameId ?? null,
-            versions: existingStandard
-              ? { connect: { id: existingStandard.id } }
-              : { create: { name: "Standard", slug: "standard", isDefault: true } },
+            name: "Standard",
+            slug: "standard",
+            isDefault: true,
           },
         });
-
-        return newGame;
-      });
+        await ctx.prisma.$executeRaw`
+          INSERT INTO "_GameVersionGames" ("A", "B")
+          VALUES (${game.id}, ${newVersion.id})
+          ON CONFLICT DO NOTHING
+        `;
+      }
 
       // Invalidate game caches after successful creation
       invalidateGameCaches().catch(() => {});
@@ -534,64 +549,81 @@ builder.mutationField("cloneGameToPlatform", (t) =>
         };
       }
 
-      // Clone game in a transaction
-      const clonedGame = await ctx.prisma.$transaction(async (tx) => {
-        // First check if a "Standard" version already exists
-        const existingStandard = await tx.gameVersion.findUnique({
-          where: { slug: "standard" },
-        });
+      // Check if a "Standard" version already exists
+      const existingStandard = await ctx.prisma.gameVersion.findUnique({
+        where: { slug: "standard" },
+      });
 
-        // Create new game entry with version connection in a single operation
-        const newGame = await tx.game.create({
+      // Create new game entry (without version connection to avoid FK issues with pooler)
+      const newGame = await ctx.prisma.game.create({
+        data: {
+          title: sourceGame.title,
+          description: sourceGame.description,
+          coverUrl: sourceGame.coverUrl,
+          releaseDate: sourceGame.releaseDate,
+          developer: sourceGame.developer,
+          publisher: sourceGame.publisher,
+          genre: sourceGame.genre,
+          esrbRating: sourceGame.esrbRating,
+          screenshots: sourceGame.screenshots,
+          platformId: targetPlatformId,
+          type: sourceGame.type,
+          baseGameId: sourceGame.baseGameId,
+        },
+      });
+
+      // Connect to Standard version using raw SQL to avoid transaction/pooler issues
+      if (existingStandard) {
+        await ctx.prisma.$executeRaw`
+          INSERT INTO "_GameVersionGames" ("A", "B")
+          VALUES (${newGame.id}, ${existingStandard.id})
+          ON CONFLICT DO NOTHING
+        `;
+      } else {
+        // Create new Standard version and connect via raw SQL
+        const newVersion = await ctx.prisma.gameVersion.create({
           data: {
-            title: sourceGame.title,
-            description: sourceGame.description,
-            coverUrl: sourceGame.coverUrl,
-            releaseDate: sourceGame.releaseDate,
-            developer: sourceGame.developer,
-            publisher: sourceGame.publisher,
-            genre: sourceGame.genre,
-            esrbRating: sourceGame.esrbRating,
-            screenshots: sourceGame.screenshots,
-            platformId: targetPlatformId,
-            type: sourceGame.type,
-            baseGameId: sourceGame.baseGameId,
-            versions: existingStandard
-              ? { connect: { id: existingStandard.id } }
-              : { create: { name: "Standard", slug: "standard", isDefault: true } },
+            name: "Standard",
+            slug: "standard",
+            isDefault: true,
           },
         });
+        await ctx.prisma.$executeRaw`
+          INSERT INTO "_GameVersionGames" ("A", "B")
+          VALUES (${newGame.id}, ${newVersion.id})
+          ON CONFLICT DO NOTHING
+        `;
+      }
 
-        // Optionally copy achievement sets
-        if (copyAchievementSets && sourceGame.achievementSets) {
-          for (const set of sourceGame.achievementSets) {
-            const newSet = await tx.achievementSet.create({
-              data: {
-                title: set.title,
-                type: set.type,
-                visibility: set.visibility,
-                gameId: newGame.id,
-              },
+      // Optionally copy achievement sets
+      if (copyAchievementSets && sourceGame.achievementSets) {
+        for (const set of sourceGame.achievementSets) {
+          const newSet = await ctx.prisma.achievementSet.create({
+            data: {
+              title: set.title,
+              type: set.type,
+              visibility: set.visibility,
+              gameId: newGame.id,
+            },
+          });
+
+          // Copy achievements
+          if (set.achievements && set.achievements.length > 0) {
+            await ctx.prisma.achievement.createMany({
+              data: set.achievements.map((achievement) => ({
+                title: achievement.title,
+                description: achievement.description,
+                iconUrl: achievement.iconUrl,
+                points: achievement.points,
+                tier: achievement.tier,
+                achievementSetId: newSet.id,
+              })),
             });
-
-            // Copy achievements
-            if (set.achievements && set.achievements.length > 0) {
-              await tx.achievement.createMany({
-                data: set.achievements.map((achievement) => ({
-                  title: achievement.title,
-                  description: achievement.description,
-                  iconUrl: achievement.iconUrl,
-                  points: achievement.points,
-                  tier: achievement.tier,
-                  achievementSetId: newSet.id,
-                })),
-              });
-            }
           }
         }
+      }
 
-        return newGame;
-      });
+      const clonedGame = newGame;
 
       // Invalidate game caches after successful clone
       invalidateGameCaches().catch(() => {});
