@@ -565,12 +565,22 @@ builder.mutationField("cloneGameToPlatform", (t) =>
         };
       }
 
-      // Check if a "Standard" version already exists
-      const existingStandard = await ctx.prisma.gameVersion.findUnique({
+      // Find or create Standard version
+      let standardVersion = await ctx.prisma.gameVersion.findFirst({
         where: { slug: "standard" },
       });
 
-      // Create new game entry (without version connection to avoid FK issues with pooler)
+      if (!standardVersion) {
+        standardVersion = await ctx.prisma.gameVersion.create({
+          data: {
+            name: "Standard",
+            slug: "standard",
+            isDefault: true,
+          },
+        });
+      }
+
+      // Create new game entry with version connection in a single operation
       const newGame = await ctx.prisma.game.create({
         data: {
           title: sourceGame.title,
@@ -587,31 +597,11 @@ builder.mutationField("cloneGameToPlatform", (t) =>
           baseGames: sourceGame.baseGames.length > 0
             ? { connect: sourceGame.baseGames.map(g => ({ id: g.id })) }
             : undefined,
+          versions: {
+            connect: { id: standardVersion.id },
+          },
         },
       });
-
-      // Connect to Standard version using raw SQL to avoid transaction/pooler issues
-      if (existingStandard) {
-        await ctx.prisma.$executeRaw`
-          INSERT INTO "_GameVersionGames" ("A", "B")
-          VALUES (${newGame.id}, ${existingStandard.id})
-          ON CONFLICT DO NOTHING
-        `;
-      } else {
-        // Create new Standard version and connect via raw SQL
-        const newVersion = await ctx.prisma.gameVersion.create({
-          data: {
-            name: "Standard",
-            slug: "standard",
-            isDefault: true,
-          },
-        });
-        await ctx.prisma.$executeRaw`
-          INSERT INTO "_GameVersionGames" ("A", "B")
-          VALUES (${newGame.id}, ${newVersion.id})
-          ON CONFLICT DO NOTHING
-        `;
-      }
 
       // Optionally copy achievement sets
       if (copyAchievementSets && sourceGame.achievementSets) {
