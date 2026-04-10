@@ -8,7 +8,7 @@ builder.prismaObject("Platform", {
     slug: t.exposeString("slug"),
     games: t.relation("games", {
       query: {
-        orderBy: { title: "asc" },
+        orderBy: { gameFamily: { title: "asc" } },
       },
     }),
     gameCount: t.relationCount("games"),

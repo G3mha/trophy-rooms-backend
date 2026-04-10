@@ -19,12 +19,15 @@ builder.prismaObject("Bundle", {
     price: t.exposeFloat("price", { nullable: true }),
     platform: t.relation("platform", { nullable: true }),
     platformId: t.exposeString("platformId", { nullable: true }),
-    games: t.relation("games", {
+
+    // Game families in this bundle
+    gameFamilies: t.relation("gameFamilies", {
       query: {
         orderBy: { title: "asc" },
       },
     }),
-    gameCount: t.relationCount("games"),
+    gameFamilyCount: t.relationCount("gameFamilies"),
+
     dlcs: t.relation("dlcs", {
       query: {
         orderBy: { name: "asc" },
@@ -78,7 +81,7 @@ export const CreateBundleInput = builder.inputType("CreateBundleInput", {
     releaseDate: t.field({ type: "DateTime" }),
     price: t.float(),
     platformId: t.id(),
-    gameIds: t.idList(),
+    gameFamilyIds: t.idList(),
     dlcIds: t.idList(),
   }),
 });
@@ -93,7 +96,7 @@ export const UpdateBundleInput = builder.inputType("UpdateBundleInput", {
     releaseDate: t.field({ type: "DateTime" }),
     price: t.float(),
     platformId: t.id(),
-    gameIds: t.idList(),
+    gameFamilyIds: t.idList(),
     dlcIds: t.idList(),
   }),
 });

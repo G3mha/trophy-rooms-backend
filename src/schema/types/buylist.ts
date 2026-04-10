@@ -67,9 +67,9 @@ builder.prismaObject("BuylistItem", {
         if (item.gameId) {
           const game = await ctx.prisma.game.findUnique({
             where: { id: item.gameId },
-            select: { title: true },
+            select: { gameFamily: { select: { title: true } } },
           });
-          const baseTitle = game?.title ?? "Unknown Game";
+          const baseTitle = game?.gameFamily?.title ?? "Unknown Game";
           if (item.gameVersionId) {
             const version = await ctx.prisma.gameVersion.findUnique({
               where: { id: item.gameVersionId },
@@ -99,9 +99,9 @@ builder.prismaObject("BuylistItem", {
         if (item.dlcId) {
           const dlc = await ctx.prisma.dLC.findUnique({
             where: { id: item.dlcId },
-            select: { coverUrl: true, game: { select: { coverUrl: true } } },
+            select: { coverUrl: true, gameFamily: { select: { coverUrl: true } } },
           });
-          return dlc?.coverUrl ?? dlc?.game?.coverUrl ?? null;
+          return dlc?.coverUrl ?? dlc?.gameFamily?.coverUrl ?? null;
         }
         if (item.gameVersionId) {
           const version = await ctx.prisma.gameVersion.findUnique({

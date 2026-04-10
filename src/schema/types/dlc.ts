@@ -17,8 +17,11 @@ builder.prismaObject("DLC", {
     coverUrl: t.exposeString("coverUrl", { nullable: true }),
     releaseDate: t.expose("releaseDate", { type: "DateTime", nullable: true }),
     price: t.exposeFloat("price", { nullable: true }),
-    game: t.relation("game"),
-    gameId: t.exposeString("gameId"),
+
+    // Link to GameFamily (DLCs are shared across platforms)
+    gameFamily: t.relation("gameFamily", { nullable: true }),
+    gameFamilyId: t.exposeString("gameFamilyId", { nullable: true }),
+
     achievementSets: t.relation("achievementSets", {
       query: {
         orderBy: { title: "asc" },
@@ -35,18 +38,19 @@ builder.prismaObject("DLC", {
         orderBy: { name: "asc" },
       },
     }),
-    // Computed field: returns DLC coverUrl if set, otherwise falls back to game.coverUrl
+    // Computed field: returns DLC coverUrl if set, otherwise falls back to gameFamily.coverUrl
     effectiveCoverUrl: t.string({
       nullable: true,
       resolve: async (dlc, _args, ctx) => {
         if (dlc.coverUrl) {
           return dlc.coverUrl;
         }
-        const game = await ctx.prisma.game.findUnique({
-          where: { id: dlc.gameId },
+        if (!dlc.gameFamilyId) return null;
+        const family = await ctx.prisma.gameFamily.findUnique({
+          where: { id: dlc.gameFamilyId },
           select: { coverUrl: true },
         });
-        return game?.coverUrl ?? null;
+        return family?.coverUrl ?? null;
       },
     }),
     // Check if the current user owns this DLC
@@ -88,7 +92,7 @@ builder.prismaObject("UserDLC", {
 // Input types for DLC mutations
 export const CreateDLCInput = builder.inputType("CreateDLCInput", {
   fields: (t) => ({
-    gameId: t.id({ required: true }),
+    gameFamilyId: t.id({ required: true }),
     name: t.string({ required: true }),
     slug: t.string({ required: true }),
     type: t.field({ type: DLCType }),

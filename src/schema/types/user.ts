@@ -44,7 +44,7 @@ builder.prismaObject("User", {
     }),
     achievementCount: t.relationCount("achievements"),
     trophyCount: t.relationCount("trophies"),
-    // Count of unique games where user has at least one achievement
+    // Count of unique game families where user has at least one achievement
     gamesWithAchievementsCount: t.int({
       resolve: async (user, _args, ctx) => {
         const result = await ctx.prisma.userAchievement.findMany({
@@ -53,16 +53,16 @@ builder.prismaObject("User", {
             achievement: {
               select: {
                 achievementSet: {
-                  select: { gameId: true },
+                  select: { gameFamilyId: true },
                 },
               },
             },
           },
         });
-        const uniqueGameIds = new Set(
-          result.map((r) => r.achievement.achievementSet.gameId)
+        const uniqueFamilyIds = new Set(
+          result.map((r) => r.achievement.achievementSet.gameFamilyId)
         );
-        return uniqueGameIds.size;
+        return uniqueFamilyIds.size;
       },
     }),
     // Detailed user statistics
@@ -77,7 +77,7 @@ builder.prismaObject("User", {
                 points: true,
                 tier: true,
                 achievementSet: {
-                  select: { gameId: true },
+                  select: { gameFamilyId: true },
                 },
               },
             },
@@ -88,11 +88,12 @@ builder.prismaObject("User", {
         let goldCount = 0;
         let silverCount = 0;
         let bronzeCount = 0;
-        const gameIds = new Set<string>();
+        const gameFamilyIds = new Set<string>();
 
         for (const ua of userAchievements) {
           totalPoints += ua.achievement.points;
-          gameIds.add(ua.achievement.achievementSet.gameId);
+          const familyId = ua.achievement.achievementSet.gameFamilyId;
+          if (familyId) gameFamilyIds.add(familyId);
 
           switch (ua.achievement.tier) {
             case AchievementTier.GOLD:
@@ -112,7 +113,7 @@ builder.prismaObject("User", {
           where: { userId: user.id },
         });
 
-        const gamesPlayed = gameIds.size;
+        const gamesPlayed = gameFamilyIds.size;
         const completionRate = gamesPlayed > 0 ? (trophyCount / gamesPlayed) * 100 : 0;
         const averagePointsPerGame = gamesPlayed > 0 ? totalPoints / gamesPlayed : 0;
 

@@ -19,7 +19,7 @@ builder.prismaObject("GameVersion", {
     // Many-to-many: games instead of game
     games: t.relation("games", {
       query: {
-        orderBy: { title: "asc" },
+        orderBy: { gameFamily: { title: "asc" } },
       },
     }),
     gameCount: t.relationCount("games"),
