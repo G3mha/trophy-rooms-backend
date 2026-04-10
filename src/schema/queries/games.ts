@@ -35,7 +35,7 @@ builder.queryField("games", (t) =>
       }
 
       if (filter?.isDerivative !== undefined) {
-        where.baseGameId = filter.isDerivative ? { not: null } : null;
+        where.baseGames = filter.isDerivative ? { some: {} } : { none: {} };
       }
 
       if (filter?.hasAchievements !== undefined) {
@@ -110,7 +110,7 @@ builder.queryField("games", (t) =>
       }
 
       if (filter?.isDerivative !== undefined) {
-        where.baseGameId = filter.isDerivative ? { not: null } : null;
+        where.baseGames = filter.isDerivative ? { some: {} } : { none: {} };
       }
 
       // Build order by clause
@@ -155,7 +155,7 @@ const AdminGameItem = builder.objectRef<{
   description: string | null;
   coverUrl: string | null;
   type: GameType;
-  baseGameId: string | null;
+  baseGameIds: string[];
   platformId: string | null;
   platformName: string | null;
   platformSlug: string | null;
@@ -172,7 +172,12 @@ AdminGameItem.implement({
       type: GameTypeEnum,
       resolve: (game) => game.type,
     }),
-    baseGameId: t.exposeString("baseGameId", { nullable: true }),
+    baseGameIds: t.exposeStringList("baseGameIds"),
+    // Backwards compatibility - return first base game ID
+    baseGameId: t.string({
+      nullable: true,
+      resolve: (game) => game.baseGameIds[0] ?? null,
+    }),
     platformId: t.exposeString("platformId", { nullable: true }),
     platformName: t.exposeString("platformName", { nullable: true }),
     platformSlug: t.exposeString("platformSlug", { nullable: true }),
@@ -187,7 +192,7 @@ const AdminGamesPage = builder.objectRef<{
     description: string | null;
     coverUrl: string | null;
     type: GameType;
-    baseGameId: string | null;
+    baseGameIds: string[];
     platformId: string | null;
     platformName: string | null;
     platformSlug: string | null;
@@ -250,6 +255,9 @@ builder.queryField("adminGames", (t) =>
           orderBy: args.search ? undefined : { title: "asc" }, // When searching, order by relevance (ID order from search)
           include: {
             platform: true,
+            baseGames: {
+              select: { id: true },
+            },
             _count: {
               select: { achievementSets: true },
             },
@@ -267,7 +275,7 @@ builder.queryField("adminGames", (t) =>
           description: game.description,
           coverUrl: game.coverUrl,
           type: game.type,
-          baseGameId: game.baseGameId,
+          baseGameIds: game.baseGames.map(bg => bg.id),
           platformId: game.platform?.id ?? null,
           platformName: game.platform?.name ?? null,
           platformSlug: game.platform?.slug ?? null,
@@ -303,7 +311,7 @@ const GamePageItem = builder.objectRef<{
   description: string | null;
   coverUrl: string | null;
   type: GameType;
-  baseGameId: string | null;
+  baseGameIds: string[];
   platformId: string | null;
   platformName: string | null;
   platformSlug: string | null;
@@ -322,7 +330,12 @@ GamePageItem.implement({
       type: GameTypeEnum,
       resolve: (game) => game.type,
     }),
-    baseGameId: t.exposeString("baseGameId", { nullable: true }),
+    baseGameIds: t.exposeStringList("baseGameIds"),
+    // Backwards compatibility - return first base game ID
+    baseGameId: t.string({
+      nullable: true,
+      resolve: (game) => game.baseGameIds[0] ?? null,
+    }),
     platform: t.field({
       type: GamePagePlatform,
       nullable: true,
@@ -348,7 +361,7 @@ const GamesPage = builder.objectRef<{
     description: string | null;
     coverUrl: string | null;
     type: GameType;
-    baseGameId: string | null;
+    baseGameIds: string[];
     platformId: string | null;
     platformName: string | null;
     platformSlug: string | null;
@@ -418,7 +431,7 @@ builder.queryField("gamesPage", (t) =>
       }
 
       if (filter?.isDerivative !== undefined) {
-        where.baseGameId = filter.isDerivative ? { not: null } : null;
+        where.baseGames = filter.isDerivative ? { some: {} } : { none: {} };
       }
 
       if (filter?.hasAchievements !== undefined) {
@@ -475,6 +488,9 @@ builder.queryField("gamesPage", (t) =>
           orderBy: orderByClause,
           include: {
             platform: true,
+            baseGames: {
+              select: { id: true },
+            },
             _count: {
               select: {
                 achievementSets: true,
@@ -502,7 +518,7 @@ builder.queryField("gamesPage", (t) =>
           description: game.description,
           coverUrl: game.coverUrl,
           type: game.type,
-          baseGameId: game.baseGameId,
+          baseGameIds: game.baseGames.map(bg => bg.id),
           platformId: game.platform?.id ?? null,
           platformName: game.platform?.name ?? null,
           platformSlug: game.platform?.slug ?? null,
@@ -556,6 +572,9 @@ builder.queryField("gamesByTitle", (t) =>
         },
         include: {
           platform: true,
+          baseGames: {
+            select: { id: true },
+          },
           _count: {
             select: {
               achievementSets: true,
@@ -579,7 +598,7 @@ builder.queryField("gamesByTitle", (t) =>
         description: game.description,
         coverUrl: game.coverUrl,
         type: game.type,
-        baseGameId: game.baseGameId,
+        baseGameIds: game.baseGames.map(bg => bg.id),
         platformId: game.platform?.id ?? null,
         platformName: game.platform?.name ?? null,
         platformSlug: game.platform?.slug ?? null,
