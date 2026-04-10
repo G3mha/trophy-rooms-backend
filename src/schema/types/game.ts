@@ -19,16 +19,20 @@ builder.prismaObject("Game", {
     esrbRating: t.exposeString("esrbRating", { nullable: true }),
     screenshots: t.exposeStringList("screenshots"),
     type: t.expose("type", { type: GameTypeEnum }),
-    baseGameId: t.exposeString("baseGameId", { nullable: true }),
-    baseGame: t.relation("baseGame", { nullable: true }),
-    derivatives: t.relation("derivatives", {
+    baseGames: t.relation("baseGames", {
       query: {
-        where: { type: { in: ["FANGAME", "ROM_HACK", "MOD"] } },
         orderBy: { title: "asc" },
       },
     }),
-    derivativeCount: t.relationCount("derivatives", {
-      where: { type: { in: ["FANGAME", "ROM_HACK", "MOD"] } },
+    baseGameCount: t.relationCount("baseGames"),
+    derivedGames: t.relation("derivedGames", {
+      query: {
+        where: { type: { in: ["FANGAME", "ROM_HACK", "MOD", "DLC", "EXPANSION"] } },
+        orderBy: { title: "asc" },
+      },
+    }),
+    derivedGameCount: t.relationCount("derivedGames", {
+      where: { type: { in: ["FANGAME", "ROM_HACK", "MOD", "DLC", "EXPANSION"] } },
     }),
     platform: t.relation("platform", { nullable: true }),
     platformId: t.exposeString("platformId", { nullable: true }),
@@ -96,7 +100,7 @@ export const CreateGameInput = builder.inputType("CreateGameInput", {
     screenshots: t.stringList(),
     platformId: t.id(),
     type: t.field({ type: GameTypeEnum }),
-    baseGameId: t.id(),
+    baseGameIds: t.idList(),
   }),
 });
 
@@ -113,7 +117,7 @@ export const UpdateGameInput = builder.inputType("UpdateGameInput", {
     screenshots: t.stringList(),
     platformId: t.id(),
     type: t.field({ type: GameTypeEnum }),
-    baseGameId: t.id(),
+    baseGameIds: t.idList(),
   }),
 });
 
@@ -124,7 +128,7 @@ export const GamesFilterInput = builder.inputType("GamesFilterInput", {
     hasAchievements: t.boolean(),
     platformId: t.id(),
     type: t.field({ type: GameTypeEnum }),
-    isDerivative: t.boolean(), // true = has baseGameId, false = no baseGameId
+    isDerivative: t.boolean(), // true = has baseGames, false = no baseGames
   }),
 });
 
