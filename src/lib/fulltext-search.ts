@@ -184,3 +184,30 @@ export async function searchDLCsFullText(
     return results.map((r) => r.id);
   });
 }
+
+/**
+ * Search game families using case-insensitive title matching with trigram similarity.
+ * Uses fuzzy matching for typo tolerance.
+ * Results are cached for performance.
+ */
+export async function searchGameFamilies(
+  prisma: PrismaClient,
+  search: string,
+  limit: number = 1000
+): Promise<string[]> {
+  const key = cacheKey(CachePrefix.GAME_FAMILY_SEARCH, { search: search.toLowerCase(), limit });
+
+  return getCachedOrCompute(key, CacheTTL.SEARCH_RESULTS, async () => {
+    // Use trigram similarity for fuzzy matching on title
+    const results = await prisma.$queryRaw<{ id: string }[]>`
+      SELECT id
+      FROM "GameFamily"
+      WHERE similarity(title, ${search}) > 0.1
+         OR LOWER(title) LIKE ${"%" + search.toLowerCase() + "%"}
+      ORDER BY similarity(title, ${search}) DESC, title ASC
+      LIMIT ${limit}
+    `;
+
+    return results.map((r) => r.id);
+  });
+}

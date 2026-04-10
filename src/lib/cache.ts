@@ -6,6 +6,7 @@ import { getRedis } from "./redis.js";
  */
 export const CachePrefix = {
   GAME_SEARCH: "search:games:",
+  GAME_FAMILY_SEARCH: "search:game-families:",
   ACHIEVEMENT_SEARCH: "search:achievements:",
   GAME_VERSION_SEARCH: "search:versions:",
   DLC_SEARCH: "search:dlcs:",
