@@ -166,17 +166,17 @@ builder.queryField("myStats", (t) =>
               achievement: {
                 select: {
                   achievementSet: {
-                    select: { gameId: true },
+                    select: { gameFamilyId: true },
                   },
                 },
               },
             },
           })
           .then((results) => {
-            const uniqueGameIds = new Set(
-              results.map((r) => r.achievement.achievementSet.gameId)
+            const uniqueFamilyIds = new Set(
+              results.map((r) => r.achievement.achievementSet.gameFamilyId).filter(Boolean)
             );
-            return uniqueGameIds.size;
+            return uniqueFamilyIds.size;
           }),
       ]);
 

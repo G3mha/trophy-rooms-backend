@@ -10,7 +10,7 @@ const ActivityFeedEntry = builder.objectRef<{
   achievementTitle: string;
   achievementTier: string;
   achievementPoints: number;
-  gameId: string;
+  gameFamilyId: string;
   gameTitle: string;
   earnedAt: Date;
 }>("ActivityFeedEntry");
@@ -25,7 +25,7 @@ ActivityFeedEntry.implement({
     achievementTitle: t.exposeString("achievementTitle"),
     achievementTier: t.exposeString("achievementTier"),
     achievementPoints: t.exposeInt("achievementPoints"),
-    gameId: t.exposeString("gameId"),
+    gameFamilyId: t.exposeString("gameFamilyId"),
     gameTitle: t.exposeString("gameTitle"),
     earnedAt: t.expose("earnedAt", { type: "DateTime" }),
   }),
@@ -38,6 +38,7 @@ const TrophyActivityEntry = builder.objectRef<{
   userName: string | null;
   userEmail: string;
   gameId: string;
+  gameFamilyId: string;
   gameTitle: string;
   earnedAt: Date;
 }>("TrophyActivityEntry");
@@ -49,6 +50,7 @@ TrophyActivityEntry.implement({
     userName: t.exposeString("userName", { nullable: true }),
     userEmail: t.exposeString("userEmail"),
     gameId: t.exposeString("gameId"),
+    gameFamilyId: t.exposeString("gameFamilyId"),
     gameTitle: t.exposeString("gameTitle"),
     earnedAt: t.expose("earnedAt", { type: "DateTime" }),
   }),
@@ -65,7 +67,8 @@ const CombinedActivityEntry = builder.objectRef<{
   achievementTitle?: string;
   achievementTier?: string;
   achievementPoints?: number;
-  gameId: string;
+  gameId?: string;
+  gameFamilyId: string;
   gameTitle: string;
   platformName?: string;
   platformSlug?: string;
@@ -83,7 +86,8 @@ CombinedActivityEntry.implement({
     achievementTitle: t.exposeString("achievementTitle", { nullable: true }),
     achievementTier: t.exposeString("achievementTier", { nullable: true }),
     achievementPoints: t.exposeInt("achievementPoints", { nullable: true }),
-    gameId: t.exposeString("gameId"),
+    gameId: t.exposeString("gameId", { nullable: true }),
+    gameFamilyId: t.exposeString("gameFamilyId"),
     gameTitle: t.exposeString("gameTitle"),
     platformName: t.exposeString("platformName", { nullable: true }),
     platformSlug: t.exposeString("platformSlug", { nullable: true }),
@@ -116,13 +120,10 @@ builder.queryField("recentAchievementActivity", (t) =>
               points: true,
               achievementSet: {
                 select: {
-                  game: {
+                  gameFamily: {
                     select: {
                       id: true,
                       title: true,
-                      platform: {
-                        select: { name: true, slug: true },
-                      },
                     },
                   },
                 },
@@ -141,8 +142,8 @@ builder.queryField("recentAchievementActivity", (t) =>
         achievementTitle: ua.achievement.title,
         achievementTier: ua.achievement.tier,
         achievementPoints: ua.achievement.points,
-        gameId: ua.achievement.achievementSet.game.id,
-        gameTitle: ua.achievement.achievementSet.game.title,
+        gameFamilyId: ua.achievement.achievementSet.gameFamily?.id ?? "",
+        gameTitle: ua.achievement.achievementSet.gameFamily?.title ?? "Unknown",
         earnedAt: ua.createdAt,
       }));
     },
@@ -167,7 +168,13 @@ builder.queryField("recentTrophyActivity", (t) =>
             select: { id: true, name: true, email: true },
           },
           game: {
-            select: { id: true, title: true },
+            select: {
+              id: true,
+              gameFamilyId: true,
+              gameFamily: {
+                select: { id: true, title: true },
+              },
+            },
           },
         },
       });
@@ -178,7 +185,8 @@ builder.queryField("recentTrophyActivity", (t) =>
         userName: t.user.name,
         userEmail: t.user.email,
         gameId: t.game.id,
-        gameTitle: t.game.title,
+        gameFamilyId: t.game.gameFamily?.id ?? t.game.gameFamilyId ?? "",
+        gameTitle: t.game.gameFamily?.title ?? "Unknown",
         earnedAt: t.createdAt,
       }));
     },
@@ -212,13 +220,10 @@ builder.queryField("activityFeed", (t) =>
                 points: true,
                 achievementSet: {
                   select: {
-                    game: {
+                    gameFamily: {
                       select: {
                         id: true,
                         title: true,
-                        platform: {
-                          select: { name: true, slug: true },
-                        },
                       },
                     },
                   },
@@ -237,7 +242,10 @@ builder.queryField("activityFeed", (t) =>
             game: {
               select: {
                 id: true,
-                title: true,
+                gameFamilyId: true,
+                gameFamily: {
+                  select: { id: true, title: true },
+                },
                 platform: {
                   select: { name: true, slug: true },
                 },
@@ -258,7 +266,8 @@ builder.queryField("activityFeed", (t) =>
         achievementTitle?: string;
         achievementTier?: string;
         achievementPoints?: number;
-        gameId: string;
+        gameId?: string;
+        gameFamilyId: string;
         gameTitle: string;
         platformName?: string;
         platformSlug?: string;
@@ -273,10 +282,8 @@ builder.queryField("activityFeed", (t) =>
         achievementTitle: ua.achievement.title,
         achievementTier: ua.achievement.tier,
         achievementPoints: ua.achievement.points,
-        gameId: ua.achievement.achievementSet.game.id,
-        gameTitle: ua.achievement.achievementSet.game.title,
-        platformName: ua.achievement.achievementSet.game.platform?.name,
-        platformSlug: ua.achievement.achievementSet.game.platform?.slug,
+        gameFamilyId: ua.achievement.achievementSet.gameFamily?.id ?? "",
+        gameTitle: ua.achievement.achievementSet.gameFamily?.title ?? "Unknown",
         earnedAt: ua.createdAt,
       }));
 
@@ -290,7 +297,8 @@ builder.queryField("activityFeed", (t) =>
         achievementTitle?: string;
         achievementTier?: string;
         achievementPoints?: number;
-        gameId: string;
+        gameId?: string;
+        gameFamilyId: string;
         gameTitle: string;
         platformName?: string;
         platformSlug?: string;
@@ -302,7 +310,8 @@ builder.queryField("activityFeed", (t) =>
         userName: t.user.name,
         userEmail: t.user.email,
         gameId: t.game.id,
-        gameTitle: t.game.title,
+        gameFamilyId: t.game.gameFamily?.id ?? t.game.gameFamilyId ?? "",
+        gameTitle: t.game.gameFamily?.title ?? "Unknown",
         platformName: t.game.platform?.name,
         platformSlug: t.game.platform?.slug,
         earnedAt: t.createdAt,

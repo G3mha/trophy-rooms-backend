@@ -110,9 +110,16 @@ builder.queryField("myGamesByStatus", (t) =>
           game: {
             select: {
               id: true,
-              title: true,
               coverUrl: true,
-              description: true,
+              gameFamilyId: true,
+              gameFamily: {
+                select: {
+                  id: true,
+                  title: true,
+                  coverUrl: true,
+                  description: true,
+                },
+              },
             },
           },
           platform: {
@@ -131,34 +138,36 @@ builder.queryField("myGamesByStatus", (t) =>
         },
       });
 
-      // Get achievement counts for each game
-      const gameIds = userGames.map((item) => item.game.id);
+      // Get achievement counts for each game family
+      const gameFamilyIds = userGames
+        .map((item) => item.game.gameFamilyId)
+        .filter((id): id is string => id !== null);
 
       const achievementCounts = await ctx.prisma.achievement.groupBy({
         by: ["achievementSetId"],
         where: {
           achievementSet: {
-            gameId: { in: gameIds },
+            gameFamilyId: { in: gameFamilyIds },
           },
         },
         _count: { id: true },
       });
 
-      // Get achievement set to game mapping
+      // Get achievement set to game family mapping
       const achievementSets = await ctx.prisma.achievementSet.findMany({
-        where: { gameId: { in: gameIds } },
-        select: { id: true, gameId: true },
+        where: { gameFamilyId: { in: gameFamilyIds } },
+        select: { id: true, gameFamilyId: true },
       });
-      const setToGameMap = new Map(achievementSets.map((s) => [s.id, s.gameId]));
+      const setToFamilyMap = new Map(achievementSets.map((s) => [s.id, s.gameFamilyId]));
 
-      // Aggregate counts by game
-      const gameAchievementMap = new Map<string, number>();
+      // Aggregate counts by game family
+      const familyAchievementMap = new Map<string, number>();
       for (const count of achievementCounts) {
-        const gameId = setToGameMap.get(count.achievementSetId);
-        if (gameId) {
-          gameAchievementMap.set(
-            gameId,
-            (gameAchievementMap.get(gameId) || 0) + count._count.id
+        const familyId = setToFamilyMap.get(count.achievementSetId);
+        if (familyId) {
+          familyAchievementMap.set(
+            familyId,
+            (familyAchievementMap.get(familyId) || 0) + count._count.id
           );
         }
       }
@@ -166,10 +175,10 @@ builder.queryField("myGamesByStatus", (t) =>
       return userGames.map((item) => ({
         id: item.id,
         gameId: item.game.id,
-        gameTitle: item.game.title,
-        gameCoverUrl: item.game.coverUrl,
-        gameDescription: item.game.description,
-        achievementCount: gameAchievementMap.get(item.game.id) || 0,
+        gameTitle: item.game.gameFamily?.title ?? "Unknown",
+        gameCoverUrl: item.game.coverUrl ?? item.game.gameFamily?.coverUrl ?? null,
+        gameDescription: item.game.gameFamily?.description ?? null,
+        achievementCount: item.game.gameFamilyId ? familyAchievementMap.get(item.game.gameFamilyId) || 0 : 0,
         platformId: item.platform?.id ?? null,
         platformName: item.platform?.name ?? null,
         platformSlug: item.platform?.slug ?? null,

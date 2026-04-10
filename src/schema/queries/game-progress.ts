@@ -1,8 +1,8 @@
 import { builder } from "../builder.js";
 
-// User's progress on a specific game
+// User's progress on a specific game family
 const UserGameProgress = builder.objectRef<{
-  gameId: string;
+  gameFamilyId: string;
   gameTitle: string;
   gameCoverUrl: string | null;
   earnedCount: number;
@@ -17,7 +17,7 @@ const UserGameProgress = builder.objectRef<{
 
 UserGameProgress.implement({
   fields: (t) => ({
-    gameId: t.exposeString("gameId"),
+    gameFamilyId: t.exposeString("gameFamilyId"),
     gameTitle: t.exposeString("gameTitle"),
     gameCoverUrl: t.exposeString("gameCoverUrl", { nullable: true }),
     earnedCount: t.exposeInt("earnedCount"),
@@ -31,7 +31,7 @@ UserGameProgress.implement({
   }),
 });
 
-// Get current user's game progress
+// Get current user's game progress (grouped by game family)
 builder.queryField("myGameProgress", (t) =>
   t.field({
     type: [UserGameProgress],
@@ -40,7 +40,7 @@ builder.queryField("myGameProgress", (t) =>
         return [];
       }
 
-      // Get all user achievements with game info
+      // Get all user achievements with game family info
       const userAchievements = await ctx.prisma.userAchievement.findMany({
         where: { userId: ctx.user.id },
         include: {
@@ -48,7 +48,7 @@ builder.queryField("myGameProgress", (t) =>
             include: {
               achievementSet: {
                 include: {
-                  game: {
+                  gameFamily: {
                     select: {
                       id: true,
                       title: true,
@@ -63,21 +63,31 @@ builder.queryField("myGameProgress", (t) =>
         orderBy: { createdAt: "desc" },
       });
 
-      // Get user's trophies
+      // Get user's trophies (linked to games, which are linked to game families)
       const userTrophies = await ctx.prisma.trophy.findMany({
         where: { userId: ctx.user.id },
         select: {
           gameId: true,
           createdAt: true,
+          game: {
+            select: { gameFamilyId: true },
+          },
         },
       });
-      const trophyMap = new Map(userTrophies.map((t) => [t.gameId, t.createdAt]));
+      // Map by gameFamilyId for trophy tracking
+      const trophyMap = new Map<string, Date>();
+      for (const t of userTrophies) {
+        const familyId = t.game.gameFamilyId;
+        if (familyId && (!trophyMap.has(familyId) || t.createdAt > trophyMap.get(familyId)!)) {
+          trophyMap.set(familyId, t.createdAt);
+        }
+      }
 
-      // Group by game
-      const gameMap = new Map<
+      // Group by game family
+      const gameFamilyMap = new Map<
         string,
         {
-          gameId: string;
+          gameFamilyId: string;
           gameTitle: string;
           gameCoverUrl: string | null;
           earnedIds: Set<string>;
@@ -87,52 +97,53 @@ builder.queryField("myGameProgress", (t) =>
       >();
 
       for (const ua of userAchievements) {
-        const game = ua.achievement.achievementSet.game;
-        if (!gameMap.has(game.id)) {
-          gameMap.set(game.id, {
-            gameId: game.id,
-            gameTitle: game.title,
-            gameCoverUrl: game.coverUrl,
+        const gameFamily = ua.achievement.achievementSet.gameFamily;
+        if (!gameFamily) continue;
+        if (!gameFamilyMap.has(gameFamily.id)) {
+          gameFamilyMap.set(gameFamily.id, {
+            gameFamilyId: gameFamily.id,
+            gameTitle: gameFamily.title,
+            gameCoverUrl: gameFamily.coverUrl,
             earnedIds: new Set(),
             earnedPoints: 0,
             lastActivityAt: ua.createdAt,
           });
         }
-        const gameData = gameMap.get(game.id)!;
-        gameData.earnedIds.add(ua.achievement.id);
-        gameData.earnedPoints += ua.achievement.points;
-        if (ua.createdAt > gameData.lastActivityAt) {
-          gameData.lastActivityAt = ua.createdAt;
+        const familyData = gameFamilyMap.get(gameFamily.id)!;
+        familyData.earnedIds.add(ua.achievement.id);
+        familyData.earnedPoints += ua.achievement.points;
+        if (ua.createdAt > familyData.lastActivityAt) {
+          familyData.lastActivityAt = ua.createdAt;
         }
       }
 
-      // Get total achievement counts and points for each game
-      const gameIds = Array.from(gameMap.keys());
-      const gameTotals = await ctx.prisma.achievement.groupBy({
+      // Get total achievement counts and points for each game family
+      const gameFamilyIds = Array.from(gameFamilyMap.keys());
+      const gameFamilyTotals = await ctx.prisma.achievement.groupBy({
         by: ["achievementSetId"],
         where: {
           achievementSet: {
-            gameId: { in: gameIds },
+            gameFamilyId: { in: gameFamilyIds },
           },
         },
         _count: { id: true },
         _sum: { points: true },
       });
 
-      // Get achievement set to game mapping
+      // Get achievement set to game family mapping
       const achievementSets = await ctx.prisma.achievementSet.findMany({
-        where: { gameId: { in: gameIds } },
-        select: { id: true, gameId: true },
+        where: { gameFamilyId: { in: gameFamilyIds } },
+        select: { id: true, gameFamilyId: true },
       });
-      const setToGameMap = new Map(achievementSets.map((s) => [s.id, s.gameId]));
+      const setToFamilyMap = new Map(achievementSets.map((s) => [s.id, s.gameFamilyId]));
 
-      // Aggregate totals by game
-      const gameTotalMap = new Map<string, { count: number; points: number }>();
-      for (const total of gameTotals) {
-        const gameId = setToGameMap.get(total.achievementSetId);
-        if (gameId) {
-          const existing = gameTotalMap.get(gameId) || { count: 0, points: 0 };
-          gameTotalMap.set(gameId, {
+      // Aggregate totals by game family
+      const familyTotalMap = new Map<string, { count: number; points: number }>();
+      for (const total of gameFamilyTotals) {
+        const familyId = setToFamilyMap.get(total.achievementSetId);
+        if (familyId) {
+          const existing = familyTotalMap.get(familyId) || { count: 0, points: 0 };
+          familyTotalMap.set(familyId, {
             count: existing.count + total._count.id,
             points: existing.points + (total._sum.points || 0),
           });
@@ -141,7 +152,7 @@ builder.queryField("myGameProgress", (t) =>
 
       // Build result
       const result: Array<{
-        gameId: string;
+        gameFamilyId: string;
         gameTitle: string;
         gameCoverUrl: string | null;
         earnedCount: number;
@@ -154,14 +165,14 @@ builder.queryField("myGameProgress", (t) =>
         lastActivityAt: Date | null;
       }> = [];
 
-      for (const [gameId, data] of gameMap.entries()) {
-        const totals = gameTotalMap.get(gameId) || { count: 0, points: 0 };
+      for (const [familyId, data] of gameFamilyMap.entries()) {
+        const totals = familyTotalMap.get(familyId) || { count: 0, points: 0 };
         const earnedCount = data.earnedIds.size;
         const totalCount = totals.count;
         const percentComplete = totalCount > 0 ? Math.round((earnedCount / totalCount) * 100) : 0;
 
         result.push({
-          gameId: data.gameId,
+          gameFamilyId: data.gameFamilyId,
           gameTitle: data.gameTitle,
           gameCoverUrl: data.gameCoverUrl,
           earnedCount,
@@ -169,8 +180,8 @@ builder.queryField("myGameProgress", (t) =>
           earnedPoints: data.earnedPoints,
           totalPoints: totals.points,
           percentComplete,
-          hasTrophy: trophyMap.has(gameId),
-          trophyEarnedAt: trophyMap.get(gameId) || null,
+          hasTrophy: trophyMap.has(familyId),
+          trophyEarnedAt: trophyMap.get(familyId) || null,
           lastActivityAt: data.lastActivityAt,
         });
       }
@@ -197,7 +208,7 @@ builder.queryField("userGameProgress", (t) =>
       userId: t.arg.string({ required: true }),
     },
     resolve: async (_root, args, ctx) => {
-      // Get all user achievements with game info
+      // Get all user achievements with game family info
       const userAchievements = await ctx.prisma.userAchievement.findMany({
         where: { userId: args.userId },
         include: {
@@ -205,7 +216,7 @@ builder.queryField("userGameProgress", (t) =>
             include: {
               achievementSet: {
                 include: {
-                  game: {
+                  gameFamily: {
                     select: {
                       id: true,
                       title: true,
@@ -226,15 +237,25 @@ builder.queryField("userGameProgress", (t) =>
         select: {
           gameId: true,
           createdAt: true,
+          game: {
+            select: { gameFamilyId: true },
+          },
         },
       });
-      const trophyMap = new Map(userTrophies.map((t) => [t.gameId, t.createdAt]));
+      // Map by gameFamilyId for trophy tracking
+      const trophyMap = new Map<string, Date>();
+      for (const t of userTrophies) {
+        const familyId = t.game.gameFamilyId;
+        if (familyId && (!trophyMap.has(familyId) || t.createdAt > trophyMap.get(familyId)!)) {
+          trophyMap.set(familyId, t.createdAt);
+        }
+      }
 
-      // Group by game
-      const gameMap = new Map<
+      // Group by game family
+      const gameFamilyMap = new Map<
         string,
         {
-          gameId: string;
+          gameFamilyId: string;
           gameTitle: string;
           gameCoverUrl: string | null;
           earnedIds: Set<string>;
@@ -244,52 +265,53 @@ builder.queryField("userGameProgress", (t) =>
       >();
 
       for (const ua of userAchievements) {
-        const game = ua.achievement.achievementSet.game;
-        if (!gameMap.has(game.id)) {
-          gameMap.set(game.id, {
-            gameId: game.id,
-            gameTitle: game.title,
-            gameCoverUrl: game.coverUrl,
+        const gameFamily = ua.achievement.achievementSet.gameFamily;
+        if (!gameFamily) continue;
+        if (!gameFamilyMap.has(gameFamily.id)) {
+          gameFamilyMap.set(gameFamily.id, {
+            gameFamilyId: gameFamily.id,
+            gameTitle: gameFamily.title,
+            gameCoverUrl: gameFamily.coverUrl,
             earnedIds: new Set(),
             earnedPoints: 0,
             lastActivityAt: ua.createdAt,
           });
         }
-        const gameData = gameMap.get(game.id)!;
-        gameData.earnedIds.add(ua.achievement.id);
-        gameData.earnedPoints += ua.achievement.points;
-        if (ua.createdAt > gameData.lastActivityAt) {
-          gameData.lastActivityAt = ua.createdAt;
+        const familyData = gameFamilyMap.get(gameFamily.id)!;
+        familyData.earnedIds.add(ua.achievement.id);
+        familyData.earnedPoints += ua.achievement.points;
+        if (ua.createdAt > familyData.lastActivityAt) {
+          familyData.lastActivityAt = ua.createdAt;
         }
       }
 
-      // Get total achievement counts and points for each game
-      const gameIds = Array.from(gameMap.keys());
-      const gameTotals = await ctx.prisma.achievement.groupBy({
+      // Get total achievement counts and points for each game family
+      const gameFamilyIds = Array.from(gameFamilyMap.keys());
+      const gameFamilyTotals = await ctx.prisma.achievement.groupBy({
         by: ["achievementSetId"],
         where: {
           achievementSet: {
-            gameId: { in: gameIds },
+            gameFamilyId: { in: gameFamilyIds },
           },
         },
         _count: { id: true },
         _sum: { points: true },
       });
 
-      // Get achievement set to game mapping
+      // Get achievement set to game family mapping
       const achievementSets = await ctx.prisma.achievementSet.findMany({
-        where: { gameId: { in: gameIds } },
-        select: { id: true, gameId: true },
+        where: { gameFamilyId: { in: gameFamilyIds } },
+        select: { id: true, gameFamilyId: true },
       });
-      const setToGameMap = new Map(achievementSets.map((s) => [s.id, s.gameId]));
+      const setToFamilyMap = new Map(achievementSets.map((s) => [s.id, s.gameFamilyId]));
 
-      // Aggregate totals by game
-      const gameTotalMap = new Map<string, { count: number; points: number }>();
-      for (const total of gameTotals) {
-        const gameId = setToGameMap.get(total.achievementSetId);
-        if (gameId) {
-          const existing = gameTotalMap.get(gameId) || { count: 0, points: 0 };
-          gameTotalMap.set(gameId, {
+      // Aggregate totals by game family
+      const familyTotalMap = new Map<string, { count: number; points: number }>();
+      for (const total of gameFamilyTotals) {
+        const familyId = setToFamilyMap.get(total.achievementSetId);
+        if (familyId) {
+          const existing = familyTotalMap.get(familyId) || { count: 0, points: 0 };
+          familyTotalMap.set(familyId, {
             count: existing.count + total._count.id,
             points: existing.points + (total._sum.points || 0),
           });
@@ -298,7 +320,7 @@ builder.queryField("userGameProgress", (t) =>
 
       // Build result
       const result: Array<{
-        gameId: string;
+        gameFamilyId: string;
         gameTitle: string;
         gameCoverUrl: string | null;
         earnedCount: number;
@@ -311,14 +333,14 @@ builder.queryField("userGameProgress", (t) =>
         lastActivityAt: Date | null;
       }> = [];
 
-      for (const [gameId, data] of gameMap.entries()) {
-        const totals = gameTotalMap.get(gameId) || { count: 0, points: 0 };
+      for (const [familyId, data] of gameFamilyMap.entries()) {
+        const totals = familyTotalMap.get(familyId) || { count: 0, points: 0 };
         const earnedCount = data.earnedIds.size;
         const totalCount = totals.count;
         const percentComplete = totalCount > 0 ? Math.round((earnedCount / totalCount) * 100) : 0;
 
         result.push({
-          gameId: data.gameId,
+          gameFamilyId: data.gameFamilyId,
           gameTitle: data.gameTitle,
           gameCoverUrl: data.gameCoverUrl,
           earnedCount,
@@ -326,8 +348,8 @@ builder.queryField("userGameProgress", (t) =>
           earnedPoints: data.earnedPoints,
           totalPoints: totals.points,
           percentComplete,
-          hasTrophy: trophyMap.has(gameId),
-          trophyEarnedAt: trophyMap.get(gameId) || null,
+          hasTrophy: trophyMap.has(familyId),
+          trophyEarnedAt: trophyMap.get(familyId) || null,
           lastActivityAt: data.lastActivityAt,
         });
       }

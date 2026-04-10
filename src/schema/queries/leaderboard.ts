@@ -225,7 +225,13 @@ builder.queryField("fastestCompletions", (t) =>
       const trophies = await ctx.prisma.trophy.findMany({
         include: {
           user: { select: { id: true, name: true, email: true } },
-          game: { select: { id: true, title: true } },
+          game: {
+            select: {
+              id: true,
+              gameFamilyId: true,
+              gameFamily: { select: { id: true, title: true } },
+            },
+          },
         },
         orderBy: { createdAt: "desc" },
       });
@@ -243,13 +249,16 @@ builder.queryField("fastestCompletions", (t) =>
       }> = [];
 
       for (const trophy of trophies) {
-        // Find the first achievement for this user in this game
+        const gameFamilyId = trophy.game.gameFamilyId;
+        if (!gameFamilyId) continue;
+
+        // Find the first achievement for this user in this game family
         const firstAchievement = await ctx.prisma.userAchievement.findFirst({
           where: {
             userId: trophy.userId,
             achievement: {
               achievementSet: {
-                gameId: trophy.gameId,
+                gameFamilyId,
               },
             },
           },
@@ -270,7 +279,7 @@ builder.queryField("fastestCompletions", (t) =>
               userName: trophy.user.name,
               userEmail: trophy.user.email,
               gameId: trophy.game.id,
-              gameTitle: trophy.game.title,
+              gameTitle: trophy.game.gameFamily?.title ?? "Unknown",
               completionTimeHours: Math.round(completionTimeHours * 10) / 10,
               completedAt: trophy.createdAt,
             });
@@ -300,27 +309,29 @@ builder.queryField("leaderboardByGamesPlayed", (t) =>
     resolve: async (_root, args, ctx) => {
       const limit = Math.min(args.limit || 10, 100);
 
-      // Get all user achievements with game info
+      // Get all user achievements with game family info
       const userAchievements = await ctx.prisma.userAchievement.findMany({
         select: {
           userId: true,
           achievement: {
             select: {
               achievementSet: {
-                select: { gameId: true },
+                select: { gameFamilyId: true },
               },
             },
           },
         },
       });
 
-      // Count unique games per user
+      // Count unique game families per user
       const userGamesMap = new Map<string, Set<string>>();
       for (const ua of userAchievements) {
+        const familyId = ua.achievement.achievementSet.gameFamilyId;
+        if (!familyId) continue;
         if (!userGamesMap.has(ua.userId)) {
           userGamesMap.set(ua.userId, new Set());
         }
-        userGamesMap.get(ua.userId)!.add(ua.achievement.achievementSet.gameId);
+        userGamesMap.get(ua.userId)!.add(familyId);
       }
 
       // Sort and limit
