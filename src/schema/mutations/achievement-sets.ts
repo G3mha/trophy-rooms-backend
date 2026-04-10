@@ -44,18 +44,19 @@ builder.mutationField("createAchievementSet", (t) =>
         };
       }
 
-      const game = await ctx.prisma.game.findUnique({
-        where: { id: input.gameId },
+      // Verify game family exists
+      const gameFamily = await ctx.prisma.gameFamily.findUnique({
+        where: { id: input.gameFamilyId },
       });
 
-      if (!game) {
+      if (!gameFamily) {
         return {
           success: false,
           achievementSetId: null,
           error: {
             code: ErrorCode.NOT_FOUND,
-            message: `Game with id "${input.gameId}" not found`,
-            field: "gameId",
+            message: `Game family with id "${input.gameFamilyId}" not found`,
+            field: "gameFamilyId",
           },
         };
       }
@@ -78,13 +79,13 @@ builder.mutationField("createAchievementSet", (t) =>
       const duplicateWhere =
         input.type === AchievementSetType.CUSTOM
           ? {
-              gameId: input.gameId,
+              gameFamilyId: input.gameFamilyId,
               title: trimmedTitle,
               type: AchievementSetType.CUSTOM,
               createdByUserId: ctx.user.id,
             }
           : {
-              gameId: input.gameId,
+              gameFamilyId: input.gameFamilyId,
               title: trimmedTitle,
               type: input.type,
             };
@@ -99,7 +100,7 @@ builder.mutationField("createAchievementSet", (t) =>
           achievementSetId: null,
           error: {
             code: ErrorCode.ALREADY_EXISTS,
-            message: `An achievement set named "${trimmedTitle}" already exists for this game`,
+            message: `An achievement set named "${trimmedTitle}" already exists for this game family`,
             field: "title",
           },
         };
@@ -114,7 +115,7 @@ builder.mutationField("createAchievementSet", (t) =>
       if (input.gameVersionId) {
         const version = await ctx.prisma.gameVersion.findUnique({
           where: { id: input.gameVersionId },
-          include: { games: { select: { id: true } } },
+          include: { games: { select: { gameFamilyId: true } } },
         });
 
         if (!version) {
@@ -129,15 +130,15 @@ builder.mutationField("createAchievementSet", (t) =>
           };
         }
 
-        // Ensure version is linked to the specified game
-        const isLinked = version.games.some((g) => g.id === input.gameId);
+        // Ensure version is linked to a game in the specified family
+        const isLinked = version.games.some((g) => g.gameFamilyId === input.gameFamilyId);
         if (!isLinked) {
           return {
             success: false,
             achievementSetId: null,
             error: {
               code: ErrorCode.VALIDATION_ERROR,
-              message: "Game version is not linked to the specified game",
+              message: "Game version is not linked to the specified game family",
               field: "gameVersionId",
             },
           };
@@ -162,14 +163,14 @@ builder.mutationField("createAchievementSet", (t) =>
           };
         }
 
-        // Ensure DLC belongs to the specified game
-        if (dlc.gameId !== input.gameId) {
+        // Ensure DLC belongs to the specified game family
+        if (dlc.gameFamilyId !== input.gameFamilyId) {
           return {
             success: false,
             achievementSetId: null,
             error: {
               code: ErrorCode.VALIDATION_ERROR,
-              message: "DLC does not belong to the specified game",
+              message: "DLC does not belong to the specified game family",
               field: "dlcId",
             },
           };
@@ -181,7 +182,7 @@ builder.mutationField("createAchievementSet", (t) =>
           title: trimmedTitle,
           type: input.type,
           visibility,
-          gameId: input.gameId,
+          gameFamilyId: input.gameFamilyId,
           gameVersionId: input.gameVersionId ?? null,
           dlcId: input.dlcId ?? null,
           createdByUserId: ctx.user.id,
@@ -283,13 +284,13 @@ builder.mutationField("updateAchievementSet", (t) =>
           const duplicateWhere =
             existing.type === AchievementSetType.CUSTOM
               ? {
-                  gameId: existing.gameId,
+                  gameFamilyId: existing.gameFamilyId,
                   title: trimmedTitle,
                   type: existing.type,
                   createdByUserId: existing.createdByUserId,
                 }
               : {
-                  gameId: existing.gameId,
+                  gameFamilyId: existing.gameFamilyId,
                   title: trimmedTitle,
                   type: existing.type,
                 };
@@ -307,7 +308,7 @@ builder.mutationField("updateAchievementSet", (t) =>
               achievementSetId: null,
               error: {
                 code: ErrorCode.ALREADY_EXISTS,
-                message: `An achievement set named "${trimmedTitle}" already exists for this game`,
+                message: `An achievement set named "${trimmedTitle}" already exists for this game family`,
                 field: "title",
               },
             };

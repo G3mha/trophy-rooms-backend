@@ -27,26 +27,26 @@ builder.queryField("allDlcs", (t) =>
     resolve: async (query, _root, _args, ctx) => {
       return ctx.prisma.dLC.findMany({
         ...query,
-        orderBy: [{ game: { title: "asc" } }, { name: "asc" }],
+        orderBy: [{ gameFamily: { title: "asc" } }, { name: "asc" }],
         include: {
-          game: true,
+          gameFamily: true,
         },
       });
     },
   })
 );
 
-// Query: Get all DLCs for a game
+// Query: Get all DLCs for a game family
 builder.queryField("dlcs", (t) =>
   t.prismaField({
     type: ["DLC"],
     args: {
-      gameId: t.arg.id({ required: true }),
+      gameFamilyId: t.arg.id({ required: true }),
     },
     resolve: async (query, _root, args, ctx) => {
       return ctx.prisma.dLC.findMany({
         ...query,
-        where: { gameId: args.gameId },
+        where: { gameFamilyId: args.gameFamilyId },
         orderBy: [{ type: "asc" }, { name: "asc" }],
       });
     },
@@ -121,7 +121,7 @@ builder.mutationField("createDLC", (t) =>
         };
       }
 
-      const { gameId, name, slug, type, description, coverUrl, releaseDate, price } = args.input;
+      const { gameFamilyId, name, slug, type, description, coverUrl, releaseDate, price } = args.input;
 
       // Validate name
       const trimmedName = name.trim();
@@ -151,19 +151,19 @@ builder.mutationField("createDLC", (t) =>
         };
       }
 
-      // Check if game exists
-      const game = await ctx.prisma.game.findUnique({
-        where: { id: gameId },
+      // Check if game family exists
+      const gameFamily = await ctx.prisma.gameFamily.findUnique({
+        where: { id: gameFamilyId },
       });
 
-      if (!game) {
+      if (!gameFamily) {
         return {
           success: false,
           dlcId: null,
           error: {
             code: ErrorCode.NOT_FOUND,
-            message: `Game with id "${gameId}" not found`,
-            field: "gameId",
+            message: `Game family with id "${gameFamilyId}" not found`,
+            field: "gameFamilyId",
           },
         };
       }
@@ -171,8 +171,8 @@ builder.mutationField("createDLC", (t) =>
       // Check for duplicate slug
       const existing = await ctx.prisma.dLC.findUnique({
         where: {
-          gameId_slug: {
-            gameId,
+          gameFamilyId_slug: {
+            gameFamilyId,
             slug: trimmedSlug,
           },
         },
@@ -184,7 +184,7 @@ builder.mutationField("createDLC", (t) =>
           dlcId: null,
           error: {
             code: ErrorCode.ALREADY_EXISTS,
-            message: `A DLC with slug "${trimmedSlug}" already exists for this game`,
+            message: `A DLC with slug "${trimmedSlug}" already exists for this game family`,
             field: "slug",
           },
         };
@@ -200,7 +200,7 @@ builder.mutationField("createDLC", (t) =>
           coverUrl: coverUrl?.trim() || null,
           releaseDate: releaseDate ?? null,
           price: price ?? null,
-          gameId,
+          gameFamilyId,
         },
       });
 
@@ -310,11 +310,11 @@ builder.mutationField("updateDLC", (t) =>
         }
 
         // Check for duplicate slug (excluding current DLC)
-        if (trimmedSlug !== existing.slug) {
+        if (trimmedSlug !== existing.slug && existing.gameFamilyId) {
           const duplicate = await ctx.prisma.dLC.findUnique({
             where: {
-              gameId_slug: {
-                gameId: existing.gameId,
+              gameFamilyId_slug: {
+                gameFamilyId: existing.gameFamilyId,
                 slug: trimmedSlug,
               },
             },
@@ -326,7 +326,7 @@ builder.mutationField("updateDLC", (t) =>
               dlcId: null,
               error: {
                 code: ErrorCode.ALREADY_EXISTS,
-                message: `A DLC with slug "${trimmedSlug}" already exists for this game`,
+                message: `A DLC with slug "${trimmedSlug}" already exists for this game family`,
                 field: "slug",
               },
             };
@@ -554,7 +554,7 @@ builder.mutationField("addDLCToVersion", (t) =>
       // Check if version exists
       const version = await ctx.prisma.gameVersion.findUnique({
         where: { id: versionId },
-        include: { games: { select: { id: true } } },
+        include: { games: { select: { gameFamilyId: true } } },
       });
 
       if (!version) {
@@ -569,15 +569,15 @@ builder.mutationField("addDLCToVersion", (t) =>
         };
       }
 
-      // Ensure DLC's game is linked to the version
-      const isLinked = version.games.some((g) => g.id === dlc.gameId);
+      // Ensure DLC's game family is linked to the version
+      const isLinked = version.games.some((g) => g.gameFamilyId === dlc.gameFamilyId);
       if (!isLinked) {
         return {
           success: false,
           dlcId: null,
           error: {
             code: ErrorCode.VALIDATION_ERROR,
-            message: "DLC and game version must be linked to the same game",
+            message: "DLC and game version must be linked to the same game family",
             field: null,
           },
         };

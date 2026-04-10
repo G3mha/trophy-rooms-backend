@@ -105,7 +105,7 @@ builder.mutationField("createBundle", (t) =>
         };
       }
 
-      const { name, slug, type, description, coverUrl, releaseDate, price, platformId, gameIds, dlcIds } = args.input;
+      const { name, slug, type, description, coverUrl, releaseDate, price, platformId, gameFamilyIds, dlcIds } = args.input;
 
       // Validate name
       const trimmedName = name.trim();
@@ -163,8 +163,8 @@ builder.mutationField("createBundle", (t) =>
           releaseDate: releaseDate ?? null,
           price: price ?? null,
           platformId: platformId ?? null,
-          games: gameIds && gameIds.length > 0 ? {
-            connect: gameIds.map((id) => ({ id })),
+          gameFamilies: gameFamilyIds && gameFamilyIds.length > 0 ? {
+            connect: gameFamilyIds.map((id) => ({ id })),
           } : undefined,
           dlcs: dlcIds && dlcIds.length > 0 ? {
             connect: dlcIds.map((id) => ({ id })),
@@ -243,7 +243,7 @@ builder.mutationField("updateBundle", (t) =>
         releaseDate?: Date | null;
         price?: number | null;
         platformId?: string | null;
-        games?: { set: { id: string }[] };
+        gameFamilies?: { set: { id: string }[] };
         dlcs?: { set: { id: string }[] };
       } = {};
 
@@ -322,9 +322,9 @@ builder.mutationField("updateBundle", (t) =>
         updateData.platformId = input.platformId ?? null;
       }
 
-      if (input.gameIds !== undefined) {
-        updateData.games = {
-          set: (input.gameIds ?? []).map((gid) => ({ id: gid })),
+      if (input.gameFamilyIds !== undefined) {
+        updateData.gameFamilies = {
+          set: (input.gameFamilyIds ?? []).map((gfid) => ({ id: gfid })),
         };
       }
 
@@ -471,22 +471,22 @@ builder.mutationField("bulkDeleteBundles", (t) =>
   })
 );
 
-// Add game to bundle
-builder.mutationField("addGameToBundle", (t) =>
+// Add game family to bundle
+builder.mutationField("addGameFamilyToBundle", (t) =>
   t.field({
     type: BundleMutationResult,
     args: {
-      gameId: t.arg.id({ required: true }),
+      gameFamilyId: t.arg.id({ required: true }),
       bundleId: t.arg.id({ required: true }),
     },
-    resolve: async (_root, { gameId, bundleId }, ctx) => {
+    resolve: async (_root, { gameFamilyId, bundleId }, ctx) => {
       if (!ctx.user) {
         return {
           success: false,
           bundleId: null,
           error: {
             code: ErrorCode.UNAUTHORIZED,
-            message: "You must be logged in to add games to bundles",
+            message: "You must be logged in to add game families to bundles",
             field: null,
           },
         };
@@ -521,29 +521,29 @@ builder.mutationField("addGameToBundle", (t) =>
         };
       }
 
-      // Check if game exists
-      const game = await ctx.prisma.game.findUnique({
-        where: { id: gameId },
+      // Check if game family exists
+      const gameFamily = await ctx.prisma.gameFamily.findUnique({
+        where: { id: gameFamilyId },
       });
 
-      if (!game) {
+      if (!gameFamily) {
         return {
           success: false,
           bundleId: null,
           error: {
             code: ErrorCode.NOT_FOUND,
-            message: `Game with id "${gameId}" not found`,
-            field: "gameId",
+            message: `Game family with id "${gameFamilyId}" not found`,
+            field: "gameFamilyId",
           },
         };
       }
 
-      // Connect game to bundle
+      // Connect game family to bundle
       await ctx.prisma.bundle.update({
         where: { id: bundleId },
         data: {
-          games: {
-            connect: { id: gameId },
+          gameFamilies: {
+            connect: { id: gameFamilyId },
           },
         },
       });
@@ -557,22 +557,22 @@ builder.mutationField("addGameToBundle", (t) =>
   })
 );
 
-// Remove game from bundle
-builder.mutationField("removeGameFromBundle", (t) =>
+// Remove game family from bundle
+builder.mutationField("removeGameFamilyFromBundle", (t) =>
   t.field({
     type: BundleMutationResult,
     args: {
-      gameId: t.arg.id({ required: true }),
+      gameFamilyId: t.arg.id({ required: true }),
       bundleId: t.arg.id({ required: true }),
     },
-    resolve: async (_root, { gameId, bundleId }, ctx) => {
+    resolve: async (_root, { gameFamilyId, bundleId }, ctx) => {
       if (!ctx.user) {
         return {
           success: false,
           bundleId: null,
           error: {
             code: ErrorCode.UNAUTHORIZED,
-            message: "You must be logged in to remove games from bundles",
+            message: "You must be logged in to remove game families from bundles",
             field: null,
           },
         };
@@ -590,12 +590,12 @@ builder.mutationField("removeGameFromBundle", (t) =>
         };
       }
 
-      // Disconnect game from bundle
+      // Disconnect game family from bundle
       await ctx.prisma.bundle.update({
         where: { id: bundleId },
         data: {
-          games: {
-            disconnect: { id: gameId },
+          gameFamilies: {
+            disconnect: { id: gameFamilyId },
           },
         },
       });

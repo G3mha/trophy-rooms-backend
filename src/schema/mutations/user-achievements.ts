@@ -81,23 +81,25 @@ builder.mutationField("markAchievementComplete", (t) =>
       });
 
       // Award trophy if all official/completionist achievements are complete
+      // Note: Achievements are linked to GameFamily, but trophies are awarded per Game (platform instance)
+      // For now, we'll award trophies for all games in the family when achievements are complete
       const achievementWithSet = await ctx.prisma.achievement.findUnique({
         where: { id: achievementId },
         select: {
           achievementSet: {
             select: {
-              gameId: true,
+              gameFamilyId: true,
             },
           },
         },
       });
 
       if (achievementWithSet?.achievementSet) {
-        const gameId = achievementWithSet.achievementSet.gameId;
+        const gameFamilyId = achievementWithSet.achievementSet.gameFamilyId;
         const totalAchievements = await ctx.prisma.achievement.count({
           where: {
             achievementSet: {
-              gameId,
+              gameFamilyId,
               OR: [
                 { type: { in: [AchievementSetType.OFFICIAL, AchievementSetType.COMPLETIONIST] } },
                 { type: AchievementSetType.CUSTOM, visibility: AchievementSetVisibility.PUBLIC },
@@ -112,7 +114,7 @@ builder.mutationField("markAchievementComplete", (t) =>
               userId: user.id,
               achievement: {
                 achievementSet: {
-                  gameId,
+                  gameFamilyId,
                   OR: [
                     { type: { in: [AchievementSetType.OFFICIAL, AchievementSetType.COMPLETIONIST] } },
                     { type: AchievementSetType.CUSTOM, visibility: AchievementSetVisibility.PUBLIC },
@@ -123,19 +125,27 @@ builder.mutationField("markAchievementComplete", (t) =>
           });
 
           if (completedCount >= totalAchievements) {
-            await ctx.prisma.trophy.upsert({
-              where: {
-                userId_gameId: {
-                  userId: user.id,
-                  gameId,
-                },
-              },
-              update: {},
-              create: {
-                userId: user.id,
-                gameId,
-              },
+            // Award trophies for all games in this family that the user has in their library
+            const userGamesInFamily = await ctx.prisma.game.findMany({
+              where: { gameFamilyId },
+              select: { id: true },
             });
+
+            for (const game of userGamesInFamily) {
+              await ctx.prisma.trophy.upsert({
+                where: {
+                  userId_gameId: {
+                    userId: user.id,
+                    gameId: game.id,
+                  },
+                },
+                update: {},
+                create: {
+                  userId: user.id,
+                  gameId: game.id,
+                },
+              });
+            }
           }
         }
       }
@@ -206,18 +216,18 @@ builder.mutationField("unmarkAchievementComplete", (t) =>
         select: {
           achievementSet: {
             select: {
-              gameId: true,
+              gameFamilyId: true,
             },
           },
         },
       });
 
       if (achievementWithSet?.achievementSet) {
-        const gameId = achievementWithSet.achievementSet.gameId;
+        const gameFamilyId = achievementWithSet.achievementSet.gameFamilyId;
         const totalAchievements = await ctx.prisma.achievement.count({
           where: {
             achievementSet: {
-              gameId,
+              gameFamilyId,
               OR: [
                 { type: { in: [AchievementSetType.OFFICIAL, AchievementSetType.COMPLETIONIST] } },
                 { type: AchievementSetType.CUSTOM, visibility: AchievementSetVisibility.PUBLIC },
@@ -232,7 +242,7 @@ builder.mutationField("unmarkAchievementComplete", (t) =>
               userId: user.id,
               achievement: {
                 achievementSet: {
-                  gameId,
+                  gameFamilyId,
                   OR: [
                     { type: { in: [AchievementSetType.OFFICIAL, AchievementSetType.COMPLETIONIST] } },
                     { type: AchievementSetType.CUSTOM, visibility: AchievementSetVisibility.PUBLIC },
@@ -243,10 +253,16 @@ builder.mutationField("unmarkAchievementComplete", (t) =>
           });
 
           if (completedCount < totalAchievements) {
+            // Remove trophies for all games in this family
+            const gamesInFamily = await ctx.prisma.game.findMany({
+              where: { gameFamilyId },
+              select: { id: true },
+            });
+
             await ctx.prisma.trophy.deleteMany({
               where: {
                 userId: user.id,
-                gameId,
+                gameId: { in: gamesInFamily.map((g) => g.id) },
               },
             });
           }
