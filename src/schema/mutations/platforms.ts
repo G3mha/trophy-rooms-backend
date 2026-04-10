@@ -4,6 +4,11 @@ import {
   UpdatePlatformInput,
   PlatformMutationResult,
 } from "../types/platform.js";
+import {
+  CreatePlatformReleaseInput,
+  UpdatePlatformReleaseInput,
+  PlatformReleaseMutationResult,
+} from "../types/platform-release.js";
 import { ErrorCode } from "../../lib/errors.js";
 import { hasRequiredRole } from "../../context.js";
 import { UserRole } from "@prisma/client";
@@ -73,7 +78,13 @@ builder.mutationField("createPlatform", (t) =>
       }
 
       const platform = await ctx.prisma.platform.create({
-        data: { name: trimmedName, slug: trimmedSlug },
+        data: {
+          name: trimmedName,
+          slug: trimmedSlug,
+          description: input.description?.trim() || null,
+          consolePictureUrl: input.consolePictureUrl?.trim() || null,
+          promotionalPictures: input.promotionalPictures ?? [],
+        },
       });
 
       return {
@@ -163,6 +174,19 @@ builder.mutationField("updatePlatform", (t) =>
         data: {
           name: trimmedName || undefined,
           slug: trimmedSlug || undefined,
+          description:
+            input.description !== undefined
+              ? input.description?.trim() || null
+              : undefined,
+          consolePictureUrl:
+            input.consolePictureUrl !== undefined
+              ? input.consolePictureUrl?.trim() || null
+              : undefined,
+          promotionalPictures:
+            input.promotionalPictures !== undefined &&
+            input.promotionalPictures !== null
+              ? input.promotionalPictures
+              : undefined,
         },
       });
 
@@ -281,6 +305,258 @@ builder.mutationField("bulkDeletePlatforms", (t) =>
       return {
         success: true,
         deletedCount: result.count,
+        error: null,
+      };
+    },
+  })
+);
+
+// Platform Release Mutations
+
+builder.mutationField("createPlatformRelease", (t) =>
+  t.field({
+    type: PlatformReleaseMutationResult,
+    args: {
+      input: t.arg({ type: CreatePlatformReleaseInput, required: true }),
+    },
+    resolve: async (_root, { input }, ctx) => {
+      if (!ctx.user) {
+        return {
+          success: false,
+          release: null,
+          error: {
+            code: ErrorCode.UNAUTHORIZED,
+            message: "You must be logged in to create a platform release",
+            field: null,
+          },
+        };
+      }
+
+      if (!hasRequiredRole(ctx.user, UserRole.TRUSTED)) {
+        return {
+          success: false,
+          release: null,
+          error: {
+            code: ErrorCode.FORBIDDEN,
+            message: "You do not have permission to create platform releases",
+            field: null,
+          },
+        };
+      }
+
+      const trimmedRegion = input.region.trim().toUpperCase();
+
+      if (!trimmedRegion) {
+        return {
+          success: false,
+          release: null,
+          error: {
+            code: ErrorCode.VALIDATION_ERROR,
+            message: "Region is required",
+            field: "region",
+          },
+        };
+      }
+
+      // Verify platform exists
+      const platform = await ctx.prisma.platform.findUnique({
+        where: { id: input.platformId },
+      });
+
+      if (!platform) {
+        return {
+          success: false,
+          release: null,
+          error: {
+            code: ErrorCode.NOT_FOUND,
+            message: `Platform with id "${input.platformId}" not found`,
+            field: "platformId",
+          },
+        };
+      }
+
+      // Check if release for this region already exists
+      const existingRelease = await ctx.prisma.platformRelease.findUnique({
+        where: {
+          platformId_region: {
+            platformId: input.platformId,
+            region: trimmedRegion,
+          },
+        },
+      });
+
+      if (existingRelease) {
+        return {
+          success: false,
+          release: null,
+          error: {
+            code: ErrorCode.ALREADY_EXISTS,
+            message: `A release for region "${trimmedRegion}" already exists for this platform`,
+            field: "region",
+          },
+        };
+      }
+
+      const release = await ctx.prisma.platformRelease.create({
+        data: {
+          platformId: input.platformId,
+          region: trimmedRegion,
+          releaseDate: input.releaseDate,
+        },
+      });
+
+      return {
+        success: true,
+        release: { id: release.id },
+        error: null,
+      };
+    },
+  })
+);
+
+builder.mutationField("updatePlatformRelease", (t) =>
+  t.field({
+    type: PlatformReleaseMutationResult,
+    args: {
+      id: t.arg.id({ required: true }),
+      input: t.arg({ type: UpdatePlatformReleaseInput, required: true }),
+    },
+    resolve: async (_root, { id, input }, ctx) => {
+      if (!ctx.user) {
+        return {
+          success: false,
+          release: null,
+          error: {
+            code: ErrorCode.UNAUTHORIZED,
+            message: "You must be logged in to update a platform release",
+            field: null,
+          },
+        };
+      }
+
+      if (!hasRequiredRole(ctx.user, UserRole.TRUSTED)) {
+        return {
+          success: false,
+          release: null,
+          error: {
+            code: ErrorCode.FORBIDDEN,
+            message: "You do not have permission to update platform releases",
+            field: null,
+          },
+        };
+      }
+
+      const existing = await ctx.prisma.platformRelease.findUnique({
+        where: { id },
+      });
+
+      if (!existing) {
+        return {
+          success: false,
+          release: null,
+          error: {
+            code: ErrorCode.NOT_FOUND,
+            message: `Platform release with id "${id}" not found`,
+            field: null,
+          },
+        };
+      }
+
+      const trimmedRegion = input.region?.trim().toUpperCase();
+
+      // Check for duplicate region if changing
+      if (trimmedRegion && trimmedRegion !== existing.region) {
+        const duplicate = await ctx.prisma.platformRelease.findUnique({
+          where: {
+            platformId_region: {
+              platformId: existing.platformId,
+              region: trimmedRegion,
+            },
+          },
+        });
+
+        if (duplicate) {
+          return {
+            success: false,
+            release: null,
+            error: {
+              code: ErrorCode.ALREADY_EXISTS,
+              message: `A release for region "${trimmedRegion}" already exists for this platform`,
+              field: "region",
+            },
+          };
+        }
+      }
+
+      const release = await ctx.prisma.platformRelease.update({
+        where: { id },
+        data: {
+          region: trimmedRegion || undefined,
+          releaseDate: input.releaseDate || undefined,
+        },
+      });
+
+      return {
+        success: true,
+        release: { id: release.id },
+        error: null,
+      };
+    },
+  })
+);
+
+builder.mutationField("deletePlatformRelease", (t) =>
+  t.field({
+    type: PlatformReleaseMutationResult,
+    args: {
+      id: t.arg.id({ required: true }),
+    },
+    resolve: async (_root, { id }, ctx) => {
+      if (!ctx.user) {
+        return {
+          success: false,
+          release: null,
+          error: {
+            code: ErrorCode.UNAUTHORIZED,
+            message: "You must be logged in to delete a platform release",
+            field: null,
+          },
+        };
+      }
+
+      if (!hasRequiredRole(ctx.user, UserRole.TRUSTED)) {
+        return {
+          success: false,
+          release: null,
+          error: {
+            code: ErrorCode.FORBIDDEN,
+            message: "You do not have permission to delete platform releases",
+            field: null,
+          },
+        };
+      }
+
+      const existing = await ctx.prisma.platformRelease.findUnique({
+        where: { id },
+      });
+
+      if (!existing) {
+        return {
+          success: false,
+          release: null,
+          error: {
+            code: ErrorCode.NOT_FOUND,
+            message: `Platform release with id "${id}" not found`,
+            field: null,
+          },
+        };
+      }
+
+      await ctx.prisma.platformRelease.delete({ where: { id } });
+
+      return {
+        success: true,
+        release: { id },
         error: null,
       };
     },
