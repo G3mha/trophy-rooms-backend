@@ -6,6 +6,14 @@ builder.prismaObject("Platform", {
     id: t.exposeID("id"),
     name: t.exposeString("name"),
     slug: t.exposeString("slug"),
+    description: t.exposeString("description", { nullable: true }),
+    consolePictureUrl: t.exposeString("consolePictureUrl", { nullable: true }),
+    promotionalPictures: t.exposeStringList("promotionalPictures"),
+    releases: t.relation("releases", {
+      query: {
+        orderBy: { releaseDate: "asc" },
+      },
+    }),
     games: t.relation("games", {
       query: {
         orderBy: { gameFamily: { title: "asc" } },
@@ -22,6 +30,9 @@ export const CreatePlatformInput = builder.inputType("CreatePlatformInput", {
   fields: (t) => ({
     name: t.string({ required: true }),
     slug: t.string({ required: true }),
+    description: t.string(),
+    consolePictureUrl: t.string(),
+    promotionalPictures: t.stringList(),
   }),
 });
 
@@ -29,6 +40,9 @@ export const UpdatePlatformInput = builder.inputType("UpdatePlatformInput", {
   fields: (t) => ({
     name: t.string(),
     slug: t.string(),
+    description: t.string(),
+    consolePictureUrl: t.string(),
+    promotionalPictures: t.stringList(),
   }),
 });
 
