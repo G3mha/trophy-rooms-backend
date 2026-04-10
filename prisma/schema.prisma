@@ -127,10 +127,9 @@ model Game {
   // Game type categorization (fangames, ROM hacks)
   type            GameType         @default(BASE_GAME)
 
-  // Self-referencing relation for derivatives (fangames/ROM hacks based on this game)
-  baseGame        Game?            @relation("GameDerivatives", fields: [baseGameId], references: [id], onDelete: SetNull)
-  baseGameId      String?
-  derivatives     Game[]           @relation("GameDerivatives")
+  // Self-referencing many-to-many for base games (DLCs/expansions/fangames can have multiple base games)
+  baseGames       Game[]           @relation("GameBaseGames")
+  derivedGames    Game[]           @relation("GameBaseGames")
 
   platform        Platform?        @relation(fields: [platformId], references: [id])
   platformId      String?
@@ -148,7 +147,6 @@ model Game {
   @@unique([title, platformId])
   @@index([platformId])
   @@index([type])
-  @@index([baseGameId])
 }
 
 model GameVersion {
