@@ -42,7 +42,7 @@ builder.mutationField("createGame", (t) =>
         };
       }
 
-      const { title, description, coverUrl, releaseDate, developer, publisher, genre, esrbRating, screenshots, type, baseGameId } = args.input;
+      const { title, description, coverUrl, releaseDate, developer, publisher, genre, esrbRating, screenshots, type, baseGameIds } = args.input;
       const platformId = args.input.platformId ?? null;
       const gameType = type ?? GameType.BASE_GAME;
 
@@ -80,20 +80,24 @@ builder.mutationField("createGame", (t) =>
         };
       }
 
-      // Validate baseGameId if provided
-      if (baseGameId) {
-        const baseGame = await ctx.prisma.game.findUnique({
-          where: { id: baseGameId },
+      // Validate baseGameIds if provided
+      if (baseGameIds && baseGameIds.length > 0) {
+        const baseGames = await ctx.prisma.game.findMany({
+          where: { id: { in: baseGameIds } },
+          select: { id: true },
         });
 
-        if (!baseGame) {
+        const foundIds = new Set(baseGames.map(g => g.id));
+        const missingIds = baseGameIds.filter(id => !foundIds.has(id));
+
+        if (missingIds.length > 0) {
           return {
             success: false,
             gameId: null,
             error: {
               code: ErrorCode.NOT_FOUND,
-              message: `Base game with id "${baseGameId}" not found`,
-              field: "baseGameId",
+              message: `Base game(s) not found: ${missingIds.join(", ")}`,
+              field: "baseGameIds",
             },
           };
         }
@@ -118,7 +122,9 @@ builder.mutationField("createGame", (t) =>
           screenshots: screenshots ?? [],
           platformId,
           type: gameType,
-          baseGameId: baseGameId ?? null,
+          baseGames: baseGameIds && baseGameIds.length > 0
+            ? { connect: baseGameIds.map(id => ({ id })) }
+            : undefined,
         },
       });
 
@@ -222,7 +228,7 @@ builder.mutationField("updateGame", (t) =>
         screenshots?: string[];
         platformId?: string | null;
         type?: GameType;
-        baseGameId?: string | null;
+        baseGames?: { set: { id: string }[] };
       } = {};
 
       if (input.title !== undefined && input.title !== null) {
@@ -330,39 +336,46 @@ builder.mutationField("updateGame", (t) =>
         updateData.type = input.type;
       }
 
-      if (input.baseGameId !== undefined) {
-        // Validate baseGameId if it's not null
-        if (input.baseGameId !== null) {
+      if (input.baseGameIds !== undefined) {
+        // Validate baseGameIds if it's not empty
+        if (input.baseGameIds !== null && input.baseGameIds.length > 0) {
           // Prevent self-reference
-          if (input.baseGameId === id) {
+          if (input.baseGameIds.includes(id)) {
             return {
               success: false,
               gameId: null,
               error: {
                 code: ErrorCode.VALIDATION_ERROR,
                 message: "A game cannot be its own base game",
-                field: "baseGameId",
+                field: "baseGameIds",
               },
             };
           }
 
-          const baseGame = await ctx.prisma.game.findUnique({
-            where: { id: input.baseGameId },
+          const baseGames = await ctx.prisma.game.findMany({
+            where: { id: { in: input.baseGameIds } },
+            select: { id: true },
           });
 
-          if (!baseGame) {
+          const foundIds = new Set(baseGames.map(g => g.id));
+          const missingIds = input.baseGameIds.filter(gameId => !foundIds.has(gameId));
+
+          if (missingIds.length > 0) {
             return {
               success: false,
               gameId: null,
               error: {
                 code: ErrorCode.NOT_FOUND,
-                message: `Base game with id "${input.baseGameId}" not found`,
-                field: "baseGameId",
+                message: `Base game(s) not found: ${missingIds.join(", ")}`,
+                field: "baseGameIds",
               },
             };
           }
         }
-        updateData.baseGameId = input.baseGameId ?? null;
+        // Use set operation to replace all base game connections
+        updateData.baseGames = {
+          set: (input.baseGameIds ?? []).map(gameId => ({ id: gameId })),
+        };
       }
 
       // Update game
@@ -497,6 +510,9 @@ builder.mutationField("cloneGameToPlatform", (t) =>
             },
           },
           versions: true,
+          baseGames: {
+            select: { id: true },
+          },
         },
       });
 
@@ -568,7 +584,9 @@ builder.mutationField("cloneGameToPlatform", (t) =>
           screenshots: sourceGame.screenshots,
           platformId: targetPlatformId,
           type: sourceGame.type,
-          baseGameId: sourceGame.baseGameId,
+          baseGames: sourceGame.baseGames.length > 0
+            ? { connect: sourceGame.baseGames.map(g => ({ id: g.id })) }
+            : undefined,
         },
       });
 
