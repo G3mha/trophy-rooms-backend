@@ -101,7 +101,7 @@ export const AchievementsFilterInput = builder.inputType(
   {
     fields: (t) => ({
       search: t.string(),
-      gameId: t.id(),
+      gameFamilyId: t.id(),
       achievementSetId: t.id(),
       onlyCompleted: t.boolean(),
       onlyIncomplete: t.boolean(),

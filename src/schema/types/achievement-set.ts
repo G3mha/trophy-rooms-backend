@@ -17,8 +17,11 @@ builder.prismaObject("AchievementSet", {
     title: t.exposeString("title"),
     type: t.expose("type", { type: AchievementSetType }),
     visibility: t.expose("visibility", { type: AchievementSetVisibility }),
-    game: t.relation("game"),
-    gameId: t.exposeString("gameId"),
+
+    // Link to GameFamily (achievements are shared across platforms)
+    gameFamily: t.relation("gameFamily", { nullable: true }),
+    gameFamilyId: t.exposeString("gameFamilyId", { nullable: true }),
+
     gameVersion: t.relation("gameVersion", { nullable: true }),
     gameVersionId: t.exposeString("gameVersionId", { nullable: true }),
     dlc: t.relation("dlc", { nullable: true }),
@@ -42,7 +45,7 @@ export const CreateAchievementSetInput = builder.inputType(
     fields: (t) => ({
       title: t.string({ required: true }),
       type: t.field({ type: AchievementSetType, required: true }),
-      gameId: t.id({ required: true }),
+      gameFamilyId: t.id({ required: true }),
       gameVersionId: t.id(),
       dlcId: t.id(),
     }),
