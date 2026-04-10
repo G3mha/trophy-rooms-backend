@@ -1,4 +1,5 @@
 // Import all types to register them with the builder
+export * from "./game-family.js";
 export * from "./game.js";
 export * from "./game-version.js";
 export * from "./achievement.js";

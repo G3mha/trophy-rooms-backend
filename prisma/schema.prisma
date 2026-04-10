@@ -46,9 +46,9 @@ enum GameStatus {
 }
 
 enum GameRegion {
-  NTSC_U    // North America
-  PAL       // Europe/Australia
-  NTSC_J    // Japan
+  NTSC_U // North America
+  PAL // Europe/Australia
+  NTSC_J // Japan
   OTHER
 }
 
@@ -90,7 +90,7 @@ model User {
   trophies        Trophy[]
   userGames       UserGame[]
   collectionItems CollectionItem[]
-  achievementSets AchievementSet[] @relation("AchievementSetCreator")
+  achievementSets AchievementSet[]  @relation("AchievementSetCreator")
   ownedDlcs       UserDLC[]
   ownedBundles    UserBundle[]
   buylistItems    BuylistItem[]
@@ -112,53 +112,72 @@ model Platform {
   updatedAt       DateTime         @updatedAt
 }
 
-model Game {
-  id              String           @id @default(cuid())
-  title           String
-  description     String?
-  coverUrl        String?
-  releaseDate     DateTime?
-  developer       String?
-  publisher       String?
-  genre           String?
-  esrbRating      String?
-  screenshots     String[]
+model GameFamily {
+  id          String    @id @default(cuid())
+  title       String
+  slug        String    @unique
+  description String?
+  coverUrl    String?
+  developer   String?
+  publisher   String?
+  genre       String?
+  esrbRating  String?
+  screenshots String[]
+  releaseDate DateTime?
+  type        GameType  @default(BASE_GAME)
 
-  // Game type categorization (fangames, ROM hacks)
-  type            GameType         @default(BASE_GAME)
+  // Self-referencing for derivatives (fangames, ROM hacks based on other games)
+  baseGameFamilies    GameFamily[] @relation("GameFamilyBaseGames")
+  derivedGameFamilies GameFamily[] @relation("GameFamilyBaseGames")
 
-  // Self-referencing many-to-many for base games (DLCs/expansions/fangames can have multiple base games)
-  baseGames       Game[]           @relation("GameBaseGames")
-  derivedGames    Game[]           @relation("GameBaseGames")
-
-  platform        Platform?        @relation(fields: [platformId], references: [id])
-  platformId      String?
+  // Relations
+  games           Game[]
   achievementSets AchievementSet[]
+  dlcs            DLC[]
+  bundles         Bundle[]         @relation("BundleGameFamilies")
+  buylistItems    BuylistItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([type])
+}
+
+model Game {
+  id String @id @default(cuid())
+
+  // Link to GameFamily (canonical game metadata)
+  gameFamily   GameFamily? @relation(fields: [gameFamilyId], references: [id], onDelete: Cascade)
+  gameFamilyId String? // Nullable during migration, will be required after
+
+  platform    Platform? @relation(fields: [platformId], references: [id])
+  platformId  String?
+  releaseDate DateTime? // Platform-specific release date
+  coverUrl    String? // Platform-specific cover override
+
   trophies        Trophy[]
   userGames       UserGame[]
   collectionItems CollectionItem[]
   versions        GameVersion[]    @relation("GameVersionGames")
-  dlcs            DLC[]
-  bundles         Bundle[]         @relation("BundleGames")
   buylistItems    BuylistItem[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
-  @@unique([title, platformId])
+  @@unique([gameFamilyId, platformId])
   @@index([platformId])
-  @@index([type])
+  @@index([gameFamilyId])
 }
 
 model GameVersion {
-  id              String           @id @default(cuid())
-  name            String           // "Standard", "Deluxe Edition"
-  slug            String           @unique // "standard", "deluxe" - now globally unique
-  description     String?
-  coverUrl        String?          // Fallback to first game's coverUrl if null
-  releaseDate     DateTime?
-  isDefault       Boolean          @default(false)
+  id          String    @id @default(cuid())
+  name        String // "Standard", "Deluxe Edition"
+  slug        String    @unique // "standard", "deluxe" - now globally unique
+  description String?
+  coverUrl    String? // Fallback to first game's coverUrl if null
+  releaseDate DateTime?
+  isDefault   Boolean   @default(false)
 
-  games           Game[]           @relation("GameVersionGames")
+  games Game[] @relation("GameVersionGames")
 
   dlcs            DLC[]            @relation("GameVersionDLCs")
   achievementSets AchievementSet[]
@@ -166,49 +185,52 @@ model GameVersion {
   collectionItems CollectionItem[]
   buylistItems    BuylistItem[]
 
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model AchievementSet {
-  id              String             @id @default(cuid())
-  title           String
-  type            AchievementSetType @default(OFFICIAL)
-  visibility      AchievementSetVisibility @default(PRIVATE)
-  game            Game               @relation(fields: [gameId], references: [id], onDelete: Cascade)
-  gameId          String
-  gameVersion     GameVersion?       @relation(fields: [gameVersionId], references: [id], onDelete: SetNull)
+  id         String                   @id @default(cuid())
+  title      String
+  type       AchievementSetType       @default(OFFICIAL)
+  visibility AchievementSetVisibility @default(PRIVATE)
+
+  // Link to GameFamily (achievements are shared across platforms)
+  gameFamily   GameFamily? @relation(fields: [gameFamilyId], references: [id], onDelete: Cascade)
+  gameFamilyId String? // Nullable during migration, will be required after
+
+  gameVersion     GameVersion?  @relation(fields: [gameVersionId], references: [id], onDelete: SetNull)
   gameVersionId   String?
-  dlc             DLC?               @relation(fields: [dlcId], references: [id], onDelete: SetNull)
+  dlc             DLC?          @relation(fields: [dlcId], references: [id], onDelete: SetNull)
   dlcId           String?
-  createdBy       User?              @relation("AchievementSetCreator", fields: [createdByUserId], references: [id])
+  createdBy       User?         @relation("AchievementSetCreator", fields: [createdByUserId], references: [id])
   createdByUserId String?
   achievements    Achievement[]
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
-  @@index([gameId])
+  @@unique([gameFamilyId, title, type, createdByUserId])
+  @@index([gameFamilyId])
   @@index([gameVersionId])
   @@index([dlcId])
   @@index([createdByUserId])
-  @@unique([gameId, title, type, createdByUserId])
 }
 
 model Achievement {
-  id              String            @id @default(cuid())
-  title           String
-  description     String?
-  iconUrl         String?
-  points          Int               @default(0)
-  tier            AchievementTier   @default(BRONZE)
-  achievementSet  AchievementSet    @relation(fields: [achievementSetId], references: [id], onDelete: Cascade)
+  id               String            @id @default(cuid())
+  title            String
+  description      String?
+  iconUrl          String?
+  points           Int               @default(0)
+  tier             AchievementTier   @default(BRONZE)
+  achievementSet   AchievementSet    @relation(fields: [achievementSetId], references: [id], onDelete: Cascade)
   achievementSetId String
-  users           UserAchievement[]
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  users            UserAchievement[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 
-  @@index([achievementSetId])
   @@unique([achievementSetId, title])
+  @@index([achievementSetId])
 }
 
 model UserAchievement {
@@ -248,8 +270,8 @@ model UserGame {
   gameVersion   GameVersion? @relation(fields: [gameVersionId], references: [id], onDelete: SetNull)
   gameVersionId String?
   status        GameStatus
-  purchasePrice Float?       // Actual purchase price
-  purchasedAt   DateTime?    // When the item was purchased
+  purchasePrice Float? // Actual purchase price
+  purchasedAt   DateTime? // When the item was purchased
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 
@@ -273,18 +295,18 @@ model CollectionItem {
   gameVersionId String?
 
   // Physical components
-  hasDisc   Boolean    @default(false)
-  hasBox    Boolean    @default(false)
-  hasManual Boolean    @default(false)
-  hasExtras Boolean    @default(false)
+  hasDisc   Boolean @default(false)
+  hasBox    Boolean @default(false)
+  hasManual Boolean @default(false)
+  hasExtras Boolean @default(false)
 
   // Status
-  isSealed  Boolean    @default(false)
-  region    GameRegion @default(NTSC_U)
-  notes     String?
+  isSealed Boolean    @default(false)
+  region   GameRegion @default(NTSC_U)
+  notes    String?
 
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId])
   @@index([gameId])
@@ -293,17 +315,18 @@ model CollectionItem {
 }
 
 model DLC {
-  id              String           @id @default(cuid())
-  name            String           // "Shadow of the Erdtree"
-  slug            String           // "shadow-of-the-erdtree"
-  type            DLCType          @default(DLC)
-  description     String?
-  coverUrl        String?          // Fallback to game.coverUrl if null
-  releaseDate     DateTime?
-  price           Float?           // null for free updates
+  id          String    @id @default(cuid())
+  name        String // "Shadow of the Erdtree"
+  slug        String // "shadow-of-the-erdtree"
+  type        DLCType   @default(DLC)
+  description String?
+  coverUrl    String? // Fallback to gameFamily.coverUrl if null
+  releaseDate DateTime?
+  price       Float? // null for free updates
 
-  game            Game             @relation(fields: [gameId], references: [id], onDelete: Cascade)
-  gameId          String
+  // Link to GameFamily (DLCs are shared across platforms)
+  gameFamily   GameFamily? @relation(fields: [gameFamilyId], references: [id], onDelete: Cascade)
+  gameFamilyId String? // Nullable during migration, will be required after
 
   achievementSets AchievementSet[]
   gameVersions    GameVersion[]    @relation("GameVersionDLCs")
@@ -311,29 +334,29 @@ model DLC {
   userDlcs        UserDLC[]
   buylistItems    BuylistItem[]
 
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  @@unique([gameId, slug])
-  @@index([gameId])
+  @@unique([gameFamilyId, slug])
+  @@index([gameFamilyId])
 }
 
 model UserDLC {
-  id            String    @id @default(cuid())
+  id String @id @default(cuid())
 
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId        String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
 
-  dlc           DLC       @relation(fields: [dlcId], references: [id], onDelete: Cascade)
-  dlcId         String
+  dlc   DLC    @relation(fields: [dlcId], references: [id], onDelete: Cascade)
+  dlcId String
 
-  purchasePrice Float?    // Actual purchase price
+  purchasePrice Float? // Actual purchase price
   purchasedAt   DateTime? // When the item was purchased
 
-  ownedAt       DateTime  @default(now())
+  ownedAt DateTime @default(now())
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([userId, dlcId])
   @@index([userId])
@@ -341,48 +364,48 @@ model UserDLC {
 }
 
 model Bundle {
-  id              String           @id @default(cuid())
-  name            String           // "Elden Ring + Shadow of the Erdtree Bundle"
-  slug            String           @unique
-  type            BundleType       @default(BUNDLE)
-  description     String?
-  coverUrl        String?
-  releaseDate     DateTime?
-  price           Float?
+  id          String     @id @default(cuid())
+  name        String // "Elden Ring + Shadow of the Erdtree Bundle"
+  slug        String     @unique
+  type        BundleType @default(BUNDLE)
+  description String?
+  coverUrl    String?
+  releaseDate DateTime?
+  price       Float?
 
   // Platform association
-  platform        Platform?        @relation(fields: [platformId], references: [id])
-  platformId      String?
+  platform   Platform? @relation(fields: [platformId], references: [id])
+  platformId String?
 
-  // Many-to-many with games and DLCs
-  games           Game[]           @relation("BundleGames")
-  dlcs            DLC[]            @relation("BundleDLCs")
-  userBundles     UserBundle[]
-  buylistItems    BuylistItem[]
+  // Many-to-many with game families and DLCs
+  gameFamilies GameFamily[]  @relation("BundleGameFamilies")
+  dlcs         DLC[]         @relation("BundleDLCs")
+  userBundles  UserBundle[]
+  buylistItems BuylistItem[]
 
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([type])
   @@index([platformId])
 }
 
 model UserBundle {
-  id            String    @id @default(cuid())
+  id String @id @default(cuid())
 
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId        String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
 
-  bundle        Bundle    @relation(fields: [bundleId], references: [id], onDelete: Cascade)
-  bundleId      String
+  bundle   Bundle @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+  bundleId String
 
-  purchasePrice Float?    // Actual purchase price
+  purchasePrice Float? // Actual purchase price
   purchasedAt   DateTime? // When the item was purchased
 
-  ownedAt       DateTime  @default(now())
+  ownedAt DateTime @default(now())
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([userId, bundleId])
   @@index([userId])
@@ -390,31 +413,33 @@ model UserBundle {
 }
 
 model BuylistItem {
-  id              String          @id @default(cuid())
-  userId          String
+  id     String @id @default(cuid())
+  userId String
 
   // Item type - one of these must be set
-  gameId          String?         // For games (with optional version)
-  gameVersionId   String?         // Specific edition (Standard, Deluxe, etc.)
-  dlcId           String?         // Standalone DLC
-  bundleId        String?         // Bundle/Season Pass
+  gameFamilyId  String? // For game family (any platform)
+  gameId        String? // For specific platform game
+  gameVersionId String? // Specific edition (Standard, Deluxe, etc.)
+  dlcId         String? // Standalone DLC
+  bundleId      String? // Bundle/Season Pass
 
   // Metadata
-  priority        BuylistPriority @default(MEDIUM)
-  notes           String?         // Gift notes, links, etc.
-  estimatedPrice  Float?          // Expected price in user's currency
+  priority       BuylistPriority @default(MEDIUM)
+  notes          String? // Gift notes, links, etc.
+  estimatedPrice Float? // Expected price in user's currency
 
   // Timestamps
-  addedAt         DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  addedAt   DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  game            Game?           @relation(fields: [gameId], references: [id], onDelete: Cascade)
-  gameVersion     GameVersion?    @relation(fields: [gameVersionId], references: [id], onDelete: SetNull)
-  dlc             DLC?            @relation(fields: [dlcId], references: [id], onDelete: Cascade)
-  bundle          Bundle?         @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gameFamily  GameFamily?  @relation(fields: [gameFamilyId], references: [id], onDelete: Cascade)
+  game        Game?        @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  gameVersion GameVersion? @relation(fields: [gameVersionId], references: [id], onDelete: SetNull)
+  dlc         DLC?         @relation(fields: [dlcId], references: [id], onDelete: Cascade)
+  bundle      Bundle?      @relation(fields: [bundleId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, gameId, gameVersionId, dlcId, bundleId])
+  @@unique([userId, gameFamilyId, gameId, gameVersionId, dlcId, bundleId])
   @@index([userId])
 }
