@@ -101,15 +101,36 @@ model User {
 }
 
 model Platform {
-  id              String           @id @default(cuid())
-  name            String           @unique
-  slug            String           @unique
-  games           Game[]
-  bundles         Bundle[]
-  collectionItems CollectionItem[]
-  userGames       UserGame[]
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  id                  String            @id @default(cuid())
+  name                String            @unique
+  slug                String            @unique
+  description         String?
+  consolePictureUrl   String?
+  promotionalPictures String[]
+
+  // Relations
+  games               Game[]
+  bundles             Bundle[]
+  collectionItems     CollectionItem[]
+  userGames           UserGame[]
+  releases            PlatformRelease[]
+
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+}
+
+model PlatformRelease {
+  id          String   @id @default(cuid())
+  platform    Platform @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  platformId  String
+  region      String   // "NA", "EU", "JP", "AU", "OTHER"
+  releaseDate DateTime
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([platformId, region])
+  @@index([platformId])
 }
 
 model GameFamily {
