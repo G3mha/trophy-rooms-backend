@@ -31,8 +31,8 @@ builder.queryField("achievements", (t) =>
 
       const achievementSetWhere: Prisma.AchievementSetWhereInput = {};
 
-      if (filter?.gameId) {
-        achievementSetWhere.gameId = filter.gameId;
+      if (filter?.gameFamilyId) {
+        achievementSetWhere.gameFamilyId = filter.gameFamilyId;
       }
 
       if (filter?.achievementSetId) {
@@ -89,8 +89,8 @@ builder.queryField("achievements", (t) =>
 
       const achievementSetWhere: Prisma.AchievementSetWhereInput = {};
 
-      if (filter?.gameId) {
-        achievementSetWhere.gameId = filter.gameId;
+      if (filter?.gameFamilyId) {
+        achievementSetWhere.gameFamilyId = filter.gameFamilyId;
       }
 
       if (filter?.achievementSetId) {

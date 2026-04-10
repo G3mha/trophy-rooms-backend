@@ -9,7 +9,7 @@ builder.queryField("achievementSets", (t) =>
   t.prismaField({
     type: ["AchievementSet"],
     args: {
-      gameId: t.arg.id(),
+      gameFamilyId: t.arg.id(),
       visibility: t.arg({ type: AchievementSetVisibility }),
       type: t.arg({ type: AchievementSetType }),
     },
@@ -17,8 +17,8 @@ builder.queryField("achievementSets", (t) =>
       try {
         const where: Prisma.AchievementSetWhereInput = {};
 
-        if (args.gameId) {
-          where.gameId = args.gameId;
+        if (args.gameFamilyId) {
+          where.gameFamilyId = args.gameFamilyId;
         }
 
         if (args.type) {
