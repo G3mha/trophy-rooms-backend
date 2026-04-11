@@ -181,6 +181,7 @@ export const GameFamilyMutationResult = builder.objectRef<{
 GameFamilyMutationResult.implement({
   fields: (t) => ({
     success: t.exposeBoolean("success"),
+    gameFamilyId: t.exposeString("gameFamilyId", { nullable: true }),
     gameFamily: t.prismaField({
       type: "GameFamily",
       nullable: true,
