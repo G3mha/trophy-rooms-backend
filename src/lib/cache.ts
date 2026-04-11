@@ -10,6 +10,8 @@ export const CachePrefix = {
   ACHIEVEMENT_SEARCH: "search:achievements:",
   GAME_VERSION_SEARCH: "search:versions:",
   DLC_SEARCH: "search:dlcs:",
+  BUNDLE_SEARCH: "search:bundles:",
+  GLOBAL_SEARCH: "search:global:",
   AUTOCOMPLETE_GAMES: "autocomplete:games:",
   AUTOCOMPLETE_ACHIEVEMENTS: "autocomplete:achievements:",
 } as const;

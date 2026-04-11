@@ -203,3 +203,29 @@ export async function searchGameFamilies(
     return results.map((r) => r.id);
   });
 }
+
+/**
+ * Search bundles using case-insensitive name matching with trigram similarity.
+ * Results are cached for performance.
+ */
+export async function searchBundles(
+  prisma: PrismaClient,
+  search: string,
+  limit: number = 1000
+): Promise<string[]> {
+  const key = cacheKey(CachePrefix.BUNDLE_SEARCH, { search: search.toLowerCase(), limit });
+
+  return getCachedOrCompute(key, CacheTTL.SEARCH_RESULTS, async () => {
+    // Use trigram similarity for fuzzy matching on name
+    const results = await prisma.$queryRaw<{ id: string }[]>`
+      SELECT id
+      FROM "Bundle"
+      WHERE similarity(name, ${search}) > 0.1
+         OR LOWER(name) LIKE ${"%" + search.toLowerCase() + "%"}
+      ORDER BY similarity(name, ${search}) DESC, name ASC
+      LIMIT ${limit}
+    `;
+
+    return results.map((r) => r.id);
+  });
+}
