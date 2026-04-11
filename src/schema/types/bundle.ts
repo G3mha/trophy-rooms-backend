@@ -34,19 +34,42 @@ builder.prismaObject("Bundle", {
       },
     }),
     dlcCount: t.relationCount("dlcs"),
-    // Check if the current user owns this Bundle
+    // Check if the current user owns this Bundle (on any platform)
     isOwned: t.boolean({
       resolve: async (bundle, _args, ctx) => {
         if (!ctx.user) return false;
-        const userBundle = await ctx.prisma.userBundle.findUnique({
+        const userBundle = await ctx.prisma.userBundle.findFirst({
           where: {
-            userId_bundleId: {
-              userId: ctx.user.id,
-              bundleId: bundle.id,
-            },
+            userId: ctx.user.id,
+            bundleId: bundle.id,
           },
         });
         return !!userBundle;
+      },
+    }),
+    // Get all platforms the user owns this bundle on
+    ownedPlatforms: t.prismaField({
+      type: ["Platform"],
+      resolve: async (query, bundle, _args, ctx) => {
+        if (!ctx.user) return [];
+        const userBundles = await ctx.prisma.userBundle.findMany({
+          where: {
+            userId: ctx.user.id,
+            bundleId: bundle.id,
+            platformId: { not: null },
+          },
+          select: {
+            platformId: true,
+          },
+        });
+        const platformIds = userBundles
+          .map((ub) => ub.platformId)
+          .filter((id): id is string => id !== null);
+        if (platformIds.length === 0) return [];
+        return ctx.prisma.platform.findMany({
+          ...query,
+          where: { id: { in: platformIds } },
+        });
       },
     }),
     createdAt: t.expose("createdAt", { type: "DateTime" }),
@@ -62,6 +85,8 @@ builder.prismaObject("UserBundle", {
     userId: t.exposeString("userId"),
     bundle: t.relation("bundle"),
     bundleId: t.exposeString("bundleId"),
+    platform: t.relation("platform", { nullable: true }),
+    platformId: t.exposeString("platformId", { nullable: true }),
     purchasePrice: t.exposeFloat("purchasePrice", { nullable: true }),
     purchasedAt: t.expose("purchasedAt", { type: "DateTime", nullable: true }),
     ownedAt: t.expose("ownedAt", { type: "DateTime" }),
