@@ -113,6 +113,7 @@ model Platform {
   bundles             Bundle[]
   collectionItems     CollectionItem[]
   userGames           UserGame[]
+  userBundles         UserBundle[]
   releases            PlatformRelease[]
 
   createdAt           DateTime          @default(now())
@@ -420,6 +421,9 @@ model UserBundle {
   bundle   Bundle @relation(fields: [bundleId], references: [id], onDelete: Cascade)
   bundleId String
 
+  platform   Platform? @relation(fields: [platformId], references: [id], onDelete: SetNull)
+  platformId String?
+
   purchasePrice Float? // Actual purchase price
   purchasedAt   DateTime? // When the item was purchased
 
@@ -428,9 +432,10 @@ model UserBundle {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([userId, bundleId])
+  @@unique([userId, bundleId, platformId])
   @@index([userId])
   @@index([bundleId])
+  @@index([platformId])
 }
 
 model BuylistItem {
