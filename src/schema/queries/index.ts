@@ -12,3 +12,4 @@ import "./user-game.js";
 import "./collection-items.js";
 import "./buylist.js";
 import "./autocomplete.js";
+import "./global-search.js";
