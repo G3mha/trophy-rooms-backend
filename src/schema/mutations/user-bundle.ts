@@ -8,8 +8,9 @@ builder.mutationField("addBundleToOwned", (t) =>
     type: UserBundleMutationResult,
     args: {
       bundleId: t.arg.id({ required: true }),
+      platformId: t.arg.id({ required: false }),
     },
-    resolve: async (_root, { bundleId }, ctx) => {
+    resolve: async (_root, { bundleId, platformId }, ctx) => {
       if (!ctx.user) {
         return {
           success: false,
@@ -39,13 +40,15 @@ builder.mutationField("addBundleToOwned", (t) =>
         };
       }
 
-      // Check if already owned
-      const existing = await ctx.prisma.userBundle.findUnique({
+      // Normalize platformId: undefined -> null
+      const normalizedPlatformId = platformId ?? null;
+
+      // Check if already owned (with same platform)
+      const existing = await ctx.prisma.userBundle.findFirst({
         where: {
-          userId_bundleId: {
-            userId: ctx.user.id,
-            bundleId,
-          },
+          userId: ctx.user.id,
+          bundleId,
+          platformId: normalizedPlatformId,
         },
       });
 
@@ -62,6 +65,7 @@ builder.mutationField("addBundleToOwned", (t) =>
         data: {
           userId: ctx.user.id,
           bundleId,
+          platformId: normalizedPlatformId,
         },
       });
 
@@ -80,8 +84,9 @@ builder.mutationField("removeBundleFromOwned", (t) =>
     type: UserBundleMutationResult,
     args: {
       bundleId: t.arg.id({ required: true }),
+      platformId: t.arg.id({ required: false }),
     },
-    resolve: async (_root, { bundleId }, ctx) => {
+    resolve: async (_root, { bundleId, platformId }, ctx) => {
       if (!ctx.user) {
         return {
           success: false,
@@ -94,13 +99,15 @@ builder.mutationField("removeBundleFromOwned", (t) =>
         };
       }
 
+      // Normalize platformId: undefined -> null
+      const normalizedPlatformId = platformId ?? null;
+
       // Check if ownership exists
-      const existing = await ctx.prisma.userBundle.findUnique({
+      const existing = await ctx.prisma.userBundle.findFirst({
         where: {
-          userId_bundleId: {
-            userId: ctx.user.id,
-            bundleId,
-          },
+          userId: ctx.user.id,
+          bundleId,
+          platformId: normalizedPlatformId,
         },
       });
 
@@ -112,13 +119,10 @@ builder.mutationField("removeBundleFromOwned", (t) =>
         };
       }
 
-      // Delete UserBundle
+      // Delete UserBundle by id
       await ctx.prisma.userBundle.delete({
         where: {
-          userId_bundleId: {
-            userId: ctx.user.id,
-            bundleId,
-          },
+          id: existing.id,
         },
       });
 
