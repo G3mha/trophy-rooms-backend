@@ -71,6 +71,7 @@ const AddToCollectionInput = builder.inputType("AddToCollectionInput", {
     hasBox: t.boolean({ required: false, defaultValue: false }),
     hasManual: t.boolean({ required: false, defaultValue: false }),
     hasExtras: t.boolean({ required: false, defaultValue: false }),
+    isDigital: t.boolean({ required: false, defaultValue: false }),
     isSealed: t.boolean({ required: false, defaultValue: false }),
     region: t.field({ type: GameRegionEnum, required: false }),
     notes: t.string({ required: false }),
@@ -86,6 +87,7 @@ const UpdateCollectionItemInput = builder.inputType("UpdateCollectionItemInput",
     hasBox: t.boolean({ required: false }),
     hasManual: t.boolean({ required: false }),
     hasExtras: t.boolean({ required: false }),
+    isDigital: t.boolean({ required: false }),
     isSealed: t.boolean({ required: false }),
     region: t.field({ type: GameRegionEnum, required: false }),
     notes: t.string({ required: false }),
@@ -116,7 +118,7 @@ builder.mutationField("addToCollection", (t) =>
         };
       }
 
-      const { gameId, platformId, gameVersionId, hasDisc, hasBox, hasManual, hasExtras, isSealed, region, notes } = args.input;
+      const { gameId, platformId, gameVersionId, hasDisc, hasBox, hasManual, hasExtras, isDigital, isSealed, region, notes } = args.input;
 
       // Check if game exists
       const game = await ctx.prisma.game.findUnique({
@@ -199,6 +201,7 @@ builder.mutationField("addToCollection", (t) =>
           hasBox: hasBox ?? false,
           hasManual: hasManual ?? false,
           hasExtras: hasExtras ?? false,
+          isDigital: isDigital ?? false,
           isSealed: isSealed ?? false,
           region: region ?? GameRegion.NTSC_U,
           notes: notes ?? null,
@@ -331,6 +334,7 @@ builder.mutationField("updateCollectionItem", (t) =>
         hasBox?: boolean;
         hasManual?: boolean;
         hasExtras?: boolean;
+        isDigital?: boolean;
         isSealed?: boolean;
         region?: GameRegion;
         notes?: string | null;
@@ -353,6 +357,9 @@ builder.mutationField("updateCollectionItem", (t) =>
       }
       if (input.hasExtras !== undefined && input.hasExtras !== null) {
         updateData.hasExtras = input.hasExtras;
+      }
+      if (input.isDigital !== undefined && input.isDigital !== null) {
+        updateData.isDigital = input.isDigital;
       }
       if (input.isSealed !== undefined && input.isSealed !== null) {
         updateData.isSealed = input.isSealed;

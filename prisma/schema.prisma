@@ -324,9 +324,10 @@ model CollectionItem {
   hasExtras Boolean @default(false)
 
   // Status
-  isSealed Boolean    @default(false)
-  region   GameRegion @default(NTSC_U)
-  notes    String?
+  isDigital Boolean    @default(false) // Digital copy (no physical components)
+  isSealed  Boolean    @default(false)
+  region    GameRegion @default(NTSC_U)
+  notes     String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -21,6 +21,7 @@ builder.prismaObject("CollectionItem", {
     hasBox: t.exposeBoolean("hasBox"),
     hasManual: t.exposeBoolean("hasManual"),
     hasExtras: t.exposeBoolean("hasExtras"),
+    isDigital: t.exposeBoolean("isDigital"),
     isSealed: t.exposeBoolean("isSealed"),
     region: t.expose("region", { type: GameRegionEnum }),
     notes: t.exposeString("notes", { nullable: true }),
