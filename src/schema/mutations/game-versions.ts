@@ -20,18 +20,18 @@ function slugify(name: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
-// Query: Get all versions (optionally filtered by game)
+// Query: Get all versions (optionally filtered by game family)
 builder.queryField("gameVersions", (t) =>
   t.prismaField({
     type: ["GameVersion"],
     args: {
-      gameId: t.arg.id(), // Now optional - filter by game
+      gameFamilyId: t.arg.id(), // Filter by game family
     },
     resolve: async (query, _root, args, ctx) => {
       return ctx.prisma.gameVersion.findMany({
         ...query,
-        where: args.gameId
-          ? { games: { some: { id: args.gameId } } }
+        where: args.gameFamilyId
+          ? { games: { some: { gameFamilyId: args.gameFamilyId } } }
           : undefined,
         orderBy: [{ isDefault: "desc" }, { name: "asc" }],
       });
