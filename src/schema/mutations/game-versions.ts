@@ -88,7 +88,7 @@ builder.mutationField("createGameVersion", (t) =>
         };
       }
 
-      const { gameIds, name, slug, description, coverUrl, releaseDate, dlcIds, isDefault } = args.input;
+      const { gameIds, name, slug, description, coverUrl, releaseDate, dlcIds, isDefault, digitalOnly } = args.input;
 
       // Validate gameIds
       if (!gameIds || gameIds.length === 0) {
@@ -185,6 +185,7 @@ builder.mutationField("createGameVersion", (t) =>
           coverUrl: coverUrl?.trim() || null,
           releaseDate: releaseDate ?? null,
           isDefault: isDefault ?? false,
+          digitalOnly: digitalOnly ?? false,
           games: {
             connect: gameIds.map((id) => ({ id })),
           },
@@ -265,6 +266,7 @@ builder.mutationField("updateGameVersion", (t) =>
         description?: string | null;
         coverUrl?: string | null;
         releaseDate?: Date | null;
+        digitalOnly?: boolean;
         dlcs?: { set: { id: string }[] };
         games?: { set: { id: string }[] };
       } = {};
@@ -330,6 +332,10 @@ builder.mutationField("updateGameVersion", (t) =>
 
       if (input.releaseDate !== undefined) {
         updateData.releaseDate = input.releaseDate ?? null;
+      }
+
+      if (input.digitalOnly !== undefined && input.digitalOnly !== null) {
+        updateData.digitalOnly = input.digitalOnly;
       }
 
       if (input.dlcIds !== undefined) {

@@ -198,6 +198,7 @@ model GameVersion {
   coverUrl    String? // Fallback to first game's coverUrl if null
   releaseDate DateTime?
   isDefault   Boolean   @default(false)
+  digitalOnly Boolean   @default(false) // If true, only digital copies can be added to collection
 
   games Game[] @relation("GameVersionGames")
 

@@ -10,6 +10,7 @@ builder.prismaObject("GameVersion", {
     coverUrl: t.exposeString("coverUrl", { nullable: true }),
     releaseDate: t.expose("releaseDate", { type: "DateTime", nullable: true }),
     isDefault: t.exposeBoolean("isDefault"),
+    digitalOnly: t.exposeBoolean("digitalOnly"),
     dlcs: t.relation("dlcs", {
       query: {
         orderBy: [{ type: "asc" }, { name: "asc" }],
@@ -69,6 +70,7 @@ export const CreateGameVersionInput = builder.inputType("CreateGameVersionInput"
     releaseDate: t.field({ type: "DateTime" }),
     dlcIds: t.idList(),
     isDefault: t.boolean(),
+    digitalOnly: t.boolean(),
   }),
 });
 
@@ -81,6 +83,7 @@ export const UpdateGameVersionInput = builder.inputType("UpdateGameVersionInput"
     releaseDate: t.field({ type: "DateTime" }),
     dlcIds: t.idList(),
     gameIds: t.idList(), // Optional: update linked games
+    digitalOnly: t.boolean(),
   }),
 });
 
