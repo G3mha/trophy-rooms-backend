@@ -111,6 +111,7 @@ model Platform {
   // Relations
   games               Game[]
   bundles             Bundle[]
+  dlcs                DLC[]             @relation("DLCPlatforms")
   collectionItems     CollectionItem[]
   userGames           UserGame[]
   userBundles         UserBundle[]
@@ -351,6 +352,9 @@ model DLC {
   // Link to GameFamily (DLCs are shared across platforms)
   gameFamily   GameFamily? @relation(fields: [gameFamilyId], references: [id], onDelete: Cascade)
   gameFamilyId String? // Nullable during migration, will be required after
+
+  // Platforms this DLC is available on
+  platforms Platform[] @relation("DLCPlatforms")
 
   achievementSets AchievementSet[]
   gameVersions    GameVersion[]    @relation("GameVersionDLCs")
