@@ -121,7 +121,7 @@ builder.mutationField("createDLC", (t) =>
         };
       }
 
-      const { gameFamilyId, name, slug, type, description, coverUrl, releaseDate, price } = args.input;
+      const { gameFamilyId, name, slug, type, description, coverUrl, releaseDate, price, platformIds } = args.input;
 
       // Validate name
       const trimmedName = name.trim();
@@ -201,6 +201,9 @@ builder.mutationField("createDLC", (t) =>
           releaseDate: releaseDate ?? null,
           price: price ?? null,
           gameFamilyId,
+          platforms: platformIds && platformIds.length > 0
+            ? { connect: platformIds.map((id) => ({ id })) }
+            : undefined,
         },
       });
 
@@ -277,6 +280,7 @@ builder.mutationField("updateDLC", (t) =>
         coverUrl?: string | null;
         releaseDate?: Date | null;
         price?: number | null;
+        platforms?: { set: { id: string }[] };
       } = {};
 
       if (input.name !== undefined && input.name !== null) {
@@ -353,6 +357,11 @@ builder.mutationField("updateDLC", (t) =>
 
       if (input.price !== undefined) {
         updateData.price = input.price ?? null;
+      }
+
+      // Handle platformIds - set platforms (replaces existing)
+      if (input.platformIds !== undefined && input.platformIds !== null) {
+        updateData.platforms = { set: input.platformIds.map((id) => ({ id })) };
       }
 
       // Update DLC

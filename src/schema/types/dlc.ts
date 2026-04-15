@@ -22,6 +22,13 @@ builder.prismaObject("DLC", {
     gameFamily: t.relation("gameFamily", { nullable: true }),
     gameFamilyId: t.exposeString("gameFamilyId", { nullable: true }),
 
+    // Platforms this DLC is available on
+    platforms: t.relation("platforms", {
+      query: {
+        orderBy: { name: "asc" },
+      },
+    }),
+
     achievementSets: t.relation("achievementSets", {
       query: {
         orderBy: { title: "asc" },
@@ -100,6 +107,7 @@ export const CreateDLCInput = builder.inputType("CreateDLCInput", {
     coverUrl: t.string(),
     releaseDate: t.field({ type: "DateTime" }),
     price: t.float(),
+    platformIds: t.idList(),
   }),
 });
 
@@ -112,6 +120,7 @@ export const UpdateDLCInput = builder.inputType("UpdateDLCInput", {
     coverUrl: t.string(),
     releaseDate: t.field({ type: "DateTime" }),
     price: t.float(),
+    platformIds: t.idList(),
   }),
 });
 
