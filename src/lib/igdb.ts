@@ -7,6 +7,7 @@ interface IGDBToken {
 export interface IGDBGame {
   id: number;
   name: string;
+  slug?: string;
   summary?: string;
   cover?: {
     id: number;
@@ -78,6 +79,47 @@ export const IGDB_PLATFORM_MAP: Record<string, number[]> = {
   "atari-7800": [60],
   "neo-geo": [80],
   "turbografx-16": [86],
+};
+
+export const PRIMARY_PLATFORM_SLUG_BY_IGDB_ID: Record<number, string> = {
+  18: "nes",
+  19: "snes",
+  4: "n64",
+  21: "gamecube",
+  5: "wii",
+  41: "wii-u",
+  130: "switch",
+  508: "switch-2",
+  33: "game-boy",
+  22: "game-boy-color",
+  24: "gba",
+  20: "nds",
+  37: "3ds",
+  7: "ps1",
+  8: "ps2",
+  9: "ps3",
+  48: "ps4",
+  167: "ps5",
+  38: "psp",
+  46: "vita",
+  11: "xbox",
+  12: "xbox-360",
+  49: "xbox-one",
+  169: "xbox-series",
+  64: "master-system",
+  29: "genesis",
+  32: "saturn",
+  23: "dreamcast",
+  35: "game-gear",
+  6: "pc",
+  14: "macos",
+  3: "linux",
+  39: "ios",
+  34: "android",
+  59: "atari-2600",
+  60: "atari-7800",
+  80: "neo-geo",
+  86: "turbografx-16",
 };
 
 // Game category enum from IGDB
@@ -237,8 +279,8 @@ export async function fetchGamesForPlatform(
   // }
 
   const query = `
-    fields id, name, summary, cover.image_id, first_release_date, genres.name,
-           rating, rating_count, total_rating, total_rating_count, category, platforms.name;
+    fields id, name, slug, summary, cover.image_id, first_release_date, genres.name,
+           rating, rating_count, total_rating, total_rating_count, category, platforms.id, platforms.name;
     where ${conditions.join(" & ")};
     sort total_rating desc;
     offset ${offset};
@@ -347,10 +389,55 @@ export async function searchGameByTitle(
   }
 
   const query = `
-    fields id, name, summary, cover.image_id, rating, rating_count,
-           total_rating, total_rating_count, category, platforms.name;
+    fields id, name, slug, summary, cover.image_id, first_release_date, rating, rating_count,
+           total_rating, total_rating_count, category, platforms.id, platforms.name;
     search "${escapedTitle}";
     where ${whereClause};
+    limit 1;
+  `;
+
+  try {
+    const results = await igdbRequest<IGDBGame[]>("games", query);
+    return results[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function extractIGDBGameSlug(urlString: string): string | null {
+  try {
+    const url = new URL(urlString);
+    const hostname = url.hostname.toLowerCase();
+    if (!hostname.endsWith("igdb.com")) {
+      return null;
+    }
+
+    const segments = url.pathname
+      .split("/")
+      .map((segment) => segment.trim())
+      .filter(Boolean);
+
+    const gamesIndex = segments.findIndex((segment) => segment === "games");
+    if (gamesIndex === -1 || gamesIndex + 1 >= segments.length) {
+      return null;
+    }
+
+    return decodeURIComponent(segments[gamesIndex + 1]).toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchGameBySlug(slug: string): Promise<IGDBGame | null> {
+  const normalizedSlug = slug.trim().toLowerCase();
+  if (!normalizedSlug) {
+    return null;
+  }
+
+  const escapedSlug = normalizedSlug.replace(/"/g, '\\"');
+  const query = `
+    fields id, name, slug, summary, cover.image_id, first_release_date, category, platforms.id, platforms.name;
+    where slug = "${escapedSlug}";
     limit 1;
   `;
 

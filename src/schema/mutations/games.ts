@@ -14,8 +14,15 @@ import {
   DeleteGameFamilyResult,
 } from "../types/game-family.js";
 import { hasRequiredRole } from "../../context.js";
-import { UserRole, GameType } from "@prisma/client";
+import { UserRole, GameType, type PrismaClient } from "@prisma/client";
 import { invalidateGameCaches } from "../../lib/cache.js";
+import {
+  extractIGDBGameSlug,
+  fetchGameBySlug,
+  getCoverUrl,
+  IGDBGameCategory,
+  PRIMARY_PLATFORM_SLUG_BY_IGDB_ID,
+} from "../../lib/igdb.js";
 
 function generateSlug(title: string): string {
   return title
@@ -23,6 +30,87 @@ function generateSlug(title: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .substring(0, 100);
+}
+
+async function ensureUniqueGameFamilySlug(
+  prisma: PrismaClient,
+  preferredSlug: string
+): Promise<string> {
+  let slug = preferredSlug;
+  let counter = 1;
+
+  while (await prisma.gameFamily.findUnique({ where: { slug } })) {
+    slug = `${preferredSlug}-${counter}`;
+    counter++;
+  }
+
+  return slug;
+}
+
+async function ensureStandardVersion(
+  prisma: PrismaClient
+) {
+  let standardVersion = await prisma.gameVersion.findFirst({
+    where: { slug: "standard" },
+  });
+
+  if (!standardVersion) {
+    standardVersion = await prisma.gameVersion.create({
+      data: {
+        name: "Standard",
+        slug: "standard",
+        isDefault: true,
+      },
+    });
+  }
+
+  return standardVersion;
+}
+
+async function createPlatformGamesForFamily(
+  prisma: PrismaClient,
+  gameFamilyId: string,
+  platformIds: string[],
+  releaseDate: Date | null
+) {
+  const uniquePlatformIds = Array.from(new Set(platformIds.filter(Boolean)));
+  if (uniquePlatformIds.length === 0) return;
+
+  const standardVersion = await ensureStandardVersion(prisma);
+
+  for (const platformId of uniquePlatformIds) {
+    const game = await prisma.game.create({
+      data: {
+        gameFamilyId,
+        platformId,
+        releaseDate,
+      },
+    });
+
+    await prisma.$executeRaw`
+      INSERT INTO "_GameVersionGames" ("A", "B")
+      VALUES (${game.id}, ${standardVersion.id})
+      ON CONFLICT DO NOTHING
+    `;
+  }
+}
+
+function mapIGDBCategoryToGameType(category?: number | null): GameType {
+  switch (category) {
+    case IGDBGameCategory.DLCAddon:
+    case IGDBGameCategory.Episode:
+    case IGDBGameCategory.Season:
+    case IGDBGameCategory.Update:
+      return GameType.DLC;
+    case IGDBGameCategory.Expansion:
+    case IGDBGameCategory.StandaloneExpansion:
+      return GameType.EXPANSION;
+    case IGDBGameCategory.Mod:
+    case IGDBGameCategory.Fork:
+      return GameType.MOD;
+    default:
+      return GameType.BASE_GAME;
+  }
 }
 
 // Create game mutation - creates both GameFamily and Game (platform instance)
@@ -995,38 +1083,175 @@ builder.mutationField("createGameFamily", (t) =>
 
       // Create platform games if specified
       if (platformIds && platformIds.length > 0) {
-        let standardVersion = await ctx.prisma.gameVersion.findFirst({
-          where: { slug: "standard" },
-        });
-
-        if (!standardVersion) {
-          standardVersion = await ctx.prisma.gameVersion.create({
-            data: {
-              name: "Standard",
-              slug: "standard",
-              isDefault: true,
-            },
-          });
-        }
-
-        for (const platformId of platformIds) {
-          const game = await ctx.prisma.game.create({
-            data: {
-              gameFamilyId: gameFamily.id,
-              platformId,
-              releaseDate: releaseDate ?? null,
-            },
-          });
-
-          await ctx.prisma.$executeRaw`
-            INSERT INTO "_GameVersionGames" ("A", "B")
-            VALUES (${game.id}, ${standardVersion.id})
-            ON CONFLICT DO NOTHING
-          `;
-        }
+        await createPlatformGamesForFamily(
+          ctx.prisma,
+          gameFamily.id,
+          platformIds,
+          releaseDate ?? null
+        );
       }
 
       // Invalidate game caches after successful creation
+      invalidateGameCaches().catch(() => {});
+
+      return {
+        success: true,
+        gameFamilyId: gameFamily.id,
+        error: null,
+      };
+    },
+  })
+);
+
+builder.mutationField("importGameFamilyFromIGDBUrl", (t) =>
+  t.field({
+    type: GameFamilyMutationResult,
+    args: {
+      url: t.arg.string({ required: true }),
+    },
+    resolve: async (_root, args, ctx) => {
+      if (!ctx.user) {
+        return {
+          success: false,
+          gameFamilyId: null,
+          error: {
+            code: ErrorCode.UNAUTHORIZED,
+            message: "You must be logged in to import a game",
+            field: null,
+          },
+        };
+      }
+
+      if (!hasRequiredRole(ctx.user, UserRole.TRUSTED)) {
+        return {
+          success: false,
+          gameFamilyId: null,
+          error: {
+            code: ErrorCode.FORBIDDEN,
+            message: "You do not have permission to import games",
+            field: null,
+          },
+        };
+      }
+
+      const igdbSlug = extractIGDBGameSlug(args.url);
+      if (!igdbSlug) {
+        return {
+          success: false,
+          gameFamilyId: null,
+          error: {
+            code: ErrorCode.VALIDATION_ERROR,
+            message: "Invalid IGDB game URL",
+            field: "url",
+          },
+        };
+      }
+
+      const igdbGame = await fetchGameBySlug(igdbSlug);
+      if (!igdbGame) {
+        return {
+          success: false,
+          gameFamilyId: null,
+          error: {
+            code: ErrorCode.NOT_FOUND,
+            message: "Game not found on IGDB",
+            field: "url",
+          },
+        };
+      }
+
+      const trimmedTitle = igdbGame.name.trim();
+      if (!trimmedTitle) {
+        return {
+          success: false,
+          gameFamilyId: null,
+          error: {
+            code: ErrorCode.VALIDATION_ERROR,
+            message: "IGDB game is missing a valid title",
+            field: "url",
+          },
+        };
+      }
+
+      const canonicalSlugs = Array.from(
+        new Set(
+          (igdbGame.platforms ?? [])
+            .map((platform) => PRIMARY_PLATFORM_SLUG_BY_IGDB_ID[platform.id])
+            .filter((slug): slug is string => Boolean(slug))
+        )
+      );
+
+      const platforms = canonicalSlugs.length
+        ? await ctx.prisma.platform.findMany({
+            where: { slug: { in: canonicalSlugs } },
+            select: { id: true, slug: true },
+          })
+        : [];
+
+      if (platforms.length === 0) {
+        return {
+          success: false,
+          gameFamilyId: null,
+          error: {
+            code: ErrorCode.NOT_FOUND,
+            message: "No supported Trophy Rooms platforms could be mapped from this IGDB game",
+            field: "url",
+          },
+        };
+      }
+
+      const platformIds = canonicalSlugs
+        .map((slug) => platforms.find((platform) => platform.slug === slug)?.id)
+        .filter((id): id is string => Boolean(id));
+
+      const existingFamily = await ctx.prisma.gameFamily.findFirst({
+        where: { title: { equals: trimmedTitle, mode: "insensitive" } },
+        include: { games: true },
+      });
+
+      if (
+        existingFamily &&
+        existingFamily.games.some((game) => game.platformId && platformIds.includes(game.platformId))
+      ) {
+        return {
+          success: false,
+          gameFamilyId: null,
+          error: {
+            code: ErrorCode.ALREADY_EXISTS,
+            message: `A game family for "${trimmedTitle}" already exists on one or more of those platforms`,
+            field: "url",
+          },
+        };
+      }
+
+      const slug = await ensureUniqueGameFamilySlug(
+        ctx.prisma,
+        generateSlug(igdbGame.slug?.trim() || trimmedTitle)
+      );
+      const releaseDate = igdbGame.first_release_date
+        ? new Date(igdbGame.first_release_date * 1000)
+        : null;
+
+      const gameFamily = await ctx.prisma.gameFamily.create({
+        data: {
+          title: trimmedTitle,
+          slug,
+          description: igdbGame.summary?.trim() || null,
+          coverUrl: igdbGame.cover?.image_id
+            ? getCoverUrl(igdbGame.cover.image_id, "cover_big")
+            : null,
+          releaseDate,
+          type: mapIGDBCategoryToGameType(igdbGame.category),
+        },
+      });
+
+      await createPlatformGamesForFamily(
+        ctx.prisma,
+        gameFamily.id,
+        platformIds,
+        releaseDate
+      );
+
       invalidateGameCaches().catch(() => {});
 
       return {
