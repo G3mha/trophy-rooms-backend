@@ -422,7 +422,12 @@ export function extractIGDBGameSlug(urlString: string): string | null {
       return null;
     }
 
-    return decodeURIComponent(segments[gamesIndex + 1]).toLowerCase();
+    const slugSegment = segments[gamesIndex + 1];
+    if (!slugSegment) {
+      return null;
+    }
+
+    return decodeURIComponent(slugSegment).toLowerCase();
   } catch {
     return null;
   }
