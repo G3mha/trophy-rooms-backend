@@ -46,7 +46,7 @@ FastestCompletionEntry.implement({
   }),
 });
 
-// Top users by trophies (Crimson Trophy holders)
+// Top users by trophies (Platinum Trophy holders)
 builder.queryField("leaderboardByTrophies", (t) =>
   t.field({
     type: [LeaderboardEntry],

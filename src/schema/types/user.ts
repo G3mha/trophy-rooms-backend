@@ -8,6 +8,7 @@ builder.enumType(UserRole, {
 // User stats object for detailed statistics
 const UserStats = builder.objectRef<{
   totalPoints: number;
+  platinumCount: number;
   goldCount: number;
   silverCount: number;
   bronzeCount: number;
@@ -18,6 +19,7 @@ const UserStats = builder.objectRef<{
 UserStats.implement({
   fields: (t) => ({
     totalPoints: t.exposeInt("totalPoints"),
+    platinumCount: t.exposeInt("platinumCount"),
     goldCount: t.exposeInt("goldCount"),
     silverCount: t.exposeInt("silverCount"),
     bronzeCount: t.exposeInt("bronzeCount"),
@@ -85,6 +87,7 @@ builder.prismaObject("User", {
         });
 
         let totalPoints = 0;
+        let platinumCount = 0;
         let goldCount = 0;
         let silverCount = 0;
         let bronzeCount = 0;
@@ -96,6 +99,9 @@ builder.prismaObject("User", {
           if (familyId) gameFamilyIds.add(familyId);
 
           switch (ua.achievement.tier) {
+            case AchievementTier.PLATINUM:
+              platinumCount++;
+              break;
             case AchievementTier.GOLD:
               goldCount++;
               break;
@@ -119,6 +125,7 @@ builder.prismaObject("User", {
 
         return {
           totalPoints,
+          platinumCount,
           goldCount,
           silverCount,
           bronzeCount,

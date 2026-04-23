@@ -3,7 +3,7 @@ import { ErrorCode } from "../../lib/errors.js";
 
 // AchievementTier enum for GraphQL
 export const AchievementTierEnum = builder.enumType("AchievementTier", {
-  values: ["BRONZE", "SILVER", "GOLD"] as const,
+  values: ["BRONZE", "SILVER", "GOLD", "PLATINUM"] as const,
 });
 
 builder.prismaObject("Achievement", {
