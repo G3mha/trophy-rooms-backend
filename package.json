@@ -15,6 +15,7 @@
     "db:seed": "tsx scripts/seed-games.ts",
     "db:seed-platforms": "tsx scripts/seed-platforms.ts",
     "db:seed-all": "tsx scripts/seed-all-platforms.ts",
+    "db:import-platform-region": "tsx scripts/import-platform-region.ts",
     "db:cleanup": "tsx scripts/cleanup-shovelware.ts",
     "db:counts": "tsx scripts/platform-counts.ts",
     "db:verify": "tsx scripts/verify-cleanup.ts",
