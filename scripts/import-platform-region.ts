@@ -1,4 +1,4 @@
-import { PrismaClient, GameType } from "@prisma/client";
+import { Prisma, PrismaClient, GameType } from "@prisma/client";
 import {
   igdbRequest,
   getCoverUrl,
@@ -33,15 +33,19 @@ const IGDB_RELEASE_REGION_IDS: Record<string, { id: number; name: string }> = {
 interface IGDBReleaseDate {
   game: number;
   date?: number;
+  release_region?: number;
 }
+
+const WESTERN_RELEASE_REGION_IDS = [1, 2, 3, 4, 8, 10];
 
 function parseArgs() {
   const args = process.argv.slice(2);
   const options = {
     platform: "gba",
-    region: "north-america",
+    region: undefined as string | undefined,
     limit: undefined as number | undefined,
     dryRun: false,
+    excludeJapaneseTitles: true,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -72,9 +76,15 @@ function parseArgs() {
     if (arg === "--dry-run") {
       options.dryRun = true;
     }
+
+    if (arg === "--include-japanese-titles") {
+      options.excludeJapaneseTitles = false;
+    }
   }
 
-  options.region = REGION_ALIASES[options.region] ?? options.region;
+  if (options.region) {
+    options.region = REGION_ALIASES[options.region] ?? options.region;
+  }
   return options;
 }
 
@@ -86,15 +96,19 @@ function generateSlug(title: string): string {
     .substring(0, 100);
 }
 
-async function ensureUniqueGameFamilySlug(preferredSlug: string): Promise<string> {
+function ensureUniqueGameFamilySlug(
+  preferredSlug: string,
+  existingSlugs: Set<string>
+): string {
   let slug = preferredSlug;
   let counter = 1;
 
-  while (await prisma.gameFamily.findUnique({ where: { slug } })) {
+  while (existingSlugs.has(slug)) {
     slug = `${preferredSlug}-${counter}`;
     counter++;
   }
 
+  existingSlugs.add(slug);
   return slug;
 }
 
@@ -129,7 +143,7 @@ async function fetchAllReleaseDatesForPlatformRegion(
   while (hasMore) {
     const query = `
       fields game, date;
-      where game.platforms = (${igdbPlatformIds.join(", ")}) & region = ${regionId};
+      where game.platforms = (${igdbPlatformIds.join(", ")}) & release_region = ${regionId};
       sort date asc;
       offset ${offset};
       limit ${pageSize};
@@ -163,6 +177,43 @@ async function fetchAllReleaseDatesForPlatformRegion(
   return gameReleaseMap;
 }
 
+async function fetchReleaseDatesByRegionsForGames(
+  gameIds: number[],
+  regionIds: number[]
+): Promise<Map<number, number | null>> {
+  if (gameIds.length === 0) {
+    return new Map();
+  }
+
+  const releaseDatesByGame = new Map<number, number | null>();
+  const chunkSize = 200;
+
+  for (let index = 0; index < gameIds.length; index += chunkSize) {
+    const chunk = gameIds.slice(index, index + chunkSize);
+    const query = `
+      fields game, date, release_region;
+      where game = (${chunk.join(", ")}) & release_region = (${regionIds.join(", ")});
+      sort date asc;
+      limit 500;
+    `;
+
+    const releaseDates = await igdbRequest<IGDBReleaseDate[]>("release_dates", query);
+    for (const releaseDate of releaseDates) {
+      if (!releaseDatesByGame.has(releaseDate.game)) {
+        releaseDatesByGame.set(releaseDate.game, releaseDate.date ?? null);
+      }
+    }
+
+    process.stdout.write(
+      `\r   Matched Western releases for ${releaseDatesByGame.size}/${gameIds.length} games...`
+    );
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+
+  console.log("");
+  return releaseDatesByGame;
+}
+
 async function fetchMainGamesByIds(gameIds: number[]): Promise<IGDBGame[]> {
   if (gameIds.length === 0) {
     return [];
@@ -190,13 +241,92 @@ async function fetchMainGamesByIds(gameIds: number[]): Promise<IGDBGame[]> {
   return allGames;
 }
 
+async function fetchAllMainGamesForPlatform(
+  igdbPlatformIds: number[],
+  limit?: number
+): Promise<IGDBGame[]> {
+  const allGames: IGDBGame[] = [];
+  let offset = 0;
+  const pageSize = 500;
+  let hasMore = true;
+
+  while (hasMore) {
+    const query = `
+      fields id, name, slug, summary, cover.image_id, first_release_date, category, game_type, keywords.name, websites.url;
+      where platforms = (${igdbPlatformIds.join(", ")}) & game_type = 0 & version_parent = null;
+      sort name asc;
+      offset ${offset};
+      limit ${pageSize};
+    `;
+
+    const games = await igdbRequest<IGDBGame[]>("games", query);
+    const retailLikeGames = games.filter((game) => !looksNonRetailIGDBEntry(game));
+    allGames.push(...retailLikeGames);
+
+    process.stdout.write(`\r   Loaded ${allGames.length} main games...`);
+
+    if (games.length < pageSize) {
+      hasMore = false;
+    } else if (limit && allGames.length >= limit) {
+      hasMore = false;
+    } else {
+      offset += pageSize;
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+  }
+
+  console.log("");
+  return limit ? allGames.slice(0, limit) : allGames;
+}
+
+function looksJapaneseTitle(title: string): boolean {
+  return /[\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}]/u.test(title);
+}
+
+function looksNonRetailIGDBEntry(game: IGDBGame): boolean {
+  const blockedKeywordFragments = [
+    "homebrew",
+    "rom hack",
+    "fangame",
+    "fan game",
+    "unofficial",
+    "clone",
+  ];
+
+  const blockedWebsiteFragments = [
+    "itch.io",
+    "romhacking.net",
+  ];
+
+  const hasBlockedKeyword = (game.keywords ?? []).some((keyword) => {
+    const normalizedKeyword = keyword.name.trim().toLowerCase();
+    return blockedKeywordFragments.some((fragment) => normalizedKeyword.includes(fragment));
+  });
+
+  if (hasBlockedKeyword) {
+    return true;
+  }
+
+  return (game.websites ?? []).some((website) => {
+    const normalizedUrl = website.url.trim().toLowerCase();
+    return blockedWebsiteFragments.some((fragment) => normalizedUrl.includes(fragment));
+  });
+}
+
 async function main() {
-  const { platform: platformSlug, region: regionSlug, limit, dryRun } = parseArgs();
+  const {
+    platform: platformSlug,
+    region: regionSlug,
+    limit,
+    dryRun,
+    excludeJapaneseTitles,
+  } = parseArgs();
 
   console.log("=== Platform Region Import (IGDB) ===\n");
   console.log(`Platform: ${platformSlug}`);
-  console.log(`Region: ${regionSlug}`);
+  console.log(`Region: ${regionSlug ?? "all"}`);
   console.log(`Mode: ${dryRun ? "dry run" : "write"}`);
+  console.log(`Exclude Japanese titles: ${excludeJapaneseTitles ? "yes" : "no"}`);
   if (limit) {
     console.log(`Limit: ${limit}`);
   }
@@ -223,31 +353,59 @@ async function main() {
     process.exit(1);
   }
 
-  const region = IGDB_RELEASE_REGION_IDS[regionSlug] ?? null;
-  if (!region) {
-    console.error(`IGDB region "${regionSlug}" was not found.`);
-    process.exit(1);
-  }
-
   console.log(`Resolved IGDB platform IDs: ${igdbPlatformIds.join(", ")}`);
-  console.log(`Resolved IGDB region: ${region.name} (${region.id})`);
   console.log("");
 
-  const releaseDates = await fetchAllReleaseDatesForPlatformRegion(
-    igdbPlatformIds,
-    region.id,
-    limit
-  );
+  let releaseDates = new Map<number, number | null>();
+  let igdbGames: IGDBGame[] = [];
 
-  if (releaseDates.size === 0) {
-    console.log("No release dates found for that platform/region.");
-    return;
+  if (regionSlug) {
+    const region = IGDB_RELEASE_REGION_IDS[regionSlug] ?? null;
+    if (!region) {
+      console.error(`IGDB region "${regionSlug}" was not found.`);
+      process.exit(1);
+    }
+
+    console.log(`Resolved IGDB region: ${region.name} (${region.id})`);
+    console.log("");
+
+    releaseDates = await fetchAllReleaseDatesForPlatformRegion(
+      igdbPlatformIds,
+      region.id,
+      limit
+    );
+
+    if (releaseDates.size === 0) {
+      console.log("No release dates found for that platform/region.");
+      return;
+    }
+
+    console.log(`Found ${releaseDates.size} unique release-date game IDs`);
+    igdbGames = await fetchMainGamesByIds(Array.from(releaseDates.keys()));
+    console.log(`Filtered down to ${igdbGames.length} main games with no version parent`);
+  } else {
+    igdbGames = await fetchAllMainGamesForPlatform(igdbPlatformIds, limit);
+    console.log(`Found ${igdbGames.length} main games with no version parent`);
+
+    releaseDates = await fetchReleaseDatesByRegionsForGames(
+      igdbGames.map((game) => game.id),
+      WESTERN_RELEASE_REGION_IDS
+    );
+
+    const westernReleaseFilteredGames = igdbGames.filter((game) => releaseDates.has(game.id));
+    const excludedWithoutWesternRelease = igdbGames.length - westernReleaseFilteredGames.length;
+    console.log(`Excluded ${excludedWithoutWesternRelease} titles without a Western release`);
+    igdbGames = westernReleaseFilteredGames;
   }
 
-  console.log(`Found ${releaseDates.size} unique release-date game IDs`);
+  const filteredByLanguage = excludeJapaneseTitles
+    ? igdbGames.filter((game) => !looksJapaneseTitle(game.name))
+    : igdbGames;
 
-  const igdbGames = await fetchMainGamesByIds(Array.from(releaseDates.keys()));
-  console.log(`Filtered down to ${igdbGames.length} main games with no version parent`);
+  const excludedJapaneseCount = igdbGames.length - filteredByLanguage.length;
+  if (excludeJapaneseTitles) {
+    console.log(`Excluded ${excludedJapaneseCount} titles that look Japanese by name`);
+  }
 
   const existingGames = await prisma.game.findMany({
     where: { platformId: platform.id },
@@ -266,7 +424,7 @@ async function main() {
       .filter((title): title is string => Boolean(title))
   );
 
-  const newGames = igdbGames.filter(
+  const newGames = filteredByLanguage.filter(
     (game) => !existingTitles.has(game.name.trim().toLowerCase())
   );
 
@@ -283,51 +441,91 @@ async function main() {
   }
 
   const standardVersion = await ensureStandardVersion();
+  const existingSlugs = new Set(
+    (
+      await prisma.gameFamily.findMany({
+        select: { slug: true },
+      })
+    ).map((gameFamily) => gameFamily.slug)
+  );
+
+  const chunkSize = 200;
   let createdFamilies = 0;
   let createdPlatformGames = 0;
 
-  for (const game of newGames) {
-    const trimmedTitle = game.name.trim();
-    if (!trimmedTitle) {
+  for (let index = 0; index < newGames.length; index += chunkSize) {
+    const chunk = newGames.slice(index, index + chunkSize);
+    const familyRows = chunk
+      .map((game) => {
+        const trimmedTitle = game.name.trim();
+        if (!trimmedTitle) {
+          return null;
+        }
+
+        const releaseTimestamp = releaseDates.get(game.id) ?? game.first_release_date ?? null;
+        const releaseDate = releaseTimestamp ? new Date(releaseTimestamp * 1000) : null;
+        const preferredSlug = generateSlug(game.slug?.trim() || trimmedTitle) || `game-${game.id}`;
+        const slug = ensureUniqueGameFamilySlug(preferredSlug, existingSlugs);
+
+        return {
+          title: trimmedTitle,
+          slug,
+          description: game.summary?.trim() || null,
+          coverUrl: game.cover?.image_id
+            ? getCoverUrl(game.cover.image_id, "cover_big")
+            : null,
+          releaseDate,
+          type: GameType.BASE_GAME,
+          screenshots: [],
+        };
+      })
+      .filter((row): row is NonNullable<typeof row> => Boolean(row));
+
+    if (familyRows.length === 0) {
       continue;
     }
 
-    const releaseTimestamp = releaseDates.get(game.id) ?? game.first_release_date ?? null;
-    const releaseDate = releaseTimestamp ? new Date(releaseTimestamp * 1000) : null;
-    const slug = await ensureUniqueGameFamilySlug(
-      generateSlug(game.slug?.trim() || trimmedTitle)
-    );
+    const chunkResult = await prisma.$transaction(async (tx) => {
+      const createdGameFamilies = await tx.gameFamily.createManyAndReturn({
+        data: familyRows,
+        select: {
+          id: true,
+          slug: true,
+          releaseDate: true,
+        },
+      });
 
-    const gameFamily = await prisma.gameFamily.create({
-      data: {
-        title: trimmedTitle,
-        slug,
-        description: game.summary?.trim() || null,
-        coverUrl: game.cover?.image_id
-          ? getCoverUrl(game.cover.image_id, "cover_big")
-          : null,
-        releaseDate,
-        type: GameType.BASE_GAME,
-        screenshots: [],
-      },
+      const createdGames = await tx.game.createManyAndReturn({
+        data: createdGameFamilies.map((gameFamily) => ({
+          gameFamilyId: gameFamily.id,
+          platformId: platform.id,
+          releaseDate: gameFamily.releaseDate,
+        })),
+        select: {
+          id: true,
+        },
+      });
+
+      if (createdGames.length > 0) {
+        const versionLinks = Prisma.join(
+          createdGames.map((game) => Prisma.sql`(${game.id}, ${standardVersion.id})`)
+        );
+
+        await tx.$executeRaw`
+          INSERT INTO "_GameVersionGames" ("A", "B")
+          VALUES ${versionLinks}
+          ON CONFLICT DO NOTHING
+        `;
+      }
+
+      return {
+        createdFamilies: createdGameFamilies.length,
+        createdPlatformGames: createdGames.length,
+      };
     });
 
-    const createdGame = await prisma.game.create({
-      data: {
-        gameFamilyId: gameFamily.id,
-        platformId: platform.id,
-        releaseDate,
-      },
-    });
-
-    await prisma.$executeRaw`
-      INSERT INTO "_GameVersionGames" ("A", "B")
-      VALUES (${createdGame.id}, ${standardVersion.id})
-      ON CONFLICT DO NOTHING
-    `;
-
-    createdFamilies++;
-    createdPlatformGames++;
+    createdFamilies += chunkResult.createdFamilies;
+    createdPlatformGames += chunkResult.createdPlatformGames;
 
     process.stdout.write(`\r   Imported ${createdFamilies}/${newGames.length}...`);
   }

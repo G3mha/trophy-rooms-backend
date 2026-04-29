@@ -6,6 +6,11 @@ import {
   getCachedOrCompute,
 } from "./cache.js";
 
+function isMissingTrigramExtensionError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes("similarity(") || message.includes("function similarity");
+}
+
 /**
  * Convert a search string to a PostgreSQL tsquery format.
  * Handles multiple words by joining with & (AND) and adds prefix matching with :*.
@@ -190,17 +195,33 @@ export async function searchGameFamilies(
   const key = cacheKey(CachePrefix.GAME_FAMILY_SEARCH, { search: search.toLowerCase(), limit });
 
   return getCachedOrCompute(key, CacheTTL.SEARCH_RESULTS, async () => {
-    // Use trigram similarity for fuzzy matching on title
-    const results = await prisma.$queryRaw<{ id: string }[]>`
-      SELECT id
-      FROM "GameFamily"
-      WHERE similarity(title, ${search}) > 0.1
-         OR LOWER(title) LIKE ${"%" + search.toLowerCase() + "%"}
-      ORDER BY similarity(title, ${search}) DESC, title ASC
-      LIMIT ${limit}
-    `;
+    try {
+      // Use trigram similarity for fuzzy matching on title when available
+      const results = await prisma.$queryRaw<{ id: string }[]>`
+        SELECT id
+        FROM "GameFamily"
+        WHERE similarity(title, ${search}) > 0.1
+           OR LOWER(title) LIKE ${"%" + search.toLowerCase() + "%"}
+        ORDER BY similarity(title, ${search}) DESC, title ASC
+        LIMIT ${limit}
+      `;
 
-    return results.map((r) => r.id);
+      return results.map((r) => r.id);
+    } catch (error) {
+      if (!isMissingTrigramExtensionError(error)) {
+        throw error;
+      }
+
+      const fallbackResults = await prisma.$queryRaw<{ id: string }[]>`
+        SELECT id
+        FROM "GameFamily"
+        WHERE LOWER(title) LIKE ${"%" + search.toLowerCase() + "%"}
+        ORDER BY title ASC
+        LIMIT ${limit}
+      `;
+
+      return fallbackResults.map((r) => r.id);
+    }
   });
 }
 
@@ -216,16 +237,32 @@ export async function searchBundles(
   const key = cacheKey(CachePrefix.BUNDLE_SEARCH, { search: search.toLowerCase(), limit });
 
   return getCachedOrCompute(key, CacheTTL.SEARCH_RESULTS, async () => {
-    // Use trigram similarity for fuzzy matching on name
-    const results = await prisma.$queryRaw<{ id: string }[]>`
-      SELECT id
-      FROM "Bundle"
-      WHERE similarity(name, ${search}) > 0.1
-         OR LOWER(name) LIKE ${"%" + search.toLowerCase() + "%"}
-      ORDER BY similarity(name, ${search}) DESC, name ASC
-      LIMIT ${limit}
-    `;
+    try {
+      // Use trigram similarity for fuzzy matching on name when available
+      const results = await prisma.$queryRaw<{ id: string }[]>`
+        SELECT id
+        FROM "Bundle"
+        WHERE similarity(name, ${search}) > 0.1
+           OR LOWER(name) LIKE ${"%" + search.toLowerCase() + "%"}
+        ORDER BY similarity(name, ${search}) DESC, name ASC
+        LIMIT ${limit}
+      `;
 
-    return results.map((r) => r.id);
+      return results.map((r) => r.id);
+    } catch (error) {
+      if (!isMissingTrigramExtensionError(error)) {
+        throw error;
+      }
+
+      const fallbackResults = await prisma.$queryRaw<{ id: string }[]>`
+        SELECT id
+        FROM "Bundle"
+        WHERE LOWER(name) LIKE ${"%" + search.toLowerCase() + "%"}
+        ORDER BY name ASC
+        LIMIT ${limit}
+      `;
+
+      return fallbackResults.map((r) => r.id);
+    }
   });
 }

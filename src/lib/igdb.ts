@@ -4,6 +4,12 @@ interface IGDBToken {
   token_type: string;
 }
 
+try {
+  process.loadEnvFile?.();
+} catch {
+  // Production environments inject secrets directly; local scripts can rely on .env.
+}
+
 export interface IGDBGame {
   id: number;
   name: string;
@@ -20,6 +26,9 @@ export interface IGDBGame {
   total_rating?: number;
   total_rating_count?: number;
   category?: number; // 0 = main game, 1 = DLC, etc.
+  game_type?: number;
+  keywords?: { id: number; name: string }[];
+  websites?: { id: number; url: string }[];
   platforms?: { id: number; name: string }[];
 }
 
@@ -194,8 +203,21 @@ export const QUALITY_FILTERS = {
   } as QualityFilter,
 };
 
-const TWITCH_CLIENT_ID = process.env.TWITCH_CLIENT_ID!;
-const TWITCH_CLIENT_SECRET = process.env.TWITCH_CLIENT_SECRET!;
+function getTwitchClientId(): string {
+  const clientId = process.env.TWITCH_CLIENT_ID;
+  if (!clientId) {
+    throw new Error("TWITCH_CLIENT_ID is required");
+  }
+  return clientId;
+}
+
+function getTwitchClientSecret(): string {
+  const clientSecret = process.env.TWITCH_CLIENT_SECRET;
+  if (!clientSecret) {
+    throw new Error("TWITCH_CLIENT_SECRET is required");
+  }
+  return clientSecret;
+}
 
 let cachedToken: { token: string; expiresAt: number } | null = null;
 
@@ -204,8 +226,11 @@ export async function getIGDBToken(): Promise<string> {
     return cachedToken.token;
   }
 
+  const clientId = getTwitchClientId();
+  const clientSecret = getTwitchClientSecret();
+
   const response = await fetch(
-    `https://id.twitch.tv/oauth2/token?client_id=${TWITCH_CLIENT_ID}&client_secret=${TWITCH_CLIENT_SECRET}&grant_type=client_credentials`,
+    `https://id.twitch.tv/oauth2/token?client_id=${clientId}&client_secret=${clientSecret}&grant_type=client_credentials`,
     { method: "POST" }
   );
 
@@ -228,11 +253,12 @@ export async function igdbRequest<T>(
   query: string
 ): Promise<T> {
   const token = await getIGDBToken();
+  const clientId = getTwitchClientId();
 
   const response = await fetch(`https://api.igdb.com/v4/${endpoint}`, {
     method: "POST",
     headers: {
-      "Client-ID": TWITCH_CLIENT_ID,
+      "Client-ID": clientId,
       Authorization: `Bearer ${token}`,
       "Content-Type": "text/plain",
     },
