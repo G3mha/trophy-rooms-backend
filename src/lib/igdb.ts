@@ -448,8 +448,13 @@ export function extractIGDBGameSlug(urlString: string): string | null {
       return null;
     }
 
-    const slugSegment = segments[gamesIndex + 1];
-    if (!slugSegment) {
+    const slugSegmentIndex = gamesIndex + 1;
+    if (slugSegmentIndex >= segments.length) {
+      return null;
+    }
+
+    const slugSegment = segments[slugSegmentIndex];
+    if (slugSegment === undefined) {
       return null;
     }
 
