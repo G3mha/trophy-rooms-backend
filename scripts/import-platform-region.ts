@@ -17,10 +17,18 @@ const REGION_ALIASES: Record<string, string> = {
   usa: "north-america",
 };
 
-interface IGDBRegion {
-  id: number;
-  name: string;
-}
+const IGDB_RELEASE_REGION_IDS: Record<string, { id: number; name: string }> = {
+  europe: { id: 1, name: "Europe" },
+  "north-america": { id: 2, name: "North America" },
+  australia: { id: 3, name: "Australia" },
+  "new-zealand": { id: 4, name: "New Zealand" },
+  japan: { id: 5, name: "Japan" },
+  china: { id: 6, name: "China" },
+  asia: { id: 7, name: "Asia" },
+  worldwide: { id: 8, name: "Worldwide" },
+  korea: { id: 9, name: "Korea" },
+  brazil: { id: 10, name: "Brazil" },
+};
 
 interface IGDBReleaseDate {
   game: number;
@@ -106,26 +114,6 @@ async function ensureStandardVersion() {
   }
 
   return standardVersion;
-}
-
-async function fetchRegionBySlug(regionSlug: string): Promise<IGDBRegion | null> {
-  const normalizedRegionName = regionSlug
-    .split("-")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-  const escapedRegionName = normalizedRegionName.replace(/"/g, '\\"');
-  const query = `
-    fields id, name;
-    where name = "${escapedRegionName}";
-    limit 10;
-  `;
-
-  const results = await igdbRequest<IGDBRegion[]>("regions", query);
-  return (
-    results.find(
-      (region) => region.name.trim().toLowerCase() === normalizedRegionName.toLowerCase()
-    ) ?? null
-  );
 }
 
 async function fetchAllReleaseDatesForPlatformRegion(
@@ -235,7 +223,7 @@ async function main() {
     process.exit(1);
   }
 
-  const region = await fetchRegionBySlug(regionSlug);
+  const region = IGDB_RELEASE_REGION_IDS[regionSlug] ?? null;
   if (!region) {
     console.error(`IGDB region "${regionSlug}" was not found.`);
     process.exit(1);
