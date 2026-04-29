@@ -5,7 +5,20 @@ import {
   cacheKey,
   getCachedOrCompute,
 } from "../../lib/cache.js";
-import { toTsQuery } from "../../lib/fulltext-search.js";
+import {
+  searchAchievementsFullText,
+  searchGames,
+} from "../../lib/fulltext-search.js";
+
+function sortByIdOrder<T extends { id: string }>(items: T[], ids: string[]): T[] {
+  const positions = new Map(ids.map((id, index) => [id, index]));
+
+  return [...items].sort(
+    (left, right) =>
+      (positions.get(left.id) ?? Number.MAX_SAFE_INTEGER) -
+      (positions.get(right.id) ?? Number.MAX_SAFE_INTEGER)
+  );
+}
 
 // ============================================
 // AUTOCOMPLETE RESULT TYPES
@@ -65,46 +78,24 @@ builder.queryField("autocompleteGames", (t) =>
       });
 
       return getCachedOrCompute(key, CacheTTL.AUTOCOMPLETE, async () => {
-        const tsquery = toTsQuery(query);
-
-        // Use full-text search with relevance ranking
-        const results = await ctx.prisma.$queryRaw<
-          { id: string; title: string; platform_name: string | null; cover_url: string | null }[]
-        >`
-          SELECT g.id, g.title, p.name as platform_name, g."coverUrl" as cover_url
-          FROM "Game" g
-          LEFT JOIN "Platform" p ON g."platformId" = p.id
-          WHERE g.search_vector @@ to_tsquery('english', ${tsquery})
-          ORDER BY ts_rank(g.search_vector, to_tsquery('english', ${tsquery})) DESC
-          LIMIT ${limit}
-        `;
-
-        // If no full-text results, try fuzzy match
-        if (results.length === 0) {
-          const fuzzyResults = await ctx.prisma.$queryRaw<
-            { id: string; title: string; platform_name: string | null; cover_url: string | null }[]
-          >`
-            SELECT g.id, g.title, p.name as platform_name, g."coverUrl" as cover_url
-            FROM "Game" g
-            LEFT JOIN "Platform" p ON g."platformId" = p.id
-            WHERE similarity(g.title, ${query}) > 0.1
-            ORDER BY similarity(g.title, ${query}) DESC
-            LIMIT ${limit}
-          `;
-
-          return fuzzyResults.map((r) => ({
-            id: r.id,
-            title: r.title,
-            platformName: r.platform_name,
-            coverUrl: r.cover_url,
-          }));
+        const matchingIds = await searchGames(ctx.prisma, query, limit);
+        if (matchingIds.length === 0) {
+          return [];
         }
 
-        return results.map((r) => ({
-          id: r.id,
-          title: r.title,
-          platformName: r.platform_name,
-          coverUrl: r.cover_url,
+        const games = await ctx.prisma.game.findMany({
+          where: { id: { in: matchingIds } },
+          include: {
+            gameFamily: true,
+            platform: true,
+          },
+        });
+
+        return sortByIdOrder(games, matchingIds).map((game) => ({
+          id: game.id,
+          title: game.gameFamily?.title ?? "Unknown Game",
+          platformName: game.platform?.name ?? null,
+          coverUrl: game.coverUrl ?? game.gameFamily?.coverUrl ?? null,
         }));
       });
     },
@@ -149,25 +140,27 @@ builder.queryField("autocompleteAchievements", (t) =>
       });
 
       return getCachedOrCompute(key, CacheTTL.AUTOCOMPLETE, async () => {
-        const tsquery = toTsQuery(query);
+        const matchingIds = await searchAchievementsFullText(ctx.prisma, query, limit);
+        if (matchingIds.length === 0) {
+          return [];
+        }
 
-        const results = await ctx.prisma.$queryRaw<
-          { id: string; title: string; game_title: string | null; icon_url: string | null }[]
-        >`
-          SELECT a.id, a.title, g.title as game_title, a."iconUrl" as icon_url
-          FROM "Achievement" a
-          JOIN "AchievementSet" s ON a."achievementSetId" = s.id
-          LEFT JOIN "Game" g ON s."gameId" = g.id
-          WHERE a.search_vector @@ to_tsquery('english', ${tsquery})
-          ORDER BY ts_rank(a.search_vector, to_tsquery('english', ${tsquery})) DESC
-          LIMIT ${limit}
-        `;
+        const achievements = await ctx.prisma.achievement.findMany({
+          where: { id: { in: matchingIds } },
+          include: {
+            achievementSet: {
+              include: {
+                gameFamily: true,
+              },
+            },
+          },
+        });
 
-        return results.map((r) => ({
-          id: r.id,
-          title: r.title,
-          gameTitle: r.game_title,
-          iconUrl: r.icon_url,
+        return sortByIdOrder(achievements, matchingIds).map((achievement) => ({
+          id: achievement.id,
+          title: achievement.title,
+          gameTitle: achievement.achievementSet.gameFamily?.title ?? null,
+          iconUrl: achievement.iconUrl,
         }));
       });
     },
@@ -193,44 +186,53 @@ builder.queryField("autocomplete", (t) =>
       const halfLimit = Math.ceil(limit / 2);
 
       // Fetch games and achievements in parallel
+      const [gameIds, achievementIds] = await Promise.all([
+        searchGames(ctx.prisma, query, halfLimit),
+        searchAchievementsFullText(ctx.prisma, query, halfLimit),
+      ]);
+
       const [games, achievements] = await Promise.all([
-        ctx.prisma.$queryRaw<{ id: string; title: string; platform_name: string | null }[]>`
-          SELECT g.id, g.title, p.name as platform_name
-          FROM "Game" g
-          LEFT JOIN "Platform" p ON g."platformId" = p.id
-          WHERE g.search_vector @@ to_tsquery('english', ${toTsQuery(query)})
-          ORDER BY ts_rank(g.search_vector, to_tsquery('english', ${toTsQuery(query)})) DESC
-          LIMIT ${halfLimit}
-        `,
-        ctx.prisma.$queryRaw<{ id: string; title: string; game_title: string | null }[]>`
-          SELECT a.id, a.title, g.title as game_title
-          FROM "Achievement" a
-          JOIN "AchievementSet" s ON a."achievementSetId" = s.id
-          LEFT JOIN "Game" g ON s."gameId" = g.id
-          WHERE a.search_vector @@ to_tsquery('english', ${toTsQuery(query)})
-          ORDER BY ts_rank(a.search_vector, to_tsquery('english', ${toTsQuery(query)})) DESC
-          LIMIT ${halfLimit}
-        `,
+        gameIds.length === 0
+          ? []
+          : ctx.prisma.game.findMany({
+              where: { id: { in: gameIds } },
+              include: {
+                gameFamily: true,
+                platform: true,
+              },
+            }),
+        achievementIds.length === 0
+          ? []
+          : ctx.prisma.achievement.findMany({
+              where: { id: { in: achievementIds } },
+              include: {
+                achievementSet: {
+                  include: {
+                    gameFamily: true,
+                  },
+                },
+              },
+            }),
       ]);
 
       const results: { id: string; title: string; subtitle: string | null; type: "game" | "achievement" }[] = [];
 
       // Add games
-      for (const game of games) {
+      for (const game of sortByIdOrder(games, gameIds)) {
         results.push({
           id: game.id,
-          title: game.title,
-          subtitle: game.platform_name,
+          title: game.gameFamily?.title ?? "Unknown Game",
+          subtitle: game.platform?.name ?? null,
           type: "game",
         });
       }
 
       // Add achievements
-      for (const achievement of achievements) {
+      for (const achievement of sortByIdOrder(achievements, achievementIds)) {
         results.push({
           id: achievement.id,
           title: achievement.title,
-          subtitle: achievement.game_title,
+          subtitle: achievement.achievementSet.gameFamily?.title ?? null,
           type: "achievement",
         });
       }
