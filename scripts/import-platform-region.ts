@@ -129,7 +129,7 @@ async function fetchAllReleaseDatesForPlatformRegion(
   while (hasMore) {
     const query = `
       fields game, date;
-      where platform = (${igdbPlatformIds.join(", ")}) & region = ${regionId};
+      where game.platforms = (${igdbPlatformIds.join(", ")}) & region = ${regionId};
       sort date asc;
       offset ${offset};
       limit ${pageSize};
