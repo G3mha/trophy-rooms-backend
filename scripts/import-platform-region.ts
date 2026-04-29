@@ -20,7 +20,6 @@ const REGION_ALIASES: Record<string, string> = {
 interface IGDBRegion {
   id: number;
   name: string;
-  slug: string;
 }
 
 interface IGDBReleaseDate {
@@ -110,15 +109,23 @@ async function ensureStandardVersion() {
 }
 
 async function fetchRegionBySlug(regionSlug: string): Promise<IGDBRegion | null> {
-  const escapedSlug = regionSlug.replace(/"/g, '\\"');
+  const normalizedRegionName = regionSlug
+    .split("-")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+  const escapedRegionName = normalizedRegionName.replace(/"/g, '\\"');
   const query = `
-    fields id, name, slug;
-    where slug = "${escapedSlug}";
-    limit 1;
+    fields id, name;
+    where name = "${escapedRegionName}";
+    limit 10;
   `;
 
   const results = await igdbRequest<IGDBRegion[]>("regions", query);
-  return results[0] ?? null;
+  return (
+    results.find(
+      (region) => region.name.trim().toLowerCase() === normalizedRegionName.toLowerCase()
+    ) ?? null
+  );
 }
 
 async function fetchAllReleaseDatesForPlatformRegion(
