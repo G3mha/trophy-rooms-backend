@@ -11,19 +11,41 @@ builder.prismaObject("GameVersion", {
     releaseDate: t.expose("releaseDate", { type: "DateTime", nullable: true }),
     isDefault: t.exposeBoolean("isDefault"),
     digitalOnly: t.exposeBoolean("digitalOnly"),
-    dlcs: t.relation("dlcs", {
-      query: {
-        orderBy: [{ type: "asc" }, { name: "asc" }],
+    dlcs: t.prismaField({
+      type: ["DLC"],
+      resolve: async (query, version, _args, ctx) => {
+        return ctx.prisma.dLC.findMany({
+          ...query,
+          where: { gameVersions: { some: { id: version.id } } },
+          orderBy: [{ type: "asc" }, { name: "asc" }],
+        });
       },
     }),
-    dlcCount: t.relationCount("dlcs"),
+    dlcCount: t.int({
+      resolve: async (version, _args, ctx) => {
+        return ctx.prisma.dLC.count({
+          where: { gameVersions: { some: { id: version.id } } },
+        });
+      },
+    }),
     // Many-to-many: games instead of game
-    games: t.relation("games", {
-      query: {
-        orderBy: { gameFamily: { title: "asc" } },
+    games: t.prismaField({
+      type: ["Game"],
+      resolve: async (query, version, _args, ctx) => {
+        return ctx.prisma.game.findMany({
+          ...query,
+          where: { versions: { some: { id: version.id } } },
+          orderBy: { gameFamily: { title: "asc" } },
+        });
       },
     }),
-    gameCount: t.relationCount("games"),
+    gameCount: t.int({
+      resolve: async (version, _args, ctx) => {
+        return ctx.prisma.game.count({
+          where: { versions: { some: { id: version.id } } },
+        });
+      },
+    }),
     // Convenience field: array of game IDs
     gameIds: t.stringList({
       resolve: async (version, _args, ctx) => {
@@ -100,10 +122,9 @@ GameVersionMutationResult.implement({
     gameVersion: t.prismaField({
       type: "GameVersion",
       nullable: true,
-      resolve: async (query, result, _args, ctx) => {
+      resolve: async (_query, result, _args, ctx) => {
         if (!result.gameVersionId) return null;
         return ctx.prisma.gameVersion.findUnique({
-          ...query,
           where: { id: result.gameVersionId },
         });
       },
