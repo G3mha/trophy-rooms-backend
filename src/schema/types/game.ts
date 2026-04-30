@@ -209,9 +209,8 @@ builder.prismaObject("Game", {
     }),
     versions: t.prismaField({
       type: ["GameVersion"],
-      resolve: async (query, game, _args, ctx) => {
+      resolve: async (_query, game, _args, ctx) => {
         return ctx.prisma.gameVersion.findMany({
-          ...query,
           where: { games: { some: { id: game.id } } },
           orderBy: [{ isDefault: "desc" }, { name: "asc" }],
         });
