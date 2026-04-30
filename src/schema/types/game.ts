@@ -176,7 +176,17 @@ builder.prismaObject("Game", {
       },
     }),
 
-    platform: t.relation("platform", { nullable: true }),
+    platform: t.prismaField({
+      type: "Platform",
+      nullable: true,
+      resolve: async (query, game, _args, ctx) => {
+        if (!game.platformId) return null;
+        return ctx.prisma.platform.findUnique({
+          ...query,
+          where: { id: game.platformId },
+        });
+      },
+    }),
     platformId: t.exposeString("platformId", { nullable: true }),
 
     // Achievement sets now come from the family
@@ -197,12 +207,23 @@ builder.prismaObject("Game", {
         orderBy: { createdAt: "desc" },
       },
     }),
-    versions: t.relation("versions", {
-      query: {
-        orderBy: [{ isDefault: "desc" }, { name: "asc" }],
+    versions: t.prismaField({
+      type: ["GameVersion"],
+      resolve: async (query, game, _args, ctx) => {
+        return ctx.prisma.gameVersion.findMany({
+          ...query,
+          where: { games: { some: { id: game.id } } },
+          orderBy: [{ isDefault: "desc" }, { name: "asc" }],
+        });
       },
     }),
-    versionCount: t.relationCount("versions"),
+    versionCount: t.int({
+      resolve: async (game, _args, ctx) => {
+        return ctx.prisma.gameVersion.count({
+          where: { games: { some: { id: game.id } } },
+        });
+      },
+    }),
 
     // DLCs now come from the family
     dlcs: t.prismaField({
