@@ -266,7 +266,13 @@ builder.prismaObject("Game", {
         });
       },
     }),
-    trophyCount: t.relationCount("trophies"),
+    trophyCount: t.int({
+      resolve: async (game, _args, ctx) => {
+        return ctx.prisma.trophy.count({
+          where: { gameId: game.id },
+        });
+      },
+    }),
     createdAt: t.expose("createdAt", { type: "DateTime" }),
     updatedAt: t.expose("updatedAt", { type: "DateTime" }),
   }),
