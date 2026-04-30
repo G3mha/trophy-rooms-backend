@@ -1,5 +1,10 @@
 import { builder } from "../builder.js";
 
+function computePercentComplete(earnedCount: number, totalCount: number): number {
+  if (totalCount <= 0) return 0;
+  return earnedCount / totalCount;
+}
+
 // User's progress on a specific game family
 const UserGameProgress = builder.objectRef<{
   gameFamilyId: string;
@@ -169,7 +174,7 @@ builder.queryField("myGameProgress", (t) =>
         const totals = familyTotalMap.get(familyId) || { count: 0, points: 0 };
         const earnedCount = data.earnedIds.size;
         const totalCount = totals.count;
-        const percentComplete = totalCount > 0 ? Math.round((earnedCount / totalCount) * 100) : 0;
+        const percentComplete = computePercentComplete(earnedCount, totalCount);
 
         result.push({
           gameFamilyId: data.gameFamilyId,
@@ -337,7 +342,7 @@ builder.queryField("userGameProgress", (t) =>
         const totals = familyTotalMap.get(familyId) || { count: 0, points: 0 };
         const earnedCount = data.earnedIds.size;
         const totalCount = totals.count;
-        const percentComplete = totalCount > 0 ? Math.round((earnedCount / totalCount) * 100) : 0;
+        const percentComplete = computePercentComplete(earnedCount, totalCount);
 
         result.push({
           gameFamilyId: data.gameFamilyId,
