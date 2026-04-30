@@ -6,14 +6,49 @@ import {
   getCachedOrCompute,
 } from "./cache.js";
 
+function extractPrismaRawError(error: unknown): { message: string; postgresCode: string | null } {
+  if (!error || typeof error !== "object") {
+    return { message: String(error), postgresCode: null };
+  }
+
+  const record = error as {
+    message?: unknown;
+    code?: unknown;
+    meta?: { code?: unknown; message?: unknown } | null;
+  };
+
+  const message =
+    typeof record.message === "string"
+      ? record.message
+      : typeof record.meta?.message === "string"
+        ? record.meta.message
+        : String(error);
+
+  const postgresCode =
+    typeof record.meta?.code === "string"
+      ? record.meta.code
+      : typeof record.code === "string" && /^\d{5}$/.test(record.code)
+        ? record.code
+        : null;
+
+  return { message, postgresCode };
+}
+
 function isMissingTrigramExtensionError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return message.includes("similarity(") || message.includes("function similarity");
+  const { message, postgresCode } = extractPrismaRawError(error);
+  return (
+    (postgresCode === "42883" && message.includes("similarity")) ||
+    message.includes("similarity(") ||
+    message.includes("function similarity")
+  );
 }
 
 function isMissingSearchVectorError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return message.includes('column "search_vector" does not exist');
+  const { message, postgresCode } = extractPrismaRawError(error);
+  return (
+    (postgresCode === "42703" && message.includes("search_vector")) ||
+    message.includes('column "search_vector" does not exist')
+  );
 }
 
 function isSearchFeatureUnavailableError(error: unknown): boolean {
