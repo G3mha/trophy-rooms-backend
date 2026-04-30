@@ -560,9 +560,8 @@ builder.queryField("game", (t) =>
     args: {
       id: t.arg.id({ required: true }),
     },
-    resolve: async (query, _root, args, ctx) => {
+    resolve: async (_query, _root, args, ctx) => {
       return ctx.prisma.game.findUnique({
-        ...query,
         where: { id: args.id },
       });
     },

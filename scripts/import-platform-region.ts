@@ -96,6 +96,10 @@ function generateSlug(title: string): string {
     .substring(0, 100);
 }
 
+function normalizeTitle(title: string): string {
+  return title.trim().toLowerCase();
+}
+
 function ensureUniqueGameFamilySlug(
   preferredSlug: string,
   existingSlugs: Set<string>
@@ -407,26 +411,51 @@ async function main() {
     console.log(`Excluded ${excludedJapaneseCount} titles that look Japanese by name`);
   }
 
-  const existingGames = await prisma.game.findMany({
-    where: { platformId: platform.id },
-    select: {
-      gameFamily: {
-        select: {
-          title: true,
+  const [existingGames, existingGameFamilies] = await Promise.all([
+    prisma.game.findMany({
+      where: { platformId: platform.id },
+      select: {
+        gameFamily: {
+          select: {
+            title: true,
+          },
         },
       },
-    },
-  });
+    }),
+    prisma.gameFamily.findMany({
+      where: { type: GameType.BASE_GAME },
+      select: {
+        id: true,
+        title: true,
+      },
+      orderBy: { createdAt: "asc" },
+    }),
+  ]);
 
-  const existingTitles = new Set(
+  const existingPlatformTitles = new Set(
     existingGames
-      .map((game) => game.gameFamily?.title?.toLowerCase())
+      .map((game) => game.gameFamily?.title ? normalizeTitle(game.gameFamily.title) : null)
       .filter((title): title is string => Boolean(title))
   );
 
-  const newGames = filteredByLanguage.filter(
-    (game) => !existingTitles.has(game.name.trim().toLowerCase())
-  );
+  const existingFamilyByTitle = new Map<string, { id: string }>();
+  for (const family of existingGameFamilies) {
+    const normalizedTitle = normalizeTitle(family.title);
+    if (!existingFamilyByTitle.has(normalizedTitle)) {
+      existingFamilyByTitle.set(normalizedTitle, { id: family.id });
+    }
+  }
+
+  const seenImportTitles = new Set(existingPlatformTitles);
+  const newGames = filteredByLanguage.filter((game) => {
+    const normalizedTitle = normalizeTitle(game.name);
+    if (seenImportTitles.has(normalizedTitle)) {
+      return false;
+    }
+
+    seenImportTitles.add(normalizedTitle);
+    return true;
+  });
 
   console.log(`New ${platform.name} games to import: ${newGames.length}`);
 
@@ -455,51 +484,92 @@ async function main() {
 
   for (let index = 0; index < newGames.length; index += chunkSize) {
     const chunk = newGames.slice(index, index + chunkSize);
-    const familyRows = chunk
-      .map((game) => {
-        const trimmedTitle = game.name.trim();
-        if (!trimmedTitle) {
-          return null;
-        }
+    const gameRowsToAttach: Array<{
+      gameFamilyId: string;
+      releaseDate: Date | null;
+    }> = [];
+    const familyRowsToCreate: Array<{
+      sourceTitle: string;
+      title: string;
+      slug: string;
+      description: string | null;
+      coverUrl: string | null;
+      releaseDate: Date | null;
+      type: GameType;
+      screenshots: string[];
+    }> = [];
 
-        const releaseTimestamp = releaseDates.get(game.id) ?? game.first_release_date ?? null;
-        const releaseDate = releaseTimestamp ? new Date(releaseTimestamp * 1000) : null;
-        const preferredSlug = generateSlug(game.slug?.trim() || trimmedTitle) || `game-${game.id}`;
-        const slug = ensureUniqueGameFamilySlug(preferredSlug, existingSlugs);
+    for (const game of chunk) {
+      const trimmedTitle = game.name.trim();
+      if (!trimmedTitle) {
+        continue;
+      }
 
-        return {
-          title: trimmedTitle,
-          slug,
-          description: game.summary?.trim() || null,
-          coverUrl: game.cover?.image_id
-            ? getCoverUrl(game.cover.image_id, "cover_big")
-            : null,
+      const normalizedTitle = normalizeTitle(trimmedTitle);
+      const releaseTimestamp = releaseDates.get(game.id) ?? game.first_release_date ?? null;
+      const releaseDate = releaseTimestamp ? new Date(releaseTimestamp * 1000) : null;
+      const existingFamily = existingFamilyByTitle.get(normalizedTitle);
+
+      if (existingFamily) {
+        gameRowsToAttach.push({
+          gameFamilyId: existingFamily.id,
           releaseDate,
-          type: GameType.BASE_GAME,
-          screenshots: [],
-        };
-      })
-      .filter((row): row is NonNullable<typeof row> => Boolean(row));
+        });
+        continue;
+      }
 
-    if (familyRows.length === 0) {
+      const preferredSlug = generateSlug(game.slug?.trim() || trimmedTitle) || `game-${game.id}`;
+      const slug = ensureUniqueGameFamilySlug(preferredSlug, existingSlugs);
+
+      familyRowsToCreate.push({
+        sourceTitle: normalizedTitle,
+        title: trimmedTitle,
+        slug,
+        description: game.summary?.trim() || null,
+        coverUrl: game.cover?.image_id
+          ? getCoverUrl(game.cover.image_id, "cover_big")
+          : null,
+        releaseDate,
+        type: GameType.BASE_GAME,
+        screenshots: [],
+      });
+    }
+
+    if (familyRowsToCreate.length === 0 && gameRowsToAttach.length === 0) {
       continue;
     }
 
     const chunkResult = await prisma.$transaction(async (tx) => {
-      const createdGameFamilies = await tx.gameFamily.createManyAndReturn({
-        data: familyRows,
-        select: {
-          id: true,
-          slug: true,
-          releaseDate: true,
-        },
+      const createdGameFamilies = familyRowsToCreate.length > 0
+        ? await tx.gameFamily.createManyAndReturn({
+            data: familyRowsToCreate.map(({ sourceTitle: _sourceTitle, ...row }) => row),
+            select: {
+              id: true,
+              slug: true,
+              releaseDate: true,
+            },
+          })
+        : [];
+
+      createdGameFamilies.forEach((gameFamily, createdIndex) => {
+        const sourceTitle = familyRowsToCreate[createdIndex]?.sourceTitle;
+        if (sourceTitle) {
+          existingFamilyByTitle.set(sourceTitle, { id: gameFamily.id });
+        }
       });
 
       const createdGames = await tx.game.createManyAndReturn({
-        data: createdGameFamilies.map((gameFamily) => ({
-          gameFamilyId: gameFamily.id,
+        data: [
+          ...gameRowsToAttach,
+          ...createdGameFamilies.map((gameFamily) => ({
+            gameFamilyId: gameFamily.id,
+            platformId: platform.id,
+            releaseDate: gameFamily.releaseDate,
+          })),
+        ].map((row) => ({
+          gameFamilyId: row.gameFamilyId,
           platformId: platform.id,
-          releaseDate: gameFamily.releaseDate,
+          releaseDate: row.releaseDate,
         })),
         select: {
           id: true,
