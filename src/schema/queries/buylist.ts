@@ -22,7 +22,8 @@ function getOrderByFromEnum(orderBy: string | undefined | null) {
     case "PRICE_DESC":
       return { estimatedPrice: "desc" as const };
     default:
-      return { addedAt: "desc" as const };
+      // Default to priority descending (HIGH first)
+      return { priority: "desc" as const };
   }
 }
 
