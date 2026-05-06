@@ -20,6 +20,8 @@
     "db:counts": "tsx scripts/platform-counts.ts",
     "db:verify": "tsx scripts/verify-cleanup.ts",
     "db:cleanup-titles": "tsx scripts/cleanup-weird-titles.ts",
+    "db:populate-achievement-icons": "tsx scripts/populate-achievement-icons.ts",
+    "db:import-retroachievements-set": "tsx scripts/import-retroachievements-set.ts",
     "postinstall": "node -e \"if (!process.env.PRISMA_SKIP_POSTINSTALL_GENERATE) { require('child_process').execSync('npx prisma generate', { stdio: 'inherit' }); }\""
   },
   "dependencies": {

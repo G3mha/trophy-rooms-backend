@@ -37,6 +37,27 @@ interface IGDBReleaseDate {
 }
 
 const WESTERN_RELEASE_REGION_IDS = [1, 2, 3, 4, 8, 10];
+const RERELEASE_PLATFORM_SLUGS = new Set([
+  "3ds",
+  "wii",
+  "wii-u",
+  "switch",
+  "switch-2",
+  "ps3",
+  "ps4",
+  "ps5",
+  "psp",
+  "vita",
+  "xbox-360",
+  "xbox-one",
+  "xbox-series",
+  "steam",
+  "windows",
+  "pc",
+  "macos",
+  "ios",
+  "android",
+]);
 
 function parseArgs() {
   const args = process.argv.slice(2);
@@ -98,6 +119,25 @@ function generateSlug(title: string): string {
 
 function normalizeTitle(title: string): string {
   return title.trim().toLowerCase();
+}
+
+function shouldReuseExistingFamily(
+  family: { id: string; releaseDate: Date | null },
+  platformSlug: string,
+  releaseDate: Date | null
+): boolean {
+  if (RERELEASE_PLATFORM_SLUGS.has(platformSlug)) {
+    return true;
+  }
+
+  if (!family.releaseDate || !releaseDate) {
+    return false;
+  }
+
+  const yearGap = Math.abs(
+    family.releaseDate.getUTCFullYear() - releaseDate.getUTCFullYear()
+  );
+  return yearGap <= 5;
 }
 
 function ensureUniqueGameFamilySlug(
@@ -294,7 +334,6 @@ function looksNonRetailIGDBEntry(game: IGDBGame): boolean {
     "fangame",
     "fan game",
     "unofficial",
-    "clone",
   ];
 
   const blockedWebsiteFragments = [
@@ -427,6 +466,7 @@ async function main() {
       select: {
         id: true,
         title: true,
+        releaseDate: true,
       },
       orderBy: { createdAt: "asc" },
     }),
@@ -438,12 +478,15 @@ async function main() {
       .filter((title): title is string => Boolean(title))
   );
 
-  const existingFamilyByTitle = new Map<string, { id: string }>();
+  const existingFamilyByTitle = new Map<
+    string,
+    Array<{ id: string; releaseDate: Date | null }>
+  >();
   for (const family of existingGameFamilies) {
     const normalizedTitle = normalizeTitle(family.title);
-    if (!existingFamilyByTitle.has(normalizedTitle)) {
-      existingFamilyByTitle.set(normalizedTitle, { id: family.id });
-    }
+    const families = existingFamilyByTitle.get(normalizedTitle) ?? [];
+    families.push({ id: family.id, releaseDate: family.releaseDate });
+    existingFamilyByTitle.set(normalizedTitle, families);
   }
 
   const seenImportTitles = new Set(existingPlatformTitles);
@@ -508,7 +551,9 @@ async function main() {
       const normalizedTitle = normalizeTitle(trimmedTitle);
       const releaseTimestamp = releaseDates.get(game.id) ?? game.first_release_date ?? null;
       const releaseDate = releaseTimestamp ? new Date(releaseTimestamp * 1000) : null;
-      const existingFamily = existingFamilyByTitle.get(normalizedTitle);
+      const existingFamily = (existingFamilyByTitle.get(normalizedTitle) ?? []).find((family) =>
+        shouldReuseExistingFamily(family, platform.slug, releaseDate)
+      );
 
       if (existingFamily) {
         gameRowsToAttach.push({
@@ -554,7 +599,9 @@ async function main() {
       createdGameFamilies.forEach((gameFamily, createdIndex) => {
         const sourceTitle = familyRowsToCreate[createdIndex]?.sourceTitle;
         if (sourceTitle) {
-          existingFamilyByTitle.set(sourceTitle, { id: gameFamily.id });
+          const families = existingFamilyByTitle.get(sourceTitle) ?? [];
+          families.push({ id: gameFamily.id, releaseDate: gameFamily.releaseDate });
+          existingFamilyByTitle.set(sourceTitle, families);
         }
       });
 
