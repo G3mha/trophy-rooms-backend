@@ -49,6 +49,14 @@ builder.prismaObject("BuylistItem", {
 
     // Computed: Get the display title for this buylist item
     displayTitle: t.string({
+      // Ensure these fields are included in the Prisma query for the resolver
+      select: {
+        gameId: true,
+        dlcId: true,
+        bundleId: true,
+        gameVersionId: true,
+        gameFamilyId: true,
+      },
       resolve: async (item, _args, ctx) => {
         if (item.bundleId) {
           const bundle = await ctx.prisma.bundle.findUnique({
@@ -81,6 +89,13 @@ builder.prismaObject("BuylistItem", {
           }
           return baseTitle;
         }
+        if (item.gameFamilyId) {
+          const gameFamily = await ctx.prisma.gameFamily.findUnique({
+            where: { id: item.gameFamilyId },
+            select: { title: true },
+          });
+          return gameFamily?.title ?? "Unknown Game";
+        }
         return "Unknown Item";
       },
     }),
@@ -88,6 +103,14 @@ builder.prismaObject("BuylistItem", {
     // Computed: Get the cover URL for this buylist item
     displayCoverUrl: t.string({
       nullable: true,
+      // Ensure these fields are included in the Prisma query for the resolver
+      select: {
+        gameId: true,
+        dlcId: true,
+        bundleId: true,
+        gameVersionId: true,
+        gameFamilyId: true,
+      },
       resolve: async (item, _args, ctx) => {
         if (item.bundleId) {
           const bundle = await ctx.prisma.bundle.findUnique({
@@ -106,16 +129,40 @@ builder.prismaObject("BuylistItem", {
         if (item.gameVersionId) {
           const version = await ctx.prisma.gameVersion.findUnique({
             where: { id: item.gameVersionId },
-            select: { coverUrl: true, games: { select: { coverUrl: true }, take: 1 } },
+            select: {
+              coverUrl: true,
+              games: {
+                select: {
+                  coverUrl: true,
+                  gameFamily: { select: { coverUrl: true } },
+                },
+                take: 1,
+              },
+            },
           });
-          return version?.coverUrl ?? version?.games[0]?.coverUrl ?? null;
+          return (
+            version?.coverUrl ??
+            version?.games[0]?.coverUrl ??
+            version?.games[0]?.gameFamily?.coverUrl ??
+            null
+          );
         }
         if (item.gameId) {
           const game = await ctx.prisma.game.findUnique({
             where: { id: item.gameId },
+            select: {
+              coverUrl: true,
+              gameFamily: { select: { coverUrl: true } },
+            },
+          });
+          return game?.coverUrl ?? game?.gameFamily?.coverUrl ?? null;
+        }
+        if (item.gameFamilyId) {
+          const gameFamily = await ctx.prisma.gameFamily.findUnique({
+            where: { id: item.gameFamilyId },
             select: { coverUrl: true },
           });
-          return game?.coverUrl ?? null;
+          return gameFamily?.coverUrl ?? null;
         }
         return null;
       },
