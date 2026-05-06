@@ -100,6 +100,41 @@ builder.prismaObject("BuylistItem", {
       },
     }),
 
+    // Computed: Get the platform for this buylist item
+    displayPlatform: t.prismaField({
+      type: "Platform",
+      nullable: true,
+      select: {
+        gameId: true,
+        dlcId: true,
+        bundleId: true,
+      },
+      resolve: async (_query, item, _args, ctx) => {
+        if (item.gameId) {
+          const game = await ctx.prisma.game.findUnique({
+            where: { id: item.gameId },
+            select: { platform: true },
+          });
+          return game?.platform ?? null;
+        }
+        if (item.dlcId) {
+          const dlc = await ctx.prisma.dLC.findUnique({
+            where: { id: item.dlcId },
+            select: { platforms: { take: 1 } },
+          });
+          return dlc?.platforms[0] ?? null;
+        }
+        if (item.bundleId) {
+          const bundle = await ctx.prisma.bundle.findUnique({
+            where: { id: item.bundleId },
+            select: { platform: true },
+          });
+          return bundle?.platform ?? null;
+        }
+        return null;
+      },
+    }),
+
     // Computed: Get the cover URL for this buylist item
     displayCoverUrl: t.string({
       nullable: true,
