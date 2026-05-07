@@ -10,10 +10,11 @@ const prisma = new PrismaClient();
 
 const DRY_RUN = process.argv.includes("--dry-run");
 
-// Collection definitions with their game family titles
+// Collection definitions with their game family titles and platforms
 const COLLECTIONS = [
   {
     slug: "castlevania-anniversary-collection",
+    platformSlugs: ["switch", "ps4", "xbox-one"],
     gameTitles: [
       "Castlevania",
       "Castlevania II: Simon's Quest",
@@ -27,6 +28,7 @@ const COLLECTIONS = [
   },
   {
     slug: "castlevania-advance-collection",
+    platformSlugs: ["switch", "ps4", "xbox-one"],
     gameTitles: [
       "Castlevania: Circle of the Moon",
       "Castlevania: Harmony of Dissonance",
@@ -36,6 +38,7 @@ const COLLECTIONS = [
   },
   {
     slug: "castlevania-dominus-collection",
+    platformSlugs: ["switch", "ps5", "xbox-series"], // No PS4 - next-gen only
     gameTitles: [
       "Castlevania: Dawn of Sorrow",
       "Castlevania: Portrait of Ruin",
@@ -48,16 +51,6 @@ async function main() {
   console.log("=== Import Castlevania Collections as Bundles ===\n");
   console.log("Mode:", DRY_RUN ? "dry-run" : "write");
   console.log("");
-
-  // Get Switch platform
-  const switchPlatform = await prisma.platform.findUnique({
-    where: { slug: "switch" },
-  });
-
-  if (!switchPlatform) {
-    console.error("Switch platform not found in database");
-    return;
-  }
 
   console.log("Fetching collection metadata from IGDB...\n");
 
@@ -79,6 +72,7 @@ async function main() {
     console.log(`${igdbGame.name}`);
     console.log(`  IGDB ID: ${igdbGame.id}`);
     console.log(`  Release: ${igdbGame.first_release_date ? new Date(igdbGame.first_release_date * 1000).toISOString().split("T")[0] : "N/A"}`);
+    console.log(`  Platforms: ${collection.platformSlugs.join(", ")}`);
 
     // Find existing game families
     const gameFamilies = await prisma.gameFamily.findMany({
@@ -89,10 +83,7 @@ async function main() {
       },
     });
 
-    console.log(`  Found ${gameFamilies.length}/${collection.gameTitles.length} games in DB:`);
-    for (const gf of gameFamilies) {
-      console.log(`    - ${gf.title}`);
-    }
+    console.log(`  Found ${gameFamilies.length}/${collection.gameTitles.length} games in DB`);
 
     const missing = collection.gameTitles.filter(
       title => !gameFamilies.some(gf => gf.title.toLowerCase() === title.toLowerCase())
@@ -106,44 +97,59 @@ async function main() {
       continue;
     }
 
-    // Check if bundle already exists
-    const existing = await prisma.bundle.findUnique({
-      where: { slug: collection.slug },
-    });
+    // Create bundle for each platform
+    for (const platformSlug of collection.platformSlugs) {
+      const platform = await prisma.platform.findUnique({
+        where: { slug: platformSlug },
+      });
 
-    if (existing) {
-      console.log(`  Already exists as bundle: ${existing.id}`);
-      console.log("");
-      continue;
+      if (!platform) {
+        console.log(`  Platform not found: ${platformSlug}`);
+        continue;
+      }
+
+      // Use platform-specific slug for non-primary platforms
+      const bundleSlug = platformSlug === "switch"
+        ? collection.slug
+        : `${collection.slug}-${platformSlug}`;
+
+      // Check if bundle already exists
+      const existing = await prisma.bundle.findUnique({
+        where: { slug: bundleSlug },
+      });
+
+      if (existing) {
+        console.log(`  Already exists (${platform.name}): ${existing.id}`);
+        continue;
+      }
+
+      const releaseDate = igdbGame.first_release_date
+        ? new Date(igdbGame.first_release_date * 1000)
+        : null;
+
+      const coverUrl = igdbGame.cover?.image_id
+        ? getCoverUrl(igdbGame.cover.image_id, "cover_big")
+        : null;
+
+      const bundle = await prisma.bundle.create({
+        data: {
+          name: igdbGame.name,
+          slug: bundleSlug,
+          type: BundleType.COLLECTION,
+          description: igdbGame.summary || null,
+          coverUrl,
+          releaseDate,
+          platformId: platform.id,
+          gameFamilies: {
+            connect: gameFamilies.map(gf => ({ id: gf.id })),
+          },
+        },
+      });
+
+      console.log(`  Created (${platform.name}): ${bundle.id}`);
     }
 
-    // Create bundle
-    const releaseDate = igdbGame.first_release_date
-      ? new Date(igdbGame.first_release_date * 1000)
-      : null;
-
-    const coverUrl = igdbGame.cover?.image_id
-      ? getCoverUrl(igdbGame.cover.image_id, "cover_big")
-      : null;
-
-    const bundle = await prisma.bundle.create({
-      data: {
-        name: igdbGame.name,
-        slug: collection.slug,
-        type: BundleType.COLLECTION,
-        description: igdbGame.summary || null,
-        coverUrl,
-        releaseDate,
-        platformId: switchPlatform.id,
-        gameFamilies: {
-          connect: gameFamilies.map(gf => ({ id: gf.id })),
-        },
-      },
-    });
-
-    console.log(`  Created bundle: ${bundle.id}`);
     console.log("");
-
     await new Promise(resolve => setTimeout(resolve, 250));
   }
 
