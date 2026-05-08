@@ -111,7 +111,7 @@ model Platform {
 
   // Relations
   games               Game[]
-  bundles             Bundle[]
+  bundles             Bundle[]          @relation("BundlePlatforms")
   dlcs                DLC[]             @relation("DLCPlatforms")
   collectionItems     CollectionItem[]
   userGames           UserGame[]
@@ -402,9 +402,8 @@ model Bundle {
   releaseDate DateTime?
   price       Float?
 
-  // Platform association
-  platform   Platform? @relation(fields: [platformId], references: [id])
-  platformId String?
+  // Platforms this bundle is available on (many-to-many)
+  platforms Platform[] @relation("BundlePlatforms")
 
   // Many-to-many with game families and DLCs
   gameFamilies GameFamily[]  @relation("BundleGameFamilies")
@@ -416,7 +415,6 @@ model Bundle {
   updatedAt DateTime @updatedAt
 
   @@index([type])
-  @@index([platformId])
 }
 
 model UserBundle {
