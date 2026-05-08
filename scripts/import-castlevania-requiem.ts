@@ -91,7 +91,9 @@ async function main() {
       releaseDate: igdbGame.first_release_date
         ? new Date(igdbGame.first_release_date * 1000)
         : null,
-      platformId: ps4.id,
+      platforms: {
+        connect: [{ id: ps4.id }],
+      },
       gameFamilies: {
         connect: gameFamilies.map(gf => ({ id: gf.id })),
       },

@@ -1,6 +1,7 @@
 /**
  * Import Castlevania Collections as Bundles from IGDB
  * These are compilation releases linking to existing game families
+ * Now supports multiple platforms per bundle
  */
 
 import { PrismaClient, BundleType } from "@prisma/client";
@@ -92,64 +93,80 @@ async function main() {
       console.log(`  Missing: ${missing.join(", ")}`);
     }
 
+    // Find platforms
+    const platforms = await prisma.platform.findMany({
+      where: { slug: { in: collection.platformSlugs } },
+    });
+
+    const foundPlatformSlugs = platforms.map(p => p.slug);
+    const missingPlatforms = collection.platformSlugs.filter(s => !foundPlatformSlugs.includes(s));
+    if (missingPlatforms.length > 0) {
+      console.log(`  Missing platforms: ${missingPlatforms.join(", ")}`);
+    }
+
     if (DRY_RUN) {
       console.log("");
       continue;
     }
 
-    // Create bundle for each platform
-    for (const platformSlug of collection.platformSlugs) {
-      const platform = await prisma.platform.findUnique({
-        where: { slug: platformSlug },
-      });
+    // Check if bundle already exists
+    const existing = await prisma.bundle.findUnique({
+      where: { slug: collection.slug },
+      include: { platforms: true },
+    });
 
-      if (!platform) {
-        console.log(`  Platform not found: ${platformSlug}`);
-        continue;
-      }
+    if (existing) {
+      // Update platforms if needed
+      const existingPlatformIds = new Set(existing.platforms.map(p => p.id));
+      const newPlatformIds = platforms.filter(p => !existingPlatformIds.has(p.id));
 
-      // Use platform-specific slug for non-primary platforms
-      const bundleSlug = platformSlug === "switch"
-        ? collection.slug
-        : `${collection.slug}-${platformSlug}`;
-
-      // Check if bundle already exists
-      const existing = await prisma.bundle.findUnique({
-        where: { slug: bundleSlug },
-      });
-
-      if (existing) {
-        console.log(`  Already exists (${platform.name}): ${existing.id}`);
-        continue;
-      }
-
-      const releaseDate = igdbGame.first_release_date
-        ? new Date(igdbGame.first_release_date * 1000)
-        : null;
-
-      const coverUrl = igdbGame.cover?.image_id
-        ? getCoverUrl(igdbGame.cover.image_id, "cover_big")
-        : null;
-
-      const bundle = await prisma.bundle.create({
-        data: {
-          name: igdbGame.name,
-          slug: bundleSlug,
-          type: BundleType.COLLECTION,
-          description: igdbGame.summary || null,
-          coverUrl,
-          releaseDate,
-          platformId: platform.id,
-          gameFamilies: {
-            connect: gameFamilies.map(gf => ({ id: gf.id })),
+      if (newPlatformIds.length > 0) {
+        await prisma.bundle.update({
+          where: { id: existing.id },
+          data: {
+            platforms: {
+              connect: newPlatformIds.map(p => ({ id: p.id })),
+            },
           },
-        },
-      });
-
-      console.log(`  Created (${platform.name}): ${bundle.id}`);
+        });
+        console.log(`  Updated with ${newPlatformIds.length} new platforms`);
+      } else {
+        console.log(`  Already exists: ${existing.id}`);
+      }
+      console.log("");
+      continue;
     }
 
+    const releaseDate = igdbGame.first_release_date
+      ? new Date(igdbGame.first_release_date * 1000)
+      : null;
+
+    const coverUrl = igdbGame.cover?.image_id
+      ? getCoverUrl(igdbGame.cover.image_id, "cover_big")
+      : null;
+
+    // Create single bundle with all platforms
+    const bundle = await prisma.bundle.create({
+      data: {
+        name: igdbGame.name,
+        slug: collection.slug,
+        type: BundleType.COLLECTION,
+        description: igdbGame.summary || null,
+        coverUrl,
+        releaseDate,
+        platforms: {
+          connect: platforms.map(p => ({ id: p.id })),
+        },
+        gameFamilies: {
+          connect: gameFamilies.map(gf => ({ id: gf.id })),
+        },
+      },
+    });
+
+    console.log(`  Created: ${bundle.id}`);
+    console.log(`  Platforms: ${platforms.map(p => p.name).join(", ")}`);
     console.log("");
+
     await new Promise(resolve => setTimeout(resolve, 250));
   }
 
