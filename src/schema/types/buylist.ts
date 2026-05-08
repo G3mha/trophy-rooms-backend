@@ -127,9 +127,9 @@ builder.prismaObject("BuylistItem", {
         if (item.bundleId) {
           const bundle = await ctx.prisma.bundle.findUnique({
             where: { id: item.bundleId },
-            select: { platform: true },
+            select: { platforms: { take: 1 } },
           });
-          return bundle?.platform ?? null;
+          return bundle?.platforms[0] ?? null;
         }
         return null;
       },

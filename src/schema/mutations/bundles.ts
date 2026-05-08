@@ -105,7 +105,7 @@ builder.mutationField("createBundle", (t) =>
         };
       }
 
-      const { name, slug, type, description, coverUrl, releaseDate, price, platformId, gameFamilyIds, dlcIds } = args.input;
+      const { name, slug, type, description, coverUrl, releaseDate, price, platformIds, gameFamilyIds, dlcIds } = args.input;
 
       // Validate name
       const trimmedName = name.trim();
@@ -162,7 +162,9 @@ builder.mutationField("createBundle", (t) =>
           coverUrl: coverUrl?.trim() || null,
           releaseDate: releaseDate ?? null,
           price: price ?? null,
-          platformId: platformId ?? null,
+          platforms: platformIds && platformIds.length > 0 ? {
+            connect: platformIds.map((id) => ({ id })),
+          } : undefined,
           gameFamilies: gameFamilyIds && gameFamilyIds.length > 0 ? {
             connect: gameFamilyIds.map((id) => ({ id })),
           } : undefined,
@@ -242,7 +244,7 @@ builder.mutationField("updateBundle", (t) =>
         coverUrl?: string | null;
         releaseDate?: Date | null;
         price?: number | null;
-        platformId?: string | null;
+        platforms?: { set: { id: string }[] };
         gameFamilies?: { set: { id: string }[] };
         dlcs?: { set: { id: string }[] };
       } = {};
@@ -318,8 +320,10 @@ builder.mutationField("updateBundle", (t) =>
         updateData.price = input.price ?? null;
       }
 
-      if (input.platformId !== undefined) {
-        updateData.platformId = input.platformId ?? null;
+      if (input.platformIds !== undefined) {
+        updateData.platforms = {
+          set: (input.platformIds ?? []).map((pid) => ({ id: pid })),
+        };
       }
 
       if (input.gameFamilyIds !== undefined) {
