@@ -13,3 +13,4 @@ import "./user-dlc.js";
 import "./bundles.js";
 import "./user-bundle.js";
 import "./buylist.js";
+import "./sell-list.js";
