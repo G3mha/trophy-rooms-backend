@@ -81,6 +81,21 @@ enum BuylistPriority {
   LOW
 }
 
+enum ItemCondition {
+  MINT
+  NEAR_MINT
+  VERY_GOOD
+  GOOD
+  FAIR
+  POOR
+}
+
+enum SellListItemStatus {
+  ACTIVE
+  SOLD
+  REMOVED
+}
+
 model User {
   id              String            @id @default(cuid())
   clerkId         String            @unique
@@ -95,6 +110,7 @@ model User {
   ownedDlcs       UserDLC[]
   ownedBundles    UserBundle[]
   buylistItems    BuylistItem[]
+  sellListItems   SellListItem[]
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
@@ -331,6 +347,9 @@ model CollectionItem {
   region    GameRegion @default(NTSC_U)
   notes     String?
 
+  // Relations
+  sellListItems SellListItem[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -473,4 +492,27 @@ model BuylistItem {
 
   @@unique([userId, gameFamilyId, gameId, gameVersionId, dlcId, bundleId])
   @@index([userId])
+}
+
+model SellListItem {
+  id               String             @id @default(cuid())
+  userId           String
+  collectionItemId String
+  askingPrice      Float?
+  condition        ItemCondition      @default(GOOD)
+  conditionNotes   String?
+  listingUrl       String?
+  notes            String?
+  status           SellListItemStatus @default(ACTIVE)
+  salePrice        Float?
+  soldAt           DateTime?
+  addedAt          DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  collectionItem CollectionItem @relation(fields: [collectionItemId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, collectionItemId])
+  @@index([userId])
+  @@index([userId, status])
 }
