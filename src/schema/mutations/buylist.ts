@@ -9,6 +9,7 @@ import {
   ConvertBuylistToCollectionInput,
   ConvertBuylistToCollectionResult,
 } from "../types/buylist.js";
+import { GameRegionEnum } from "../types/collection-item.js";
 
 // Add item to buylist
 builder.mutationField("addToBuylist", (t) =>
@@ -400,8 +401,16 @@ builder.mutationField("markAsPurchased", (t) =>
       platformId: t.arg.id({ required: false }), // Optional platform for games
       purchasePrice: t.arg.float({ required: false }), // Actual purchase price
       purchasedAt: t.arg({ type: "DateTime", required: false }), // When purchased
+      // Collection item fields (for games only)
+      region: t.arg({ type: GameRegionEnum, required: false }),
+      isDigital: t.arg.boolean({ required: false }),
+      hasDisc: t.arg.boolean({ required: false }),
+      hasBox: t.arg.boolean({ required: false }),
+      hasManual: t.arg.boolean({ required: false }),
+      hasExtras: t.arg.boolean({ required: false }),
+      isSealed: t.arg.boolean({ required: false }),
     },
-    resolve: async (_root, { id, platformId, purchasePrice, purchasedAt }, ctx) => {
+    resolve: async (_root, { id, platformId, purchasePrice, purchasedAt, region, isDigital, hasDisc, hasBox, hasManual, hasExtras, isSealed }, ctx) => {
       let user;
       try {
         user = requireAuth(ctx);
@@ -494,6 +503,25 @@ builder.mutationField("markAsPurchased", (t) =>
             platformId: platformId ?? null,
             purchasePrice: purchasePrice ?? null,
             purchasedAt: purchasedAtValue,
+          },
+        });
+
+        // Also add to physical collection
+        const digital = isDigital ?? false;
+        await ctx.prisma.collectionItem.create({
+          data: {
+            userId: user.id,
+            gameId: item.gameId,
+            platformId: platformId ?? null,
+            gameVersionId: item.gameVersionId ?? null,
+            region: region ?? GameRegion.NTSC_U,
+            isDigital: digital,
+            hasDisc: digital ? false : (hasDisc ?? true),
+            hasBox: digital ? false : (hasBox ?? true),
+            hasManual: digital ? false : (hasManual ?? true),
+            hasExtras: digital ? false : (hasExtras ?? false),
+            isSealed: digital ? false : (isSealed ?? false),
+            notes: item.notes,
           },
         });
       } else if (item.dlcId) {
