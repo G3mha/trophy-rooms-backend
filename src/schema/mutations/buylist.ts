@@ -1,4 +1,4 @@
-import { GameStatus, BuylistPriority, Prisma } from "@prisma/client";
+import { GameStatus, BuylistPriority, Prisma, GameRegion } from "@prisma/client";
 import { builder } from "../builder.js";
 import { ErrorCode } from "../../lib/errors.js";
 import { requireAuth } from "../../context.js";
@@ -6,6 +6,8 @@ import {
   BuylistMutationResult,
   AddToBuylistInput,
   UpdateBuylistItemInput,
+  ConvertBuylistToCollectionInput,
+  ConvertBuylistToCollectionResult,
 } from "../types/buylist.js";
 
 // Add item to buylist
@@ -554,6 +556,170 @@ builder.mutationField("markAsPurchased", (t) =>
       return {
         success: true,
         buylistItemId: id,
+        error: null,
+      };
+    },
+  })
+);
+
+// Convert buylist item to collection item
+builder.mutationField("convertBuylistToCollection", (t) =>
+  t.field({
+    type: ConvertBuylistToCollectionResult,
+    args: {
+      input: t.arg({ type: ConvertBuylistToCollectionInput, required: true }),
+    },
+    resolve: async (_root, { input }, ctx) => {
+      let user;
+      try {
+        user = requireAuth(ctx);
+      } catch {
+        return {
+          success: false,
+          collectionItemId: null,
+          error: {
+            code: ErrorCode.UNAUTHORIZED,
+            message: "You must be logged in to convert buylist items",
+            field: null,
+          },
+        };
+      }
+
+      const {
+        buylistItemId,
+        platformId,
+        gameVersionId,
+        region,
+        isDigital,
+        hasDisc,
+        hasBox,
+        hasManual,
+        hasExtras,
+        isSealed,
+        notes,
+      } = input;
+
+      // Find the buylist item
+      const buylistItem = await ctx.prisma.buylistItem.findUnique({
+        where: { id: buylistItemId },
+      });
+
+      if (!buylistItem) {
+        return {
+          success: false,
+          collectionItemId: null,
+          error: {
+            code: ErrorCode.NOT_FOUND,
+            message: "Buylist item not found",
+            field: "buylistItemId",
+          },
+        };
+      }
+
+      // Verify ownership
+      if (buylistItem.userId !== user.id) {
+        return {
+          success: false,
+          collectionItemId: null,
+          error: {
+            code: ErrorCode.FORBIDDEN,
+            message: "You can only convert your own buylist items",
+            field: null,
+          },
+        };
+      }
+
+      // Validate it's a GAME type (CollectionItem only supports games)
+      if (!buylistItem.gameId) {
+        return {
+          success: false,
+          collectionItemId: null,
+          error: {
+            code: ErrorCode.VALIDATION_ERROR,
+            message: "Only game items can be converted to collection items. DLCs and bundles are not supported.",
+            field: "buylistItemId",
+          },
+        };
+      }
+
+      // Validate platform exists (if provided)
+      if (platformId) {
+        const platform = await ctx.prisma.platform.findUnique({
+          where: { id: platformId },
+        });
+        if (!platform) {
+          return {
+            success: false,
+            collectionItemId: null,
+            error: {
+              code: ErrorCode.NOT_FOUND,
+              message: `Platform with id "${platformId}" not found`,
+              field: "platformId",
+            },
+          };
+        }
+      }
+
+      // Validate game version exists (if provided)
+      if (gameVersionId) {
+        const version = await ctx.prisma.gameVersion.findUnique({
+          where: { id: gameVersionId },
+          include: { games: { select: { id: true } } },
+        });
+
+        if (!version) {
+          return {
+            success: false,
+            collectionItemId: null,
+            error: {
+              code: ErrorCode.NOT_FOUND,
+              message: `Game version with id "${gameVersionId}" not found`,
+              field: "gameVersionId",
+            },
+          };
+        }
+
+        // Ensure version is linked to the game
+        const isLinked = version.games.some((g) => g.id === buylistItem.gameId);
+        if (!isLinked) {
+          return {
+            success: false,
+            collectionItemId: null,
+            error: {
+              code: ErrorCode.VALIDATION_ERROR,
+              message: "Game version is not linked to this game",
+              field: "gameVersionId",
+            },
+          };
+        }
+      }
+
+      // Create collection item
+      const collectionItem = await ctx.prisma.collectionItem.create({
+        data: {
+          userId: user.id,
+          gameId: buylistItem.gameId,
+          platformId: platformId ?? null,
+          gameVersionId: gameVersionId ?? buylistItem.gameVersionId ?? null,
+          region: region ?? GameRegion.NTSC_U,
+          isDigital: isDigital ?? false,
+          hasDisc: isDigital ? false : (hasDisc ?? true),
+          hasBox: isDigital ? false : (hasBox ?? true),
+          hasManual: isDigital ? false : (hasManual ?? true),
+          hasExtras: isDigital ? false : (hasExtras ?? false),
+          isSealed: isDigital ? false : (isSealed ?? false),
+          notes: notes ?? buylistItem.notes ?? null,
+        },
+      });
+
+      // Delete the buylist item
+      await ctx.prisma.buylistItem.delete({
+        where: { id: buylistItemId },
+      });
+
+      return {
+        success: true,
+        collectionItemId: collectionItem.id,
         error: null,
       };
     },

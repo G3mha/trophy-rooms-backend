@@ -1,6 +1,7 @@
 import { builder, MutationErrorRef } from "../builder.js";
 import { BuylistPriority as PrismaBuylistPriority } from "@prisma/client";
 import { ErrorCode } from "../../lib/errors.js";
+import { GameRegionEnum } from "./collection-item.js";
 
 // Register the BuylistPriority enum
 export const BuylistPriority = builder.enumType(PrismaBuylistPriority, {
@@ -304,5 +305,54 @@ BuylistStats.implement({
     gameCount: t.exposeInt("gameCount"),
     dlcCount: t.exposeInt("dlcCount"),
     bundleCount: t.exposeInt("bundleCount"),
+  }),
+});
+
+// Input type for converting buylist item to collection
+export const ConvertBuylistToCollectionInput = builder.inputType(
+  "ConvertBuylistToCollectionInput",
+  {
+    fields: (t) => ({
+      buylistItemId: t.id({ required: true }),
+      platformId: t.id({ required: false }),
+      gameVersionId: t.id({ required: false }),
+      region: t.field({ type: GameRegionEnum, required: false }),
+      isDigital: t.boolean({ required: false, defaultValue: false }),
+      hasDisc: t.boolean({ required: false, defaultValue: true }),
+      hasBox: t.boolean({ required: false, defaultValue: true }),
+      hasManual: t.boolean({ required: false, defaultValue: true }),
+      hasExtras: t.boolean({ required: false, defaultValue: false }),
+      isSealed: t.boolean({ required: false, defaultValue: false }),
+      notes: t.string({ required: false }),
+    }),
+  }
+);
+
+// Result type for converting buylist item to collection
+export const ConvertBuylistToCollectionResult = builder.objectRef<{
+  success: boolean;
+  collectionItemId: string | null;
+  error: { code: ErrorCode; message: string; field: string | null } | null;
+}>("ConvertBuylistToCollectionResult");
+
+ConvertBuylistToCollectionResult.implement({
+  fields: (t) => ({
+    success: t.exposeBoolean("success"),
+    collectionItem: t.prismaField({
+      type: "CollectionItem",
+      nullable: true,
+      resolve: async (query, result, _args, ctx) => {
+        if (!result.collectionItemId) return null;
+        return ctx.prisma.collectionItem.findUnique({
+          ...query,
+          where: { id: result.collectionItemId },
+        });
+      },
+    }),
+    error: t.field({
+      type: MutationErrorRef,
+      nullable: true,
+      resolve: (result) => result.error,
+    }),
   }),
 });
