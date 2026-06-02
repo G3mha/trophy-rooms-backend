@@ -156,6 +156,7 @@ model GameFamily {
   id          String    @id @default(cuid())
   title       String
   slug        String    @unique
+  searchTitle String?   // Normalized title for search (lowercase, no spaces, no accents)
   description String?
   coverUrl    String?
   developer   String?
@@ -181,6 +182,7 @@ model GameFamily {
   updatedAt DateTime @updatedAt
 
   @@index([type])
+  @@index([searchTitle])
 }
 
 model Game {
