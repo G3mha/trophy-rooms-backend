@@ -23,6 +23,7 @@ import {
   IGDBGameCategory,
   PRIMARY_PLATFORM_SLUG_BY_IGDB_ID,
 } from "../../lib/igdb.js";
+import { normalizeForSearch } from "../../lib/normalize-search.js";
 
 function generateSlug(title: string): string {
   return title
@@ -234,6 +235,7 @@ builder.mutationField("createGame", (t) =>
         data: {
           title: trimmedTitle,
           slug,
+          searchTitle: normalizeForSearch(trimmedTitle),
           description: description?.trim() || null,
           coverUrl: coverUrl?.trim() || null,
           releaseDate: releaseDate ?? null,
@@ -356,6 +358,7 @@ builder.mutationField("updateGame", (t) =>
       const familyUpdateData: {
         title?: string;
         slug?: string;
+        searchTitle?: string;
         description?: string | null;
         coverUrl?: string | null;
         releaseDate?: Date | null;
@@ -389,6 +392,7 @@ builder.mutationField("updateGame", (t) =>
           };
         }
         familyUpdateData.title = trimmedTitle;
+        familyUpdateData.searchTitle = normalizeForSearch(trimmedTitle);
 
         // Update slug if title changes
         if (existing.gameFamily && trimmedTitle !== existing.gameFamily.title) {
@@ -1066,6 +1070,7 @@ builder.mutationField("createGameFamily", (t) =>
         data: {
           title: trimmedTitle,
           slug,
+          searchTitle: normalizeForSearch(trimmedTitle),
           description: description?.trim() || null,
           coverUrl: coverUrl?.trim() || null,
           releaseDate: releaseDate ?? null,
@@ -1236,6 +1241,7 @@ builder.mutationField("importGameFamilyFromIGDBUrl", (t) =>
         data: {
           title: trimmedTitle,
           slug,
+          searchTitle: normalizeForSearch(trimmedTitle),
           description: igdbGame.summary?.trim() || null,
           coverUrl: igdbGame.cover?.image_id
             ? getCoverUrl(igdbGame.cover.image_id, "cover_big")
@@ -1319,6 +1325,7 @@ builder.mutationField("updateGameFamily", (t) =>
       const updateData: {
         title?: string;
         slug?: string;
+        searchTitle?: string;
         description?: string | null;
         coverUrl?: string | null;
         releaseDate?: Date | null;
@@ -1345,6 +1352,7 @@ builder.mutationField("updateGameFamily", (t) =>
           };
         }
         updateData.title = trimmedTitle;
+        updateData.searchTitle = normalizeForSearch(trimmedTitle);
       }
 
       if (input.slug !== undefined && input.slug !== null) {
