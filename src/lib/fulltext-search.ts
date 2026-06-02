@@ -5,6 +5,7 @@ import {
   cacheKey,
   getCachedOrCompute,
 } from "./cache.js";
+import { normalizeForSearch } from "./normalize-search.js";
 
 function extractPrismaRawError(error: unknown): { message: string; postgresCode: string | null } {
   if (!error || typeof error !== "object") {
@@ -84,20 +85,27 @@ export function toTsQuery(search: string): string {
  *
  * Since Game doesn't have a title column directly (it's on GameFamily),
  * we join with GameFamily to search by title.
+ * Also searches the normalized searchTitle for fuzzy matching (handles "Leaf Green" → "LeafGreen").
  */
 async function searchGamesFullTextUncached(
   prisma: PrismaClient,
   search: string,
   limit: number
 ): Promise<string[]> {
-  // Use trigram similarity on GameFamily.title and return associated Game IDs
+  const normalizedSearch = normalizeForSearch(search);
+
+  // Use trigram similarity on GameFamily.title and also match against normalized searchTitle
   const results = await prisma.$queryRaw<{ id: string }[]>`
     SELECT g.id
     FROM "Game" g
     JOIN "GameFamily" gf ON g."gameFamilyId" = gf.id
     WHERE similarity(gf.title, ${search}) > 0.1
        OR LOWER(gf.title) LIKE ${"%" + search.toLowerCase() + "%"}
-    ORDER BY similarity(gf.title, ${search}) DESC, gf.title ASC
+       OR gf."searchTitle" LIKE ${"%" + normalizedSearch + "%"}
+    ORDER BY
+      CASE WHEN gf."searchTitle" LIKE ${"%" + normalizedSearch + "%"} THEN 0 ELSE 1 END,
+      similarity(gf.title, ${search}) DESC,
+      gf.title ASC
     LIMIT ${limit}
   `;
 
@@ -109,12 +117,17 @@ async function searchGamesLikeUncached(
   search: string,
   limit: number
 ): Promise<string[]> {
+  const normalizedSearch = normalizeForSearch(search);
+
   const results = await prisma.$queryRaw<{ id: string }[]>`
     SELECT g.id
     FROM "Game" g
     JOIN "GameFamily" gf ON g."gameFamilyId" = gf.id
     WHERE LOWER(gf.title) LIKE ${likePattern(search)}
-    ORDER BY gf.title ASC
+       OR gf."searchTitle" LIKE ${"%" + normalizedSearch + "%"}
+    ORDER BY
+      CASE WHEN gf."searchTitle" LIKE ${"%" + normalizedSearch + "%"} THEN 0 ELSE 1 END,
+      gf.title ASC
     LIMIT ${limit}
   `;
 
@@ -316,6 +329,7 @@ export async function searchDLCsFullText(
 /**
  * Search game families using case-insensitive title matching with trigram similarity.
  * Uses fuzzy matching for typo tolerance.
+ * Also searches normalized searchTitle for flexible matching (e.g., "Leaf Green" → "LeafGreen").
  * Results are cached for performance.
  */
 export async function searchGameFamilies(
@@ -326,14 +340,20 @@ export async function searchGameFamilies(
   const key = cacheKey(CachePrefix.GAME_FAMILY_SEARCH, { search: search.toLowerCase(), limit });
 
   return getCachedOrCompute(key, CacheTTL.SEARCH_RESULTS, async () => {
+    const normalizedSearch = normalizeForSearch(search);
+
     try {
-      // Use trigram similarity for fuzzy matching on title when available
+      // Use trigram similarity for fuzzy matching on title and also match against normalized searchTitle
       const results = await prisma.$queryRaw<{ id: string }[]>`
         SELECT id
         FROM "GameFamily"
         WHERE similarity(title, ${search}) > 0.1
            OR LOWER(title) LIKE ${likePattern(search)}
-        ORDER BY similarity(title, ${search}) DESC, title ASC
+           OR "searchTitle" LIKE ${"%" + normalizedSearch + "%"}
+        ORDER BY
+          CASE WHEN "searchTitle" LIKE ${"%" + normalizedSearch + "%"} THEN 0 ELSE 1 END,
+          similarity(title, ${search}) DESC,
+          title ASC
         LIMIT ${limit}
       `;
 
@@ -347,7 +367,10 @@ export async function searchGameFamilies(
         SELECT id
         FROM "GameFamily"
         WHERE LOWER(title) LIKE ${likePattern(search)}
-        ORDER BY title ASC
+           OR "searchTitle" LIKE ${"%" + normalizedSearch + "%"}
+        ORDER BY
+          CASE WHEN "searchTitle" LIKE ${"%" + normalizedSearch + "%"} THEN 0 ELSE 1 END,
+          title ASC
         LIMIT ${limit}
       `;
 
