@@ -8,12 +8,12 @@
 
 import { PrismaClient, GameType } from "@prisma/client";
 import { igdbRequest, getCoverUrl, type IGDBGame, PRIMARY_PLATFORM_SLUG_BY_IGDB_ID } from "../src/lib/igdb.js";
+import { normalizeForSearch } from "../src/lib/normalize-search.js";
 
 const prisma = new PrismaClient();
 
 const GAMES_TO_IMPORT = [
-  { search: "Pokémon FireRed", slug: "pokemon-firered-version" },
-  { search: "Pokémon LeafGreen", slug: "pokemon-leafgreen-version" },
+  { search: "Tears of the Kingdom", slug: "the-legend-of-zelda-tears-of-the-kingdom" },
 ];
 
 function generateSlug(title: string): string {
@@ -103,6 +103,7 @@ async function main() {
       data: {
         title: igdbGame.name,
         slug: igdbGame.slug || generateSlug(igdbGame.name),
+        searchTitle: normalizeForSearch(igdbGame.name),
         description: igdbGame.summary || null,
         coverUrl: igdbGame.cover?.image_id
           ? getCoverUrl(igdbGame.cover.image_id, "cover_big")
