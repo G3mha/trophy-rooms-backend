@@ -8,7 +8,7 @@ import { searchGameFamilies } from "../src/lib/fulltext-search.js";
 const prisma = new PrismaClient();
 
 async function test() {
-  const searchTerms = ["Leaf Green", "leafgreen", "Pokemon Leaf", "LeafGreen"];
+  const searchTerms = ["Boktai 3", "boktai3", "Sabata"];
 
   for (const term of searchTerms) {
     console.log(`\nSearching for "${term}"...`);
