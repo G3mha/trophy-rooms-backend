@@ -10,6 +10,24 @@ const SearchResultType = builder.enumType("SearchResultType", {
   values: ["GAME", "BUNDLE", "DLC"] as const,
 });
 
+// Human-readable labels for subtitle display. BASE_GAME is omitted (it is the
+// default; platforms and year are more useful there).
+const GAME_TYPE_LABELS: Record<string, string | null> = {
+  BASE_GAME: null,
+  FANGAME: "Fangame",
+  ROM_HACK: "ROM Hack",
+  MOD: "Mod",
+  DLC: "DLC",
+  EXPANSION: "Expansion",
+};
+
+const BUNDLE_TYPE_LABELS: Record<string, string> = {
+  BUNDLE: "Bundle",
+  SEASON_PASS: "Season Pass",
+  COLLECTION: "Collection",
+  SUBSCRIPTION: "Subscription",
+};
+
 // Unified search result item
 const GlobalSearchItem = builder.objectRef<{
   id: string;
@@ -92,13 +110,32 @@ builder.queryField("globalSearch", (t) =>
         gameFamilyIds.length > 0
           ? ctx.prisma.gameFamily.findMany({
               where: { id: { in: gameFamilyIds } },
-              select: { id: true, title: true, coverUrl: true, type: true },
+              select: {
+                id: true,
+                title: true,
+                coverUrl: true,
+                type: true,
+                games: {
+                  select: {
+                    releaseDate: true,
+                    platform: { select: { name: true } },
+                  },
+                  orderBy: { releaseDate: "asc" },
+                },
+              },
             })
           : [],
         bundleIds.length > 0
           ? ctx.prisma.bundle.findMany({
               where: { id: { in: bundleIds } },
-              select: { id: true, name: true, coverUrl: true, type: true },
+              select: {
+                id: true,
+                name: true,
+                coverUrl: true,
+                type: true,
+                releaseDate: true,
+                platforms: { select: { name: true } },
+              },
             })
           : [],
         dlcIds.length > 0
@@ -111,22 +148,49 @@ builder.queryField("globalSearch", (t) =>
           : [],
       ]);
 
-      // Transform to unified format
-      const gameItems = gameFamilies.map((gf) => ({
-        id: gf.id,
-        type: "GAME" as const,
-        title: gf.title,
-        coverUrl: gf.coverUrl,
-        subtitle: gf.type ? gf.type.replace(/_/g, " ") : null,
-      }));
+      // Transform to unified format, with subtitles like
+      // "Wii U · Nintendo Switch · 2013" or "Collection · Nintendo Switch · 2021"
+      const gameItems = gameFamilies.map((gf) => {
+        const platformNames = [
+          ...new Set(
+            gf.games
+              .map((g) => g.platform?.name)
+              .filter((name): name is string => Boolean(name))
+          ),
+        ];
+        const year = gf.games
+          .find((g) => g.releaseDate)
+          ?.releaseDate?.getFullYear();
+        const parts = [
+          GAME_TYPE_LABELS[gf.type],
+          ...platformNames,
+          year?.toString(),
+        ].filter((part): part is string => Boolean(part));
 
-      const bundleItems = bundles.map((b) => ({
-        id: b.id,
-        type: "BUNDLE" as const,
-        title: b.name,
-        coverUrl: b.coverUrl,
-        subtitle: b.type.replace(/_/g, " "),
-      }));
+        return {
+          id: gf.id,
+          type: "GAME" as const,
+          title: gf.title,
+          coverUrl: gf.coverUrl,
+          subtitle: parts.length > 0 ? parts.join(" · ") : null,
+        };
+      });
+
+      const bundleItems = bundles.map((b) => {
+        const parts = [
+          BUNDLE_TYPE_LABELS[b.type] ?? "Bundle",
+          ...b.platforms.map((p) => p.name),
+          b.releaseDate?.getFullYear().toString(),
+        ].filter((part): part is string => Boolean(part));
+
+        return {
+          id: b.id,
+          type: "BUNDLE" as const,
+          title: b.name,
+          coverUrl: b.coverUrl,
+          subtitle: parts.join(" · "),
+        };
+      });
 
       const dlcItems = dlcs.map((d) => ({
         id: d.id,
