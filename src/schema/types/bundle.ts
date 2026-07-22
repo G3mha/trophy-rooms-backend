@@ -79,24 +79,6 @@ builder.prismaObject("Bundle", {
   }),
 });
 
-// UserBundle type
-builder.prismaObject("UserBundle", {
-  fields: (t) => ({
-    id: t.exposeID("id"),
-    user: t.relation("user"),
-    userId: t.exposeString("userId"),
-    bundle: t.relation("bundle"),
-    bundleId: t.exposeString("bundleId"),
-    platform: t.relation("platform", { nullable: true }),
-    platformId: t.exposeString("platformId", { nullable: true }),
-    purchasePrice: t.exposeFloat("purchasePrice", { nullable: true }),
-    purchasedAt: t.expose("purchasedAt", { type: "DateTime", nullable: true }),
-    ownedAt: t.expose("ownedAt", { type: "DateTime" }),
-    createdAt: t.expose("createdAt", { type: "DateTime" }),
-    updatedAt: t.expose("updatedAt", { type: "DateTime" }),
-  }),
-});
-
 // Input types for Bundle mutations
 export const CreateBundleInput = builder.inputType("CreateBundleInput", {
   fields: (t) => ({

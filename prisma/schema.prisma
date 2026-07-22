@@ -108,7 +108,6 @@ model User {
   collectionItems CollectionItem[]
   achievementSets AchievementSet[]  @relation("AchievementSetCreator")
   ownedDlcs       UserDLC[]
-  ownedBundles    UserBundle[]
   buylistItems    BuylistItem[]
   sellListItems   SellListItem[]
   createdAt       DateTime          @default(now())
@@ -131,7 +130,6 @@ model Platform {
   dlcs                DLC[]             @relation("DLCPlatforms")
   collectionItems     CollectionItem[]
   userGames           UserGame[]
-  userBundles         UserBundle[]
   releases            PlatformRelease[]
 
   createdAt           DateTime          @default(now())
@@ -439,7 +437,6 @@ model Bundle {
   // Many-to-many with game families and DLCs
   gameFamilies    GameFamily[]     @relation("BundleGameFamilies")
   dlcs            DLC[]            @relation("BundleDLCs")
-  userBundles     UserBundle[]
   buylistItems    BuylistItem[]
   collectionItems CollectionItem[]
 
@@ -447,32 +444,6 @@ model Bundle {
   updatedAt DateTime @updatedAt
 
   @@index([type])
-}
-
-model UserBundle {
-  id String @id @default(cuid())
-
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId String
-
-  bundle   Bundle @relation(fields: [bundleId], references: [id], onDelete: Cascade)
-  bundleId String
-
-  platform   Platform? @relation(fields: [platformId], references: [id], onDelete: SetNull)
-  platformId String?
-
-  purchasePrice Float? // Actual purchase price
-  purchasedAt   DateTime? // When the item was purchased
-
-  ownedAt DateTime @default(now())
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([userId, bundleId, platformId])
-  @@index([userId])
-  @@index([bundleId])
-  @@index([platformId])
 }
 
 model BuylistItem {
