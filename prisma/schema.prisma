@@ -327,11 +327,16 @@ model UserGame {
 }
 
 model CollectionItem {
-  id            String       @id @default(cuid())
-  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId        String
-  game          Game         @relation(fields: [gameId], references: [id], onDelete: Cascade)
-  gameId        String
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  // Item type - exactly one of gameId/bundleId must be set (like BuylistItem)
+  game     Game?   @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  gameId   String?
+  bundle   Bundle? @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+  bundleId String?
+
   platform      Platform?    @relation(fields: [platformId], references: [id])
   platformId    String?
   gameVersion   GameVersion? @relation(fields: [gameVersionId], references: [id], onDelete: SetNull)
@@ -349,6 +354,10 @@ model CollectionItem {
   region    GameRegion @default(NTSC_U)
   notes     String?
 
+  // Purchase info (carried over from the retired UserBundle model)
+  purchasePrice Float?
+  purchasedAt   DateTime?
+
   // Relations
   sellListItems SellListItem[]
 
@@ -357,6 +366,7 @@ model CollectionItem {
 
   @@index([userId])
   @@index([gameId])
+  @@index([bundleId])
   @@index([gameVersionId])
   @@index([userId, gameId])
 }
@@ -427,10 +437,11 @@ model Bundle {
   platforms Platform[] @relation("BundlePlatforms")
 
   // Many-to-many with game families and DLCs
-  gameFamilies GameFamily[]  @relation("BundleGameFamilies")
-  dlcs         DLC[]         @relation("BundleDLCs")
-  userBundles  UserBundle[]
-  buylistItems BuylistItem[]
+  gameFamilies    GameFamily[]     @relation("BundleGameFamilies")
+  dlcs            DLC[]            @relation("BundleDLCs")
+  userBundles     UserBundle[]
+  buylistItems    BuylistItem[]
+  collectionItems CollectionItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

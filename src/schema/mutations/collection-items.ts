@@ -1,7 +1,10 @@
 import { GameRegion } from "@prisma/client";
 import { builder, MutationErrorRef } from "../builder.js";
 import { ErrorCode } from "../../lib/errors.js";
-import { addGamesToLibrary } from "../../lib/library.js";
+import {
+  addGamesToLibrary,
+  resolveBundleLibraryGames,
+} from "../../lib/library.js";
 import { requireAuth } from "../../context.js";
 import { GameRegionEnum } from "../types/collection-item.js";
 
@@ -10,7 +13,8 @@ const CollectionItemMutationResult = builder.objectRef<{
   success: boolean;
   collectionItem: {
     id: string;
-    gameId: string;
+    gameId: string | null;
+    bundleId: string | null;
     platformId: string | null;
     hasDisc: boolean;
     hasBox: boolean;
@@ -62,10 +66,12 @@ RemoveFromCollectionResult.implement({
   }),
 });
 
-// Input type for adding to collection
+// Input type for adding to collection.
+// Exactly one of gameId/bundleId must be set.
 const AddToCollectionInput = builder.inputType("AddToCollectionInput", {
   fields: (t) => ({
-    gameId: t.id({ required: true }),
+    gameId: t.id({ required: false }),
+    bundleId: t.id({ required: false }),
     platformId: t.id({ required: false }),
     gameVersionId: t.id({ required: false }),
     hasDisc: t.boolean({ required: false, defaultValue: false }),
@@ -76,8 +82,11 @@ const AddToCollectionInput = builder.inputType("AddToCollectionInput", {
     isSealed: t.boolean({ required: false, defaultValue: false }),
     region: t.field({ type: GameRegionEnum, required: false }),
     notes: t.string({ required: false }),
-    // Also add the game to the user's library (as BACKLOG) if not already there
+    // Also add the game(s) to the user's library (as BACKLOG) if not already
+    // there. For bundles, libraryGameFamilyIds narrows which included games
+    // are added (defaults to all of them).
     addToLibrary: t.boolean({ required: false, defaultValue: false }),
+    libraryGameFamilyIds: t.idList({ required: false }),
   }),
 });
 
@@ -121,14 +130,40 @@ builder.mutationField("addToCollection", (t) =>
         };
       }
 
-      const { gameId, platformId, gameVersionId, hasDisc, hasBox, hasManual, hasExtras, isDigital, isSealed, region, notes, addToLibrary } = args.input;
+      const { gameId, bundleId, platformId, gameVersionId, hasDisc, hasBox, hasManual, hasExtras, isDigital, isSealed, region, notes, addToLibrary, libraryGameFamilyIds } = args.input;
 
-      // Check if game exists
-      const game = await ctx.prisma.game.findUnique({
-        where: { id: gameId },
-      });
+      // Exactly one of gameId/bundleId must be set
+      if ((!gameId && !bundleId) || (gameId && bundleId)) {
+        return {
+          success: false,
+          collectionItem: null,
+          error: {
+            code: ErrorCode.VALIDATION_ERROR,
+            message: "Provide exactly one of gameId or bundleId",
+            field: gameId ? "bundleId" : "gameId",
+          },
+        };
+      }
 
-      if (!game) {
+      // Game versions only apply to game items
+      if (gameVersionId && !gameId) {
+        return {
+          success: false,
+          collectionItem: null,
+          error: {
+            code: ErrorCode.VALIDATION_ERROR,
+            message: "Game versions do not apply to bundles",
+            field: "gameVersionId",
+          },
+        };
+      }
+
+      // Check if the game / bundle exists
+      const game = gameId
+        ? await ctx.prisma.game.findUnique({ where: { id: String(gameId) } })
+        : null;
+
+      if (gameId && !game) {
         return {
           success: false,
           collectionItem: null,
@@ -136,6 +171,29 @@ builder.mutationField("addToCollection", (t) =>
             code: ErrorCode.NOT_FOUND,
             message: `Game with id "${gameId}" not found`,
             field: "gameId",
+          },
+        };
+      }
+
+      const bundle = bundleId
+        ? await ctx.prisma.bundle.findUnique({
+            where: { id: String(bundleId) },
+            select: {
+              id: true,
+              gameFamilies: { select: { id: true } },
+              platforms: { select: { id: true } },
+            },
+          })
+        : null;
+
+      if (bundleId && !bundle) {
+        return {
+          success: false,
+          collectionItem: null,
+          error: {
+            code: ErrorCode.NOT_FOUND,
+            message: `Bundle with id "${bundleId}" not found`,
+            field: "bundleId",
           },
         };
       }
@@ -197,7 +255,8 @@ builder.mutationField("addToCollection", (t) =>
       const collectionItem = await ctx.prisma.collectionItem.create({
         data: {
           userId: user.id,
-          gameId,
+          gameId: gameId ? String(gameId) : null,
+          bundleId: bundleId ? String(bundleId) : null,
           platformId: platformId ?? null,
           gameVersionId: gameVersionId ?? null,
           hasDisc: hasDisc ?? false,
@@ -212,13 +271,26 @@ builder.mutationField("addToCollection", (t) =>
       });
 
       if (addToLibrary) {
-        await addGamesToLibrary(ctx.prisma, user.id, [
-          {
-            id: String(gameId),
-            platformId: platformId ? String(platformId) : game.platformId,
-            gameVersionId: gameVersionId ? String(gameVersionId) : null,
-          },
-        ]);
+        if (game && gameId) {
+          await addGamesToLibrary(ctx.prisma, user.id, [
+            {
+              id: String(gameId),
+              platformId: platformId ? String(platformId) : game.platformId,
+              gameVersionId: gameVersionId ? String(gameVersionId) : null,
+            },
+          ]);
+        } else if (bundle) {
+          const familyIds = (
+            libraryGameFamilyIds ?? bundle.gameFamilies.map((f) => f.id)
+          ).map(String);
+          const games = await resolveBundleLibraryGames(
+            ctx.prisma,
+            bundle,
+            platformId ? String(platformId) : null,
+            familyIds
+          );
+          await addGamesToLibrary(ctx.prisma, user.id, games);
+        }
       }
 
       return {
