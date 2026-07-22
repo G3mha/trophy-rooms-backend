@@ -1,5 +1,6 @@
 import { builder } from "../builder.js";
 import { ErrorCode } from "../../lib/errors.js";
+import { addGamesToLibrary } from "../../lib/library.js";
 import { UserBundleMutationResult } from "../types/bundle.js";
 
 // Add bundle to user's owned bundles
@@ -9,8 +10,15 @@ builder.mutationField("addBundleToOwned", (t) =>
     args: {
       bundleId: t.arg.id({ required: true }),
       platformId: t.arg.id({ required: false }),
+      // GameFamily ids from this bundle whose games should also be added to
+      // the user's library (as BACKLOG). Families not in the bundle are ignored.
+      libraryGameFamilyIds: t.arg.idList({ required: false }),
     },
-    resolve: async (_root, { bundleId, platformId }, ctx) => {
+    resolve: async (
+      _root,
+      { bundleId, platformId, libraryGameFamilyIds },
+      ctx
+    ) => {
       if (!ctx.user) {
         return {
           success: false,
@@ -26,6 +34,11 @@ builder.mutationField("addBundleToOwned", (t) =>
       // Check if bundle exists
       const bundle = await ctx.prisma.bundle.findUnique({
         where: { id: bundleId },
+        select: {
+          id: true,
+          gameFamilies: { select: { id: true } },
+          platforms: { select: { id: true } },
+        },
       });
 
       if (!bundle) {
@@ -52,26 +65,60 @@ builder.mutationField("addBundleToOwned", (t) =>
         },
       });
 
+      let userBundleId: string;
       if (existing) {
-        return {
-          success: true,
-          userBundleId: existing.id,
-          error: null,
-        };
+        userBundleId = existing.id;
+      } else {
+        const userBundle = await ctx.prisma.userBundle.create({
+          data: {
+            userId: ctx.user.id,
+            bundleId,
+            platformId: normalizedPlatformId,
+          },
+        });
+        userBundleId = userBundle.id;
       }
 
-      // Create UserBundle
-      const userBundle = await ctx.prisma.userBundle.create({
-        data: {
-          userId: ctx.user.id,
-          bundleId,
-          platformId: normalizedPlatformId,
-        },
-      });
+      // Add the selected included games to the user's library
+      const requestedFamilyIds = (libraryGameFamilyIds ?? []).map(String);
+      if (requestedFamilyIds.length > 0) {
+        const bundleFamilyIds = new Set(bundle.gameFamilies.map((f) => f.id));
+        const familyIds = requestedFamilyIds.filter((id) =>
+          bundleFamilyIds.has(id)
+        );
+
+        if (familyIds.length > 0) {
+          const bundlePlatformIds = bundle.platforms.map((p) => p.id);
+          const games = await ctx.prisma.game.findMany({
+            where: {
+              gameFamilyId: { in: familyIds },
+              ...(normalizedPlatformId
+                ? { platformId: normalizedPlatformId }
+                : bundlePlatformIds.length > 0
+                  ? { platformId: { in: bundlePlatformIds } }
+                  : {}),
+            },
+            select: { id: true, gameFamilyId: true, platformId: true },
+          });
+
+          // One game per family: without an explicit platform, a family could
+          // match on several of the bundle's platforms
+          const seenFamilies = new Set<string>();
+          const gamesPerFamily = games.filter((game) => {
+            if (!game.gameFamilyId || seenFamilies.has(game.gameFamilyId)) {
+              return false;
+            }
+            seenFamilies.add(game.gameFamilyId);
+            return true;
+          });
+
+          await addGamesToLibrary(ctx.prisma, ctx.user.id, gamesPerFamily);
+        }
+      }
 
       return {
         success: true,
-        userBundleId: userBundle.id,
+        userBundleId,
         error: null,
       };
     },
