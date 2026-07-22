@@ -33,7 +33,7 @@ async function main() {
       FOREIGN KEY ("A") REFERENCES "Bundle"("id")
       ON DELETE CASCADE ON UPDATE CASCADE
     `;
-  } catch (e) {
+  } catch {
     console.log("  FK constraint A already exists");
   }
 
@@ -44,7 +44,7 @@ async function main() {
       FOREIGN KEY ("B") REFERENCES "Platform"("id")
       ON DELETE CASCADE ON UPDATE CASCADE
     `;
-  } catch (e) {
+  } catch {
     console.log("  FK constraint B already exists");
   }
 

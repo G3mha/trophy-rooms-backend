@@ -171,7 +171,7 @@ async function populateSetIcons(config: SourceConfig) {
   }
 
   let iconsByTitle = new Map<string, string>();
-  let syntheticIcons = new Map<string, string>();
+  const syntheticIcons = new Map<string, string>();
 
   if (config.type === "retroachievements") {
     const retro = await fetchRetroAchievementsIcons(config.retroGameId);

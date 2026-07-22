@@ -24,7 +24,7 @@ async function main() {
     console.log(`- ${game.name} (${game.slug})`);
     console.log(`  ID: ${game.id}`);
     if (game.platforms) {
-      console.log(`  Platforms: ${game.platforms.map((p: any) => p.name).join(", ")}`);
+      console.log(`  Platforms: ${game.platforms.map((p: { name: string }) => p.name).join(", ")}`);
     }
     console.log("");
   }

@@ -70,7 +70,7 @@ async function migrate() {
 
   // Let's check if title column still exists
   try {
-    const testGame = await prisma.$queryRaw<{ title: string }[]>`
+    const _testGame = await prisma.$queryRaw<{ title: string }[]>`
       SELECT title FROM "Game" LIMIT 1
     `;
     console.log("Title column still exists, proceeding with migration...\n");

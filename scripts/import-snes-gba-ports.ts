@@ -11,7 +11,7 @@ const prisma = new PrismaClient();
 const DRY_RUN = process.argv.includes("--dry-run");
 
 // Known SNES to GBA ports - search terms and expected slugs
-const SNES_GBA_PORTS = [
+const _SNES_GBA_PORTS = [
   // Super Mario Advance series
   "Super Mario Advance",
   "Super Mario World: Super Mario Advance 2",
@@ -34,7 +34,7 @@ const SNES_GBA_PORTS = [
   "Breath of Fire II GBA",
 ];
 
-async function searchGBAPort(searchTerm: string): Promise<IGDBGame | null> {
+async function _searchGBAPort(searchTerm: string): Promise<IGDBGame | null> {
   // Search with GBA platform filter
   const query = `
     fields id, name, slug, summary, cover.image_id, first_release_date, platforms.id, platforms.name;

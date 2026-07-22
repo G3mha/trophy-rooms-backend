@@ -9,7 +9,7 @@ async function main() {
   console.log("=== Verifying Cleanup Results ===\n");
 
   const platforms = await prisma.platform.findMany();
-  const platformMap = new Map(platforms.map((p) => [p.id, p]));
+  const _platformMap = new Map(platforms.map((p) => [p.id, p]));
 
   // Sample games from high-shovelware platforms
   for (const slug of HIGH_SHOVELWARE_PLATFORMS) {

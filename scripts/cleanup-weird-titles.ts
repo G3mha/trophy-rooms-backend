@@ -44,7 +44,7 @@ function isSuspiciousTitle(title: string): { suspicious: boolean; reason: string
   }
 
   // Only underscores, dashes, or dots
-  if (/^[_\-\.]+$/.test(trimmed)) {
+  if (/^[_\-.]+$/.test(trimmed)) {
     return { suspicious: true, reason: "Only underscores/dashes/dots" };
   }
 

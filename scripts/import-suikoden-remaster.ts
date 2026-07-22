@@ -119,7 +119,7 @@ async function main() {
   console.log(`  IGDB ID: ${bundle.id}`);
   console.log(`  Slug: ${bundle.slug}`);
   if (bundle.platforms) {
-    console.log(`  Platforms: ${bundle.platforms.map((p: any) => p.name).join(", ")}`);
+    console.log(`  Platforms: ${bundle.platforms.map((p: { name: string }) => p.name).join(", ")}`);
   }
 
   // Check if bundle already exists

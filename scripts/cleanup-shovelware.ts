@@ -88,7 +88,7 @@ async function shouldDeleteGame(
   game: { title: string; platformId: string | null },
   platformSlug: string | null,
   igdbGame: IGDBGame | null,
-  dryRun: boolean
+  _dryRun: boolean
 ): Promise<{ delete: boolean; reason: string }> {
   // If not found on IGDB, keep the game
   if (!igdbGame) {
@@ -271,7 +271,7 @@ async function main() {
       console.log(`\n[Reconnecting to database at offset ${offset}...]`);
       try {
         await reconnectPrisma();
-      } catch (error) {
+      } catch {
         console.log(`[Reconnection failed, will retry on next operation...]`);
         // Don't reset counter - will try again on next interval
         continue;
