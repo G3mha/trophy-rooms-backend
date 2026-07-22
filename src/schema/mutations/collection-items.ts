@@ -1,6 +1,7 @@
 import { GameRegion } from "@prisma/client";
 import { builder, MutationErrorRef } from "../builder.js";
 import { ErrorCode } from "../../lib/errors.js";
+import { addGamesToLibrary } from "../../lib/library.js";
 import { requireAuth } from "../../context.js";
 import { GameRegionEnum } from "../types/collection-item.js";
 
@@ -75,6 +76,8 @@ const AddToCollectionInput = builder.inputType("AddToCollectionInput", {
     isSealed: t.boolean({ required: false, defaultValue: false }),
     region: t.field({ type: GameRegionEnum, required: false }),
     notes: t.string({ required: false }),
+    // Also add the game to the user's library (as BACKLOG) if not already there
+    addToLibrary: t.boolean({ required: false, defaultValue: false }),
   }),
 });
 
@@ -118,7 +121,7 @@ builder.mutationField("addToCollection", (t) =>
         };
       }
 
-      const { gameId, platformId, gameVersionId, hasDisc, hasBox, hasManual, hasExtras, isDigital, isSealed, region, notes } = args.input;
+      const { gameId, platformId, gameVersionId, hasDisc, hasBox, hasManual, hasExtras, isDigital, isSealed, region, notes, addToLibrary } = args.input;
 
       // Check if game exists
       const game = await ctx.prisma.game.findUnique({
@@ -207,6 +210,16 @@ builder.mutationField("addToCollection", (t) =>
           notes: notes ?? null,
         },
       });
+
+      if (addToLibrary) {
+        await addGamesToLibrary(ctx.prisma, user.id, [
+          {
+            id: String(gameId),
+            platformId: platformId ? String(platformId) : game.platformId,
+            gameVersionId: gameVersionId ? String(gameVersionId) : null,
+          },
+        ]);
+      }
 
       return {
         success: true,
