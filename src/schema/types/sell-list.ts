@@ -53,9 +53,14 @@ builder.prismaObject("SellListItem", {
                 gameFamily: { select: { title: true } },
               },
             },
+            bundle: { select: { name: true } },
             gameVersion: { select: { name: true } },
           },
         });
+
+        if (collectionItem?.bundle) {
+          return collectionItem.bundle.name;
+        }
 
         const baseTitle = collectionItem?.game?.gameFamily?.title ?? "Unknown Game";
         if (collectionItem?.gameVersion) {
@@ -82,10 +87,12 @@ builder.prismaObject("SellListItem", {
                 gameFamily: { select: { coverUrl: true } },
               },
             },
+            bundle: { select: { coverUrl: true } },
           },
         });
 
         return (
+          collectionItem?.bundle?.coverUrl ??
           collectionItem?.gameVersion?.coverUrl ??
           collectionItem?.game?.coverUrl ??
           collectionItem?.game?.gameFamily?.coverUrl ??
