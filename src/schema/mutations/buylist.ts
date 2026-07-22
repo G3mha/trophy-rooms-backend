@@ -546,17 +546,17 @@ builder.mutationField("markAsPurchased", (t) =>
           },
         });
       } else if (item.bundleId) {
-        // Add bundle to owned (without specific platform from buylist)
-        const existingUserBundle = await ctx.prisma.userBundle.findFirst({
+        // Add bundle to the collection (without specific platform from buylist)
+        const existingItem = await ctx.prisma.collectionItem.findFirst({
           where: {
             userId: user.id,
             bundleId: item.bundleId,
             platformId: null,
           },
         });
-        if (existingUserBundle) {
-          await ctx.prisma.userBundle.update({
-            where: { id: existingUserBundle.id },
+        if (existingItem) {
+          await ctx.prisma.collectionItem.update({
+            where: { id: existingItem.id },
             data: {
               // Update purchase info if provided
               ...(purchasePrice !== undefined && purchasePrice !== null && { purchasePrice }),
@@ -564,7 +564,7 @@ builder.mutationField("markAsPurchased", (t) =>
             },
           });
         } else {
-          await ctx.prisma.userBundle.create({
+          await ctx.prisma.collectionItem.create({
             data: {
               userId: user.id,
               bundleId: item.bundleId,

@@ -1,9 +1,14 @@
 import { builder } from "../builder.js";
 import { ErrorCode } from "../../lib/errors.js";
-import { addGamesToLibrary } from "../../lib/library.js";
+import {
+  addGamesToLibrary,
+  resolveBundleLibraryGames,
+} from "../../lib/library.js";
 import { UserBundleMutationResult } from "../types/bundle.js";
 
-// Add bundle to user's owned bundles
+// Add bundle to user's collection. Bundle ownership lives in CollectionItem
+// (bundleId set instead of gameId), so bundles carry region/condition and can
+// be sold like any other physical item.
 builder.mutationField("addBundleToOwned", (t) =>
   t.field({
     type: UserBundleMutationResult,
@@ -54,78 +59,53 @@ builder.mutationField("addBundleToOwned", (t) =>
       }
 
       // Normalize platformId: undefined -> null
-      const normalizedPlatformId = platformId ?? null;
+      const normalizedPlatformId = platformId ? String(platformId) : null;
 
       // Check if already owned (with same platform)
-      const existing = await ctx.prisma.userBundle.findFirst({
+      const existing = await ctx.prisma.collectionItem.findFirst({
         where: {
           userId: ctx.user.id,
-          bundleId,
+          bundleId: String(bundleId),
           platformId: normalizedPlatformId,
         },
       });
 
-      let userBundleId: string;
+      let collectionItemId: string;
       if (existing) {
-        userBundleId = existing.id;
+        collectionItemId = existing.id;
       } else {
-        const userBundle = await ctx.prisma.userBundle.create({
+        const collectionItem = await ctx.prisma.collectionItem.create({
           data: {
             userId: ctx.user.id,
-            bundleId,
+            bundleId: String(bundleId),
             platformId: normalizedPlatformId,
           },
         });
-        userBundleId = userBundle.id;
+        collectionItemId = collectionItem.id;
       }
 
       // Add the selected included games to the user's library
       const requestedFamilyIds = (libraryGameFamilyIds ?? []).map(String);
       if (requestedFamilyIds.length > 0) {
-        const bundleFamilyIds = new Set(bundle.gameFamilies.map((f) => f.id));
-        const familyIds = requestedFamilyIds.filter((id) =>
-          bundleFamilyIds.has(id)
+        const games = await resolveBundleLibraryGames(
+          ctx.prisma,
+          bundle,
+          normalizedPlatformId,
+          requestedFamilyIds
         );
-
-        if (familyIds.length > 0) {
-          const bundlePlatformIds = bundle.platforms.map((p) => p.id);
-          const games = await ctx.prisma.game.findMany({
-            where: {
-              gameFamilyId: { in: familyIds },
-              ...(normalizedPlatformId
-                ? { platformId: normalizedPlatformId }
-                : bundlePlatformIds.length > 0
-                  ? { platformId: { in: bundlePlatformIds } }
-                  : {}),
-            },
-            select: { id: true, gameFamilyId: true, platformId: true },
-          });
-
-          // One game per family: without an explicit platform, a family could
-          // match on several of the bundle's platforms
-          const seenFamilies = new Set<string>();
-          const gamesPerFamily = games.filter((game) => {
-            if (!game.gameFamilyId || seenFamilies.has(game.gameFamilyId)) {
-              return false;
-            }
-            seenFamilies.add(game.gameFamilyId);
-            return true;
-          });
-
-          await addGamesToLibrary(ctx.prisma, ctx.user.id, gamesPerFamily);
-        }
+        await addGamesToLibrary(ctx.prisma, ctx.user.id, games);
       }
 
       return {
         success: true,
-        userBundleId,
+        userBundleId: collectionItemId,
         error: null,
       };
     },
   })
 );
 
-// Remove bundle from user's owned bundles
+// Remove bundle from user's collection
 builder.mutationField("removeBundleFromOwned", (t) =>
   t.field({
     type: UserBundleMutationResult,
@@ -147,13 +127,13 @@ builder.mutationField("removeBundleFromOwned", (t) =>
       }
 
       // Normalize platformId: undefined -> null
-      const normalizedPlatformId = platformId ?? null;
+      const normalizedPlatformId = platformId ? String(platformId) : null;
 
       // Check if ownership exists
-      const existing = await ctx.prisma.userBundle.findFirst({
+      const existing = await ctx.prisma.collectionItem.findFirst({
         where: {
           userId: ctx.user.id,
-          bundleId,
+          bundleId: String(bundleId),
           platformId: normalizedPlatformId,
         },
       });
@@ -166,8 +146,7 @@ builder.mutationField("removeBundleFromOwned", (t) =>
         };
       }
 
-      // Delete UserBundle by id
-      await ctx.prisma.userBundle.delete({
+      await ctx.prisma.collectionItem.delete({
         where: {
           id: existing.id,
         },

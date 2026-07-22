@@ -54,19 +54,22 @@ builder.queryField("bundle", (t) =>
   })
 );
 
-// Query: Get user's owned bundles
+// Query: Get user's owned bundles (bundle ownership lives in CollectionItem)
 builder.queryField("myOwnedBundles", (t) =>
   t.prismaField({
     type: ["Bundle"],
     resolve: async (query, _root, _args, ctx) => {
       if (!ctx.user) return [];
-      const userBundles = await ctx.prisma.userBundle.findMany({
-        where: { userId: ctx.user.id },
+      const items = await ctx.prisma.collectionItem.findMany({
+        where: { userId: ctx.user.id, bundleId: { not: null } },
         select: { bundleId: true },
       });
+      const bundleIds = items
+        .map((item) => item.bundleId)
+        .filter((id): id is string => id !== null);
       return ctx.prisma.bundle.findMany({
         ...query,
-        where: { id: { in: userBundles.map((ub) => ub.bundleId) } },
+        where: { id: { in: bundleIds } },
         orderBy: { name: "asc" },
       });
     },

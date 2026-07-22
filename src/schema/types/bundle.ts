@@ -40,13 +40,13 @@ builder.prismaObject("Bundle", {
     isOwned: t.boolean({
       resolve: async (bundle, _args, ctx) => {
         if (!ctx.user) return false;
-        const userBundle = await ctx.prisma.userBundle.findFirst({
+        const item = await ctx.prisma.collectionItem.findFirst({
           where: {
             userId: ctx.user.id,
             bundleId: bundle.id,
           },
         });
-        return !!userBundle;
+        return !!item;
       },
     }),
     // Get all platforms the user owns this bundle on
@@ -54,7 +54,7 @@ builder.prismaObject("Bundle", {
       type: ["Platform"],
       resolve: async (query, bundle, _args, ctx) => {
         if (!ctx.user) return [];
-        const userBundles = await ctx.prisma.userBundle.findMany({
+        const items = await ctx.prisma.collectionItem.findMany({
           where: {
             userId: ctx.user.id,
             bundleId: bundle.id,
@@ -64,8 +64,8 @@ builder.prismaObject("Bundle", {
             platformId: true,
           },
         });
-        const platformIds = userBundles
-          .map((ub) => ub.platformId)
+        const platformIds = items
+          .map((item) => item.platformId)
           .filter((id): id is string => id !== null);
         if (platformIds.length === 0) return [];
         return ctx.prisma.platform.findMany({
@@ -186,12 +186,13 @@ export const UserBundleMutationResult = builder.objectRef<{
 UserBundleMutationResult.implement({
   fields: (t) => ({
     success: t.exposeBoolean("success"),
-    userBundle: t.prismaField({
-      type: "UserBundle",
+    // Bundle ownership lives in CollectionItem; userBundleId carries its id
+    collectionItem: t.prismaField({
+      type: "CollectionItem",
       nullable: true,
       resolve: async (query, result, _args, ctx) => {
         if (!result.userBundleId) return null;
-        return ctx.prisma.userBundle.findUnique({
+        return ctx.prisma.collectionItem.findUnique({
           ...query,
           where: { id: result.userBundleId },
         });
