@@ -90,6 +90,7 @@ When multiple complete games are sold as one retail product (e.g., "Super Mario 
 3. **Compilation-only covers**: If a game is only sold via the compilation on that platform, set the Game's explicit `coverUrl` to the compilation box art. The GameFamily cover stays the original release's art
 4. **The compilation itself is a Bundle** with `type: COLLECTION`, connected to the included GameFamilies and the platform, with the retail box art and release date
 5. **Ownership goes through the Bundle**: The physical cart/box in a collection is a UserBundle. Games only available inside the compilation should NOT get standalone GameVersions users can add to collections directly
+   - Adding a bundle to owned can also add the included games to the user's library (`addBundleToOwned.libraryGameFamilyIds`): each selected family's Game on the bundle's platform is upserted as a BACKLOG UserGame, never overwriting existing entries. Removing the bundle never removes UserGames - play history outlives ownership
 6. **BUNDLE vs COLLECTION**: `BUNDLE` = a game packaged with its DLC (e.g., "Elden Ring + Shadow of the Erdtree"); `COLLECTION` = multiple complete games
 
 ### Example: Super Mario 3D World + Bowser's Fury
