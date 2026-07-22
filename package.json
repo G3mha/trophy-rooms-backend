@@ -22,7 +22,8 @@
     "db:cleanup-titles": "tsx scripts/cleanup-weird-titles.ts",
     "db:populate-achievement-icons": "tsx scripts/populate-achievement-icons.ts",
     "db:import-retroachievements-set": "tsx scripts/import-retroachievements-set.ts",
-    "postinstall": "node -e \"if (!process.env.PRISMA_SKIP_POSTINSTALL_GENERATE) { require('child_process').execSync('npx prisma generate', { stdio: 'inherit' }); }\""
+    "postinstall": "node -e \"if (!process.env.PRISMA_SKIP_POSTINSTALL_GENERATE) { require('child_process').execSync('npx prisma generate', { stdio: 'inherit' }); }\"",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@clerk/backend": "^1.21.0",
@@ -40,9 +41,12 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "eslint": "^9.39.5",
     "prisma": "^6.1.0",
     "tsx": "^4.19.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.65.0"
   },
   "engines": {
     "node": ">=20.0.0"
