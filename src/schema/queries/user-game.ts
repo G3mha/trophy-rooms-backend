@@ -1,6 +1,21 @@
 import { builder } from "../builder.js";
 import { GameStatusEnum } from "../types/user-game.js";
 
+// Bundle a library game belongs to (for stacking compilations in the UI)
+const UserGameBundleRef = builder.objectRef<{
+  id: string;
+  name: string;
+  coverUrl: string | null;
+}>("UserGameBundleRef");
+
+UserGameBundleRef.implement({
+  fields: (t) => ({
+    id: t.exposeString("id"),
+    name: t.exposeString("name"),
+    coverUrl: t.exposeString("coverUrl", { nullable: true }),
+  }),
+});
+
 // UserGame item type with game info (for listing)
 const UserGameItem = builder.objectRef<{
   id: string;
@@ -15,6 +30,7 @@ const UserGameItem = builder.objectRef<{
   gameVersionId: string | null;
   gameVersionName: string | null;
   status: "BACKLOG" | "PLAYING" | "PAUSED" | "COMPLETED" | "DROPPED";
+  bundles: Array<{ id: string; name: string; coverUrl: string | null }>;
   addedAt: Date;
   updatedAt: Date;
 }>("UserGameItem");
@@ -33,6 +49,10 @@ UserGameItem.implement({
     gameVersionId: t.exposeString("gameVersionId", { nullable: true }),
     gameVersionName: t.exposeString("gameVersionName", { nullable: true }),
     status: t.expose("status", { type: GameStatusEnum }),
+    bundles: t.field({
+      type: [UserGameBundleRef],
+      resolve: (item) => item.bundles,
+    }),
     addedAt: t.expose("addedAt", { type: "DateTime" }),
     updatedAt: t.expose("updatedAt", { type: "DateTime" }),
   }),
@@ -118,6 +138,14 @@ builder.queryField("myGamesByStatus", (t) =>
                   title: true,
                   coverUrl: true,
                   description: true,
+                  bundles: {
+                    select: {
+                      id: true,
+                      name: true,
+                      coverUrl: true,
+                      platforms: { select: { id: true } },
+                    },
+                  },
                 },
               },
             },
@@ -185,6 +213,14 @@ builder.queryField("myGamesByStatus", (t) =>
         gameVersionId: item.gameVersion?.id ?? null,
         gameVersionName: item.gameVersion?.name ?? null,
         status: item.status,
+        bundles: (item.game.gameFamily?.bundles ?? [])
+          .filter(
+            (b) =>
+              b.platforms.length === 0 ||
+              !item.platformId ||
+              b.platforms.some((p) => p.id === item.platformId)
+          )
+          .map((b) => ({ id: b.id, name: b.name, coverUrl: b.coverUrl })),
         addedAt: item.createdAt,
         updatedAt: item.updatedAt,
       }));
