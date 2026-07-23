@@ -52,6 +52,7 @@ Game metadata (covers, descriptions, release dates) comes from IGDB via `src/lib
 
 - **GameFamily**: Canonical game metadata (title, description, cover). One per game regardless of platforms.
 - **Game**: Platform-specific instance. Links a GameFamily to a Platform with optional version and cover override.
+- **GameVersion**: Shared edition label ("Standard", "Deluxe Edition", "Remastered", "Vengeance Edition") linked to Games many-to-many. Its `releaseDate` is the canonical (first) release; when an edition ships on different dates per platform, add a `GameVersionReleaseDate` override per (game, version) - same override philosophy as Game.coverUrl over GameFamily.coverUrl. Read via `GameVersion.releaseDateFor(gameId)`.
 
 ### Nintendo Switch 2 Enhanced Editions
 
