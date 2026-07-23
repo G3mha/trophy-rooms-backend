@@ -54,6 +54,9 @@ builder.prismaObject("Game", {
       },
     }),
     releaseDate: t.expose("releaseDate", { type: "DateTime", nullable: true }),
+    // Raw per-platform override values (no family fallback) for admin editing
+    platformCoverUrl: t.exposeString("coverUrl", { nullable: true }),
+    platformDescription: t.exposeString("description", { nullable: true }),
     developer: t.string({
       nullable: true,
       resolve: async (game, _args, ctx) => {
