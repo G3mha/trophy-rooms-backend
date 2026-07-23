@@ -46,6 +46,8 @@ One-off database scripts live in `scripts/` and run with `npx tsx scripts/<name>
 
 Game metadata (covers, descriptions, release dates) comes from IGDB via `src/lib/igdb.ts`.
 
+**When a script creates GameFamily rows, set `searchTitle` (via `normalizeForSearch` from `src/lib/normalize-search.ts`) or run `scripts/backfill-search-titles.ts` afterwards.** Families without it rank last in search and can be pushed out of results entirely.
+
 ## Game Data Model Rules
 
 ### GameFamily vs Game
