@@ -28,6 +28,20 @@ async function igdbBySlug(slug: string): Promise<IGDBGame | null> {
   }
 }
 
+async function igdbByName(name: string): Promise<IGDBGame | null> {
+  try {
+    const escaped = name.replace(/"/g, '\\"');
+    const [game] = await igdbRequest<IGDBGame[]>(
+      "games",
+      `fields id, name, slug, summary, cover.image_id, first_release_date;
+       where name = "${escaped}"; limit 1;`
+    );
+    return game ?? null;
+  } catch {
+    return null;
+  }
+}
+
 async function main() {
   console.log("=== Mario & Luigi series pass ===\n");
 
@@ -94,10 +108,25 @@ async function main() {
       },
     });
     if (existing) {
+      // Repair cover/description if the original run missed IGDB
+      if (!existing.coverUrl) {
+        const igdb = await igdbByName(nf.title);
+        if (igdb?.cover?.image_id) {
+          await prisma.gameFamily.update({
+            where: { id: existing.id },
+            data: {
+              coverUrl: getCoverUrl(igdb.cover.image_id, "cover_big"),
+              description: existing.description ?? igdb.summary ?? null,
+            },
+          });
+          console.log(`${nf.title}: cover repaired (${igdb.slug})`);
+          continue;
+        }
+      }
       console.log(`${nf.title}: already exists`);
       continue;
     }
-    const igdb = await igdbBySlug(nf.igdbSlug);
+    const igdb = (await igdbBySlug(nf.igdbSlug)) ?? (await igdbByName(nf.title));
     const family = await prisma.gameFamily.create({
       data: {
         title: nf.title,
