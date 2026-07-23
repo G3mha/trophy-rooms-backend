@@ -13,7 +13,7 @@ import { normalizeForSearch } from "../src/lib/normalize-search.js";
 const prisma = new PrismaClient();
 
 const GAMES_TO_IMPORT = [
-  { search: "Tears of the Kingdom", slug: "the-legend-of-zelda-tears-of-the-kingdom" },
+  { search: "Halloween Ash vs Evil Dead", slug: "halloween-and-ash-vs-evil-dead" },
 ];
 
 function generateSlug(title: string): string {
