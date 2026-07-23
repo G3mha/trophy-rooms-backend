@@ -195,11 +195,12 @@ model Game {
   releaseDate DateTime? // Platform-specific release date
   coverUrl    String? // Platform-specific cover override
 
-  trophies        Trophy[]
-  userGames       UserGame[]
-  collectionItems CollectionItem[]
-  versions        GameVersion[]    @relation("GameVersionGames")
-  buylistItems    BuylistItem[]
+  trophies            Trophy[]
+  userGames           UserGame[]
+  collectionItems     CollectionItem[]
+  versions            GameVersion[]            @relation("GameVersionGames")
+  versionReleaseDates GameVersionReleaseDate[]
+  buylistItems        BuylistItem[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
@@ -214,11 +215,12 @@ model GameVersion {
   slug        String    @unique // "standard", "deluxe" - now globally unique
   description String?
   coverUrl    String? // Fallback to first game's coverUrl if null
-  releaseDate DateTime?
+  releaseDate DateTime? // Canonical (first) release; per-platform overrides below
   isDefault   Boolean   @default(false)
   digitalOnly Boolean   @default(false) // If true, only digital copies can be added to collection
 
-  games Game[] @relation("GameVersionGames")
+  games               Game[]                   @relation("GameVersionGames")
+  versionReleaseDates GameVersionReleaseDate[]
 
   dlcs            DLC[]            @relation("GameVersionDLCs")
   achievementSets AchievementSet[]
@@ -228,6 +230,21 @@ model GameVersion {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// Per-platform release date override for a shared GameVersion: a retail
+// edition can ship on different dates per platform (e.g. Sifu Vengeance
+// Edition: PS5 2022-05-03, Switch 2022-11-08). Follows the same override
+// pattern as Game.coverUrl over GameFamily.coverUrl.
+model GameVersionReleaseDate {
+  game          Game        @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  gameId        String
+  gameVersion   GameVersion @relation(fields: [gameVersionId], references: [id], onDelete: Cascade)
+  gameVersionId String
+  releaseDate   DateTime
+
+  @@id([gameId, gameVersionId])
+  @@index([gameVersionId])
 }
 
 model AchievementSet {

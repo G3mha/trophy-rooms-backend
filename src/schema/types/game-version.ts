@@ -1,6 +1,17 @@
 import { builder, MutationErrorRef } from "../builder.js";
 import { ErrorCode } from "../../lib/errors.js";
 
+// Per-platform release date override for a shared version (e.g. Sifu
+// Vengeance Edition shipped on PS5 months before Switch)
+builder.prismaObject("GameVersionReleaseDate", {
+  fields: (t) => ({
+    gameId: t.exposeString("gameId"),
+    gameVersionId: t.exposeString("gameVersionId"),
+    releaseDate: t.expose("releaseDate", { type: "DateTime" }),
+    game: t.relation("game"),
+  }),
+});
+
 builder.prismaObject("GameVersion", {
   fields: (t) => ({
     id: t.exposeID("id"),
@@ -62,6 +73,27 @@ builder.prismaObject("GameVersion", {
       },
     }),
     achievementSetCount: t.relationCount("achievementSets"),
+    versionReleaseDates: t.relation("versionReleaseDates"),
+    // Computed field: the release date of this version for a specific game
+    // (platform), falling back to the version's canonical releaseDate
+    releaseDateFor: t.field({
+      type: "DateTime",
+      nullable: true,
+      args: {
+        gameId: t.arg.id({ required: true }),
+      },
+      resolve: async (version, args, ctx) => {
+        const override = await ctx.prisma.gameVersionReleaseDate.findUnique({
+          where: {
+            gameId_gameVersionId: {
+              gameId: String(args.gameId),
+              gameVersionId: version.id,
+            },
+          },
+        });
+        return override?.releaseDate ?? version.releaseDate ?? null;
+      },
+    }),
     // Computed field: returns version coverUrl if set, otherwise falls back to first game's coverUrl
     effectiveCoverUrl: t.string({
       nullable: true,
