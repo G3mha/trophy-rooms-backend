@@ -93,6 +93,28 @@ builder.mutationField("createGameVersion", (t) =>
 
       const { gameIds, name, slug, description, coverUrl, releaseDate, dlcIds, isDefault, digitalOnly } = args.input;
 
+      if (coverUrl?.trim() && gameIds && gameIds.length > 1) {
+        const linkedGames = await ctx.prisma.game.findMany({
+          where: { id: { in: gameIds.map(String) } },
+          select: { gameFamilyId: true },
+        });
+        const familyCount = new Set(
+          linkedGames.map((g) => g.gameFamilyId).filter(Boolean)
+        ).size;
+        if (familyCount > 1) {
+          return {
+            success: false,
+            gameVersionId: null,
+            error: {
+              code: ErrorCode.VALIDATION_ERROR,
+              message:
+                "A version linked to multiple games cannot carry a cover; it would show on all of them. Set covers on each game's platform override instead.",
+              field: "coverUrl",
+            },
+          };
+        }
+      }
+
       // Validate gameIds
       if (!gameIds || gameIds.length === 0) {
         return {
@@ -185,7 +207,7 @@ builder.mutationField("createGameVersion", (t) =>
           name: trimmedName,
           slug: trimmedSlug,
           description: description?.trim() || null,
-          coverUrl: coverUrl?.trim() || null,
+          coverUrl: coverUrl?.trim() || null,  // multi-family guard runs above
           releaseDate: releaseDate ?? null,
           isDefault: isDefault ?? false,
           digitalOnly: digitalOnly ?? false,
@@ -330,7 +352,32 @@ builder.mutationField("updateGameVersion", (t) =>
       }
 
       if (input.coverUrl !== undefined) {
-        updateData.coverUrl = input.coverUrl?.trim() || null;
+        const trimmedCover = input.coverUrl?.trim() || null;
+        if (trimmedCover) {
+          // A shared version's single cover cannot represent every game it
+          // is linked to (e.g. "Gold Edition" for both RE7 and Village) -
+          // per-SKU art belongs on the Game's platform cover override
+          const linkedGames = await ctx.prisma.game.findMany({
+            where: { versions: { some: { id } } },
+            select: { gameFamilyId: true },
+          });
+          const familyCount = new Set(
+            linkedGames.map((g) => g.gameFamilyId).filter(Boolean)
+          ).size;
+          if (familyCount > 1) {
+            return {
+              success: false,
+              gameVersionId: null,
+              error: {
+                code: ErrorCode.VALIDATION_ERROR,
+                message:
+                  "This version is shared by multiple games; a version cover would show on all of them. Set the cover on the specific game's platform override instead.",
+                field: "coverUrl",
+              },
+            };
+          }
+        }
+        updateData.coverUrl = trimmedCover;
       }
 
       if (input.releaseDate !== undefined) {
