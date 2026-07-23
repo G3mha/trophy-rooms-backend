@@ -35,6 +35,9 @@ const GlobalSearchItem = builder.objectRef<{
   title: string;
   coverUrl: string | null;
   subtitle: string | null;
+  typeLabel: string | null;
+  platformSlugs: string[];
+  releaseYear: number | null;
 }>("GlobalSearchItem");
 
 GlobalSearchItem.implement({
@@ -44,6 +47,9 @@ GlobalSearchItem.implement({
     title: t.exposeString("title"),
     coverUrl: t.exposeString("coverUrl", { nullable: true }),
     subtitle: t.exposeString("subtitle", { nullable: true }),
+    typeLabel: t.exposeString("typeLabel", { nullable: true }),
+    platformSlugs: t.exposeStringList("platformSlugs"),
+    releaseYear: t.exposeInt("releaseYear", { nullable: true }),
   }),
 });
 
@@ -55,6 +61,9 @@ const GlobalSearchResults = builder.objectRef<{
     title: string;
     coverUrl: string | null;
     subtitle: string | null;
+    typeLabel: string | null;
+    platformSlugs: string[];
+    releaseYear: number | null;
   }>;
   gameCount: number;
   bundleCount: number;
@@ -118,7 +127,7 @@ builder.queryField("globalSearch", (t) =>
                 games: {
                   select: {
                     releaseDate: true,
-                    platform: { select: { name: true } },
+                    platform: { select: { name: true, slug: true } },
                   },
                   orderBy: { releaseDate: "asc" },
                 },
@@ -134,7 +143,7 @@ builder.queryField("globalSearch", (t) =>
                 coverUrl: true,
                 type: true,
                 releaseDate: true,
-                platforms: { select: { name: true } },
+                platforms: { select: { name: true, slug: true } },
               },
             })
           : [],
@@ -151,18 +160,20 @@ builder.queryField("globalSearch", (t) =>
       // Transform to unified format, with subtitles like
       // "Wii U · Nintendo Switch · 2013" or "Collection · Nintendo Switch · 2021"
       const gameItems = gameFamilies.map((gf) => {
-        const platformNames = [
-          ...new Set(
-            gf.games
-              .map((g) => g.platform?.name)
-              .filter((name): name is string => Boolean(name))
-          ),
-        ];
+        const platforms = gf.games
+          .map((g) => g.platform)
+          .filter(
+            (platform): platform is { name: string; slug: string } =>
+              Boolean(platform)
+          );
+        const platformNames = [...new Set(platforms.map((p) => p.name))];
+        const platformSlugs = [...new Set(platforms.map((p) => p.slug))];
         const year = gf.games
           .find((g) => g.releaseDate)
           ?.releaseDate?.getFullYear();
+        const typeLabel = GAME_TYPE_LABELS[gf.type] ?? null;
         const parts = [
-          GAME_TYPE_LABELS[gf.type],
+          typeLabel,
           ...platformNames,
           year?.toString(),
         ].filter((part): part is string => Boolean(part));
@@ -173,14 +184,19 @@ builder.queryField("globalSearch", (t) =>
           title: gf.title,
           coverUrl: gf.coverUrl,
           subtitle: parts.length > 0 ? parts.join(" · ") : null,
+          typeLabel,
+          platformSlugs,
+          releaseYear: year ?? null,
         };
       });
 
       const bundleItems = bundles.map((b) => {
+        const typeLabel = BUNDLE_TYPE_LABELS[b.type] ?? "Bundle";
+        const year = b.releaseDate?.getFullYear();
         const parts = [
-          BUNDLE_TYPE_LABELS[b.type] ?? "Bundle",
+          typeLabel,
           ...b.platforms.map((p) => p.name),
-          b.releaseDate?.getFullYear().toString(),
+          year?.toString(),
         ].filter((part): part is string => Boolean(part));
 
         return {
@@ -189,6 +205,9 @@ builder.queryField("globalSearch", (t) =>
           title: b.name,
           coverUrl: b.coverUrl,
           subtitle: parts.join(" · "),
+          typeLabel,
+          platformSlugs: b.platforms.map((p) => p.slug),
+          releaseYear: year ?? null,
         };
       });
 
@@ -198,6 +217,9 @@ builder.queryField("globalSearch", (t) =>
         title: d.name,
         coverUrl: d.coverUrl,
         subtitle: d.gameFamily ? `DLC for ${d.gameFamily.title}` : "DLC",
+        typeLabel: null,
+        platformSlugs: [],
+        releaseYear: null,
       }));
 
       // Combine and limit results
