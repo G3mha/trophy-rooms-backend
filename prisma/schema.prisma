@@ -194,6 +194,7 @@ model Game {
   platformId  String?
   releaseDate DateTime? // Platform-specific release date
   coverUrl    String? // Platform-specific cover override
+  description String? // Platform-specific description override (e.g. a remake's own text)
 
   trophies            Trophy[]
   userGames           UserGame[]

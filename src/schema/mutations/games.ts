@@ -160,6 +160,7 @@ builder.mutationField("createGame", (t) =>
         baseGameFamilyIds,
         platformReleaseDate,
         platformCoverUrl,
+        platformDescription,
       } = args.input;
       const platformId = args.input.platformId ?? null;
       const gameType = type ?? GameType.BASE_GAME;
@@ -258,6 +259,7 @@ builder.mutationField("createGame", (t) =>
           platformId,
           releaseDate: platformReleaseDate ?? releaseDate ?? null,
           coverUrl: platformCoverUrl?.trim() || null,
+          description: platformDescription?.trim() || null,
         },
       });
 
@@ -376,6 +378,7 @@ builder.mutationField("updateGame", (t) =>
         platformId?: string | null;
         releaseDate?: Date | null;
         coverUrl?: string | null;
+        description?: string | null;
       } = {};
 
       if (input.title !== undefined && input.title !== null) {
@@ -519,6 +522,10 @@ builder.mutationField("updateGame", (t) =>
 
       if (input.platformCoverUrl !== undefined) {
         gameUpdateData.coverUrl = input.platformCoverUrl?.trim() || null;
+      }
+
+      if (input.platformDescription !== undefined) {
+        gameUpdateData.description = input.platformDescription?.trim() || null;
       }
 
       // Update GameFamily if there are family updates

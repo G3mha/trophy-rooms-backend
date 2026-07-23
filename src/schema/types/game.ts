@@ -25,9 +25,11 @@ builder.prismaObject("Game", {
         return family?.title ?? "Unknown";
       },
     }),
+    // Platform-specific description override, falls back to family description
     description: t.string({
       nullable: true,
       resolve: async (game, _args, ctx) => {
+        if (game.description) return game.description;
         if (!game.gameFamilyId) return null;
         const family = await ctx.prisma.gameFamily.findUnique({
           where: { id: game.gameFamilyId },
@@ -362,6 +364,7 @@ export const CreateGameInput = builder.inputType("CreateGameInput", {
     platformId: t.id(),
     platformReleaseDate: t.field({ type: "DateTime" }),
     platformCoverUrl: t.string(),
+    platformDescription: t.string(),
   }),
 });
 
@@ -384,6 +387,7 @@ export const UpdateGameInput = builder.inputType("UpdateGameInput", {
     platformId: t.id(),
     platformReleaseDate: t.field({ type: "DateTime" }),
     platformCoverUrl: t.string(),
+    platformDescription: t.string(),
   }),
 });
 
