@@ -55,6 +55,7 @@ Game metadata (covers, descriptions, release dates) comes from IGDB via `src/lib
 - **GameFamily**: Canonical game metadata (title, description, cover). One per game regardless of platforms.
 - **Game**: Platform-specific instance. Links a GameFamily to a Platform with optional version, cover override, and description override (use the description override when a same-family remake deserves its own text, e.g. Link's Awakening on Switch).
 - **GameVersion**: Shared edition label ("Standard", "Deluxe Edition", "Remastered", "Vengeance Edition") linked to Games many-to-many. Its `releaseDate` is the canonical (first) release; when an edition ships on different dates per platform, add a `GameVersionReleaseDate` override per (game, version) - same override philosophy as Game.coverUrl over GameFamily.coverUrl. Read via `GameVersion.releaseDateFor(gameId)`.
+- **GameVersion covers**: a version may carry `coverUrl` ONLY while it belongs to a single game family. A shared version's one cover would display on every linked game (e.g. RE7's Gold box on Village's Gold Edition). The mutations enforce this; per-SKU art for shared editions goes on each Game's platform cover override.
 
 ### Nintendo Switch 2 Enhanced Editions
 
