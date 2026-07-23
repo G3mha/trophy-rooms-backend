@@ -5,6 +5,22 @@ import {
 } from "@prisma/client";
 import { builder } from "../builder.js";
 
+builder.queryField("achievementSet", (t) =>
+  t.prismaField({
+    type: "AchievementSet",
+    nullable: true,
+    args: {
+      id: t.arg.id({ required: true }),
+    },
+    resolve: async (query, _root, args, ctx) => {
+      return ctx.prisma.achievementSet.findUnique({
+        ...query,
+        where: { id: String(args.id) },
+      });
+    },
+  })
+);
+
 builder.queryField("achievementSets", (t) =>
   t.prismaField({
     type: ["AchievementSet"],

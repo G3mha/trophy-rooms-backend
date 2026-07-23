@@ -118,6 +118,23 @@ builder.prismaObject("Game", {
       },
     }),
 
+    // Base game families of this game's family (fangames, ROM hacks, mods)
+    baseGameFamilies: t.prismaField({
+      type: ["GameFamily"],
+      resolve: async (query, game, _args, ctx) => {
+        if (!game.gameFamilyId) return [];
+        const family = await ctx.prisma.gameFamily.findUnique({
+          where: { id: game.gameFamilyId },
+          include: { baseGameFamilies: { select: { id: true } } },
+        });
+        if (!family || family.baseGameFamilies.length === 0) return [];
+        return ctx.prisma.gameFamily.findMany({
+          ...query,
+          where: { id: { in: family.baseGameFamilies.map((f) => f.id) } },
+        });
+      },
+    }),
+
     // Base games via family
     baseGames: t.prismaField({
       type: ["Game"],
