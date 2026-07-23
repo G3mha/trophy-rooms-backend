@@ -161,6 +161,7 @@ builder.queryField("myGamesByStatus", (t) =>
             select: {
               id: true,
               name: true,
+              coverUrl: true,
             },
           },
         },
@@ -204,7 +205,12 @@ builder.queryField("myGamesByStatus", (t) =>
         id: item.id,
         gameId: item.game.id,
         gameTitle: item.game.gameFamily?.title ?? "Unknown",
-        gameCoverUrl: item.game.coverUrl ?? item.game.gameFamily?.coverUrl ?? null,
+        // The owned version's art wins over the game/family default
+        gameCoverUrl:
+          item.gameVersion?.coverUrl ??
+          item.game.coverUrl ??
+          item.game.gameFamily?.coverUrl ??
+          null,
         gameDescription: item.game.gameFamily?.description ?? null,
         achievementCount: item.game.gameFamilyId ? familyAchievementMap.get(item.game.gameFamilyId) || 0 : 0,
         platformId: item.platform?.id ?? null,
