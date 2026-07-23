@@ -125,3 +125,5 @@ Do NOT add NSO as a platform or create entries for NSO releases. NSO does not of
 ### Backward Compatibility
 
 Do NOT create Game entries for platforms that merely play a game via backward compatibility (e.g., a Switch game playable on Switch 2, a PS4 game playable on PS5). A Game entry requires an actual platform release that can be owned. Only create the newer platform's entry when a distinct edition exists for it (see the Switch 2 Enhanced Editions rules).
+
+Playing on a backward-compatible platform is still representable in the Library: `UserGame.platformId` records where the user PLAYS (it is independent of the referenced Game's native platform), so a Switch cart owned in the Collection can have a Library entry marked as played on Switch 2. The iOS status picker offers all platforms for exactly this reason.
