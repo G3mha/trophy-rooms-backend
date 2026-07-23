@@ -105,7 +105,10 @@ builder.queryField("globalSearch", (t) =>
       }
 
       const searchLimit = Math.min(limit ?? 20, 50);
-      const perTypeLimit = Math.ceil(searchLimit / 3);
+      // Each type gets the full budget - games dominate results and an even
+      // three-way split starves franchise searches (e.g. "Metroid" has 17
+      // game families). The combined slice below still bounds the total.
+      const perTypeLimit = searchLimit;
 
       // Search all types in parallel
       const [gameFamilyIds, bundleIds, dlcIds] = await Promise.all([
