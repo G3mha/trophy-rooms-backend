@@ -106,6 +106,7 @@ model User {
   trophies        Trophy[]
   userGames       UserGame[]
   collectionItems CollectionItem[]
+  playSessions    PlaySession[]
   achievementSets AchievementSet[]  @relation("AchievementSetCreator")
   ownedDlcs       UserDLC[]
   buylistItems    BuylistItem[]
@@ -202,6 +203,7 @@ model Game {
   versions            GameVersion[]            @relation("GameVersionGames")
   versionReleaseDates GameVersionReleaseDate[]
   buylistItems        BuylistItem[]
+  playSessions        PlaySession[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
@@ -315,6 +317,25 @@ model Trophy {
 
   @@unique([userId, gameId])
   @@index([userId])
+  @@index([gameId])
+}
+
+model PlaySession {
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  game   Game   @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  gameId String
+
+  playedOn DateTime @db.Date // Day the session happened
+  minutes  Int // Time played in minutes
+  notes    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, playedOn])
+  @@index([userId, gameId])
   @@index([gameId])
 }
 
