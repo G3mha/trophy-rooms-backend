@@ -14,3 +14,4 @@ import "./bundles.js";
 import "./user-bundle.js";
 import "./buylist.js";
 import "./sell-list.js";
+import "./play-sessions.js";
