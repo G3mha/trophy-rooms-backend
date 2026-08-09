@@ -14,3 +14,4 @@ import "./buylist.js";
 import "./sell-list.js";
 import "./autocomplete.js";
 import "./global-search.js";
+import "./play-sessions.js";
