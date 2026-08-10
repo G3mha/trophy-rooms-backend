@@ -59,6 +59,25 @@ export async function createContext(request: Request): Promise<Context> {
         where: { supabaseId: identity.id },
       });
 
+      // Migration adoption: a Supabase identity whose (verified) email matches
+      // an account still keyed to its old Clerk id claims that account, so
+      // returning users keep their data without any manual remapping.
+      if (!user && identity.provider === "supabase" && identity.email) {
+        const existing = await prisma.user.findUnique({
+          where: { email: identity.email },
+        });
+        if (existing && existing.supabaseId.startsWith("user_")) {
+          user = await prisma.user.update({
+            where: { id: existing.id },
+            data: { supabaseId: identity.id },
+          });
+          logger.info(
+            { userId: user.id },
+            "Adopted Clerk-era account for Supabase identity"
+          );
+        }
+      }
+
       if (!user) {
         let email = identity.email;
         let name = identity.name;
