@@ -71,3 +71,15 @@ export function extractBearerToken(authHeader: string | null): string | null {
   }
   return authHeader.slice(7);
 }
+
+/// Permanently deletes a user from Clerk (used by account deletion).
+export async function deleteClerkUser(clerkId: string): Promise<boolean> {
+  try {
+    await clerkClient.users.deleteUser(clerkId);
+    return true;
+  } catch (error) {
+    logger.error({ error, clerkId }, "Failed to delete Clerk user");
+    return false;
+  }
+}
+
