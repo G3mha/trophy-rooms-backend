@@ -6,12 +6,40 @@ import {
   extractBearerToken,
   fetchClerkUserData,
 } from "./lib/clerk.js";
+import { verifySupabaseToken } from "./lib/supabase.js";
 import { logger } from "./lib/logger.js";
 
 export interface Context {
   prisma: PrismaClient;
   user: User | null;
-  clerkUserId: string | null;
+  authUserId: string | null;
+}
+
+interface AuthenticatedIdentity {
+  id: string;
+  email: string;
+  name: string | null;
+  provider: "supabase" | "clerk";
+}
+
+// Verifies the bearer token against Supabase first (target platform), then
+// Clerk (legacy, kept during the migration window so existing sessions keep
+// working). The User row is keyed by supabaseId, which holds a Clerk id for
+// accounts that have not re-authenticated through Supabase yet.
+async function resolveIdentity(
+  token: string
+): Promise<AuthenticatedIdentity | null> {
+  const supabaseUser = await verifySupabaseToken(token);
+  if (supabaseUser) {
+    return { ...supabaseUser, provider: "supabase" };
+  }
+
+  const clerkUser = await verifyClerkToken(token);
+  if (clerkUser) {
+    return { ...clerkUser, provider: "clerk" };
+  }
+
+  return null;
 }
 
 export async function createContext(request: Request): Promise<Context> {
@@ -19,42 +47,51 @@ export async function createContext(request: Request): Promise<Context> {
   const token = extractBearerToken(authHeader);
 
   let user: User | null = null;
-  let clerkUserId: string | null = null;
+  let authUserId: string | null = null;
 
   if (token) {
-    const clerkUser = await verifyClerkToken(token);
+    const identity = await resolveIdentity(token);
 
-    if (clerkUser) {
-      clerkUserId = clerkUser.id;
+    if (identity) {
+      authUserId = identity.id;
 
-      // Find or create user in database
       user = await prisma.user.findUnique({
-        where: { clerkId: clerkUser.id },
+        where: { supabaseId: identity.id },
       });
 
       if (!user) {
-        // Fetch full user data from Clerk API
-        const fullClerkUser = await fetchClerkUserData(clerkUser.id);
-        const userData = fullClerkUser ?? clerkUser;
+        let email = identity.email;
+        let name = identity.name;
+
+        if (identity.provider === "clerk") {
+          const fullClerkUser = await fetchClerkUserData(identity.id);
+          if (fullClerkUser) {
+            email = fullClerkUser.email;
+            name = fullClerkUser.name;
+          }
+        }
 
         // Create user on first authentication
         try {
           user = await prisma.user.create({
             data: {
-              clerkId: userData.id,
-              email: userData.email,
-              name: userData.name,
+              supabaseId: identity.id,
+              email,
+              name,
             },
           });
-          logger.info({ userId: user.id }, "Created new user from Clerk");
+          logger.info(
+            { userId: user.id, provider: identity.provider },
+            "Created new user"
+          );
         } catch (error) {
           // Handle race condition - user might have been created by another request
           user = await prisma.user.findUnique({
-            where: { clerkId: clerkUser.id },
+            where: { supabaseId: identity.id },
           });
           if (!user) {
             logger.error(
-              { error, clerkId: clerkUser.id },
+              { error, authUserId: identity.id },
               "Failed to create user"
             );
           }
@@ -66,7 +103,7 @@ export async function createContext(request: Request): Promise<Context> {
   return {
     prisma,
     user,
-    clerkUserId,
+    authUserId,
   };
 }
 

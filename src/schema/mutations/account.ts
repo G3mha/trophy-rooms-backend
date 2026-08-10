@@ -1,6 +1,11 @@
 import { builder, MutationErrorRef } from "../builder.js";
 import { ErrorCode } from "../../lib/errors.js";
 import { deleteClerkUser } from "../../lib/clerk.js";
+import { deleteSupabaseUser } from "../../lib/supabase.js";
+
+// Supabase auth ids are UUIDs; Clerk ids look like "user_...". Used to route
+// identity deletion during the migration window.
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const DeleteMyAccountResult = builder.objectRef<{
   success: boolean;
@@ -36,15 +41,17 @@ builder.mutationField("deleteMyAccount", (t) =>
         };
       }
 
-      const { id, clerkId } = ctx.user;
+      const { id, supabaseId } = ctx.user;
 
       // App data first (cascades wipe collection, library, journal, etc.);
-      // if the Clerk deletion then fails, the next authenticated request
+      // if the identity deletion then fails, the next authenticated request
       // recreates an empty user row and the deletion can be retried.
       await ctx.prisma.user.delete({ where: { id } });
 
-      const clerkDeleted = await deleteClerkUser(clerkId);
-      if (!clerkDeleted) {
+      const identityDeleted = UUID_PATTERN.test(supabaseId)
+        ? await deleteSupabaseUser(supabaseId)
+        : await deleteClerkUser(supabaseId);
+      if (!identityDeleted) {
         return {
           success: false,
           error: {
