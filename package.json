@@ -26,7 +26,6 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "@clerk/backend": "^1.21.0",
     "@pothos/core": "^4.3.0",
     "@pothos/plugin-prisma": "^4.3.0",
     "@pothos/plugin-relay": "^4.3.0",
