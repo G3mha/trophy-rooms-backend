@@ -10,6 +10,15 @@ const SearchResultType = builder.enumType("SearchResultType", {
   values: ["GAME", "BUNDLE", "DLC"] as const,
 });
 
+// findMany({ where: { id: { in: ids } } }) returns rows in arbitrary order;
+// restore the search ranking the id list carries.
+function orderByIds<T extends { id: string }>(rows: T[], ids: string[]): T[] {
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  return ids
+    .map((id) => byId.get(id))
+    .filter((row): row is T => row !== undefined);
+}
+
 // Human-readable labels for subtitle display. BASE_GAME is omitted (it is the
 // default; platforms and year are more useful there).
 const GAME_TYPE_LABELS: Record<string, string | null> = {
@@ -162,7 +171,7 @@ builder.queryField("globalSearch", (t) =>
 
       // Transform to unified format, with subtitles like
       // "Wii U · Nintendo Switch · 2013" or "Collection · Nintendo Switch · 2021"
-      const gameItems = gameFamilies.map((gf) => {
+      const gameItems = orderByIds(gameFamilies, gameFamilyIds).map((gf) => {
         const platforms = gf.games
           .map((g) => g.platform)
           .filter(
@@ -193,7 +202,7 @@ builder.queryField("globalSearch", (t) =>
         };
       });
 
-      const bundleItems = bundles.map((b) => {
+      const bundleItems = orderByIds(bundles, bundleIds).map((b) => {
         const typeLabel = BUNDLE_TYPE_LABELS[b.type] ?? "Bundle";
         const year = b.releaseDate?.getFullYear();
         const parts = [
@@ -214,7 +223,7 @@ builder.queryField("globalSearch", (t) =>
         };
       });
 
-      const dlcItems = dlcs.map((d) => ({
+      const dlcItems = orderByIds(dlcs, dlcIds).map((d) => ({
         id: d.id,
         type: "DLC" as const,
         title: d.name,
