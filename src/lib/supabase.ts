@@ -15,6 +15,13 @@ const jwks = createRemoteJWKSet(
   new URL(`${SUPABASE_URL}/auth/v1/.well-known/jwks.json`)
 );
 
+export function extractBearerToken(authHeader: string | null): string | null {
+  if (!authHeader?.startsWith("Bearer ")) {
+    return null;
+  }
+  return authHeader.slice(7);
+}
+
 export async function verifySupabaseToken(
   token: string
 ): Promise<SupabaseUser | null> {
@@ -39,7 +46,6 @@ export async function verifySupabaseToken(
       name,
     };
   } catch {
-    // Not a (valid) Supabase token - callers may try other verifiers
     return null;
   }
 }
