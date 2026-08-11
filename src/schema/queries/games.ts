@@ -115,7 +115,9 @@ builder.queryField("games", (t) =>
       }
 
       // Build order by clause
-      let orderByClause: Prisma.GameOrderByWithRelationInput;
+      let orderByClause:
+        | Prisma.GameOrderByWithRelationInput
+        | Prisma.GameOrderByWithRelationInput[];
 
       switch (orderBy) {
         case "TITLE_DESC":
@@ -128,7 +130,12 @@ builder.queryField("games", (t) =>
           orderByClause = { createdAt: "desc" };
           break;
         case "ACHIEVEMENT_COUNT_DESC":
-          orderByClause = { gameFamily: { achievementSets: { _count: "desc" } } };
+          // Title tiebreaker keeps the long tail of zero-set games in a
+          // sensible order instead of Postgres-arbitrary
+          orderByClause = [
+            { gameFamily: { achievementSets: { _count: "desc" } } },
+            { gameFamily: { title: "asc" } },
+          ];
           break;
         case "TROPHY_COUNT_DESC":
           orderByClause = { trophies: { _count: "desc" } };
@@ -460,7 +467,10 @@ builder.queryField("gamesPage", (t) =>
       }
 
       // Build order by clause
-      let orderByClause: Prisma.GameOrderByWithRelationInput | undefined;
+      let orderByClause:
+        | Prisma.GameOrderByWithRelationInput
+        | Prisma.GameOrderByWithRelationInput[]
+        | undefined;
 
       // When searching without explicit orderBy, preserve relevance order
       if (!searchMatchingIds || orderBy) {
@@ -475,7 +485,10 @@ builder.queryField("gamesPage", (t) =>
             orderByClause = { createdAt: "desc" };
             break;
           case "ACHIEVEMENT_COUNT_DESC":
-            orderByClause = { gameFamily: { achievementSets: { _count: "desc" } } };
+            orderByClause = [
+              { gameFamily: { achievementSets: { _count: "desc" } } },
+              { gameFamily: { title: "asc" } },
+            ];
             break;
           case "TROPHY_COUNT_DESC":
             orderByClause = { trophies: { _count: "desc" } };
