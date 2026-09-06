@@ -5,7 +5,6 @@ const ActivityFeedEntry = builder.objectRef<{
   id: string;
   userId: string;
   userName: string | null;
-  userEmail: string;
   achievementId: string;
   achievementTitle: string;
   achievementTier: string;
@@ -20,7 +19,6 @@ ActivityFeedEntry.implement({
     id: t.exposeString("id"),
     userId: t.exposeString("userId"),
     userName: t.exposeString("userName", { nullable: true }),
-    userEmail: t.exposeString("userEmail"),
     achievementId: t.exposeString("achievementId"),
     achievementTitle: t.exposeString("achievementTitle"),
     achievementTier: t.exposeString("achievementTier"),
@@ -36,7 +34,6 @@ const TrophyActivityEntry = builder.objectRef<{
   id: string;
   userId: string;
   userName: string | null;
-  userEmail: string;
   gameId: string;
   gameFamilyId: string;
   gameTitle: string;
@@ -48,7 +45,6 @@ TrophyActivityEntry.implement({
     id: t.exposeString("id"),
     userId: t.exposeString("userId"),
     userName: t.exposeString("userName", { nullable: true }),
-    userEmail: t.exposeString("userEmail"),
     gameId: t.exposeString("gameId"),
     gameFamilyId: t.exposeString("gameFamilyId"),
     gameTitle: t.exposeString("gameTitle"),
@@ -62,7 +58,6 @@ const CombinedActivityEntry = builder.objectRef<{
   type: "achievement" | "trophy";
   userId: string;
   userName: string | null;
-  userEmail: string;
   achievementId?: string;
   achievementTitle?: string;
   achievementTier?: string;
@@ -81,7 +76,6 @@ CombinedActivityEntry.implement({
     type: t.exposeString("type"),
     userId: t.exposeString("userId"),
     userName: t.exposeString("userName", { nullable: true }),
-    userEmail: t.exposeString("userEmail"),
     achievementId: t.exposeString("achievementId", { nullable: true }),
     achievementTitle: t.exposeString("achievementTitle", { nullable: true }),
     achievementTier: t.exposeString("achievementTier", { nullable: true }),
@@ -110,7 +104,7 @@ builder.queryField("recentAchievementActivity", (t) =>
         orderBy: { createdAt: "desc" },
         include: {
           user: {
-            select: { id: true, name: true, email: true },
+            select: { id: true, name: true },
           },
           achievement: {
             select: {
@@ -137,7 +131,6 @@ builder.queryField("recentAchievementActivity", (t) =>
         id: ua.id,
         userId: ua.user.id,
         userName: ua.user.name,
-        userEmail: ua.user.email,
         achievementId: ua.achievement.id,
         achievementTitle: ua.achievement.title,
         achievementTier: ua.achievement.tier,
@@ -165,7 +158,7 @@ builder.queryField("recentTrophyActivity", (t) =>
         orderBy: { createdAt: "desc" },
         include: {
           user: {
-            select: { id: true, name: true, email: true },
+            select: { id: true, name: true },
           },
           game: {
             select: {
@@ -183,7 +176,6 @@ builder.queryField("recentTrophyActivity", (t) =>
         id: t.id,
         userId: t.user.id,
         userName: t.user.name,
-        userEmail: t.user.email,
         gameId: t.game.id,
         gameFamilyId: t.game.gameFamily?.id ?? t.game.gameFamilyId ?? "",
         gameTitle: t.game.gameFamily?.title ?? "Unknown",
@@ -210,7 +202,7 @@ builder.queryField("activityFeed", (t) =>
           orderBy: { createdAt: "desc" },
           include: {
             user: {
-              select: { id: true, name: true, email: true },
+              select: { id: true, name: true },
             },
             achievement: {
               select: {
@@ -237,7 +229,7 @@ builder.queryField("activityFeed", (t) =>
           orderBy: { createdAt: "desc" },
           include: {
             user: {
-              select: { id: true, name: true, email: true },
+              select: { id: true, name: true },
             },
             game: {
               select: {
@@ -261,7 +253,6 @@ builder.queryField("activityFeed", (t) =>
         type: "achievement" | "trophy";
         userId: string;
         userName: string | null;
-        userEmail: string;
         achievementId?: string;
         achievementTitle?: string;
         achievementTier?: string;
@@ -277,7 +268,6 @@ builder.queryField("activityFeed", (t) =>
         type: "achievement" as const,
         userId: ua.user.id,
         userName: ua.user.name,
-        userEmail: ua.user.email,
         achievementId: ua.achievement.id,
         achievementTitle: ua.achievement.title,
         achievementTier: ua.achievement.tier,
@@ -292,7 +282,6 @@ builder.queryField("activityFeed", (t) =>
         type: "achievement" | "trophy";
         userId: string;
         userName: string | null;
-        userEmail: string;
         achievementId?: string;
         achievementTitle?: string;
         achievementTier?: string;
@@ -308,7 +297,6 @@ builder.queryField("activityFeed", (t) =>
         type: "trophy" as const,
         userId: t.user.id,
         userName: t.user.name,
-        userEmail: t.user.email,
         gameId: t.game.id,
         gameFamilyId: t.game.gameFamily?.id ?? t.game.gameFamilyId ?? "",
         gameTitle: t.game.gameFamily?.title ?? "Unknown",
