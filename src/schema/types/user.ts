@@ -35,13 +35,17 @@ builder.prismaObject("User", {
     // Email is PII. User is reachable from public queries (user(id:)) and
     // from public relations (Trophy.user, UserAchievement.user, ...), so the
     // field itself has to be gated rather than the queries that lead to it.
+    //
+    // Unauthorised callers get "" rather than null: shipped iOS builds decode
+    // this into a non-optional String, and a null fails the whole decode. Once
+    // the userEmail shim in ../deprecations.ts goes, this should return null.
     email: t.string({
       nullable: true,
       resolve: (user, _args, ctx) =>
         ctx.user?.id === user.id ||
         hasRequiredRole(ctx.user, UserRole.ADMIN)
           ? user.email
-          : null,
+          : "",
     }),
     name: t.exposeString("name", { nullable: true }),
     role: t.expose("role", { type: UserRole }),
