@@ -1,4 +1,5 @@
 import { builder } from "../builder.js";
+import { USER_EMAIL_DEPRECATION } from "../deprecations.js";
 
 // Leaderboard entry type
 const LeaderboardEntry = builder.objectRef<{
@@ -14,6 +15,11 @@ LeaderboardEntry.implement({
     rank: t.exposeInt("rank"),
     userId: t.exposeString("userId"),
     userName: t.exposeString("userName", { nullable: true }),
+    // Compatibility shim for shipped clients - see ../deprecations.js
+    userEmail: t.string({
+      deprecationReason: USER_EMAIL_DEPRECATION,
+      resolve: () => "",
+    }),
     value: t.exposeInt("value"),
     secondaryValue: t.exposeInt("secondaryValue", { nullable: true }),
   }),
@@ -35,6 +41,11 @@ FastestCompletionEntry.implement({
     rank: t.exposeInt("rank"),
     userId: t.exposeString("userId"),
     userName: t.exposeString("userName", { nullable: true }),
+    // Compatibility shim for shipped clients - see ../deprecations.js
+    userEmail: t.string({
+      deprecationReason: USER_EMAIL_DEPRECATION,
+      resolve: () => "",
+    }),
     gameId: t.exposeString("gameId"),
     gameTitle: t.exposeString("gameTitle"),
     completionTimeHours: t.exposeFloat("completionTimeHours"),
