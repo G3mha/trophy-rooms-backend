@@ -1,5 +1,6 @@
 import { builder } from "../builder.js";
 import { UserRole, AchievementTier } from "@prisma/client";
+import { hasRequiredRole } from "../../context.js";
 
 builder.enumType(UserRole, {
   name: "UserRole",
@@ -31,7 +32,17 @@ UserStats.implement({
 builder.prismaObject("User", {
   fields: (t) => ({
     id: t.exposeID("id"),
-    email: t.exposeString("email"),
+    // Email is PII. User is reachable from public queries (user(id:)) and
+    // from public relations (Trophy.user, UserAchievement.user, ...), so the
+    // field itself has to be gated rather than the queries that lead to it.
+    email: t.string({
+      nullable: true,
+      resolve: (user, _args, ctx) =>
+        ctx.user?.id === user.id ||
+        hasRequiredRole(ctx.user, UserRole.ADMIN)
+          ? user.email
+          : null,
+    }),
     name: t.exposeString("name", { nullable: true }),
     role: t.expose("role", { type: UserRole }),
     achievements: t.relation("achievements", {
