@@ -13,9 +13,11 @@ try {
 
 const prisma = new PrismaClient();
 
-const RA_KEY = process.env.RETROACHIEVEMENTS_API_KEY ??
-  process.env.RA_WEB_API_KEY ??
-  "oZawpVZlsExdHcejYYlPpUYZcyFzO4GD";
+const RETRO_API_KEY = process.env.RETROACHIEVEMENTS_API_KEY ?? process.env.RA_WEB_API_KEY;
+
+if (!RETRO_API_KEY) {
+  throw new Error("RETROACHIEVEMENTS_API_KEY or RA_WEB_API_KEY environment variable is required");
+}
 
 const SET_TITLE = "Completionist set";
 
@@ -53,7 +55,7 @@ function uniquifyTitles<T extends { title: string }>(items: T[]) {
 
 async function fetchRetroGame(retroGameId: number) {
   const response = await fetch(
-    `https://retroachievements.org/API/API_GetGameExtended.php?i=${retroGameId}&y=${RA_KEY}`
+    `https://retroachievements.org/API/API_GetGameExtended.php?i=${retroGameId}&y=${RETRO_API_KEY}`
   );
 
   if (!response.ok) {
