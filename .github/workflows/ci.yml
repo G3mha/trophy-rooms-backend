@@ -40,3 +40,15 @@ jobs:
       # `prisma generate` reads the schema only, so no DATABASE_URL is needed.
       - name: Build
         run: npm run build
+
+      # The build rewrites tracked generated sources (src/generated/pothos-types.ts).
+      # A dirty tree here means the committed copy is stale - typically a Prisma
+      # schema change that was not regenerated.
+      - name: Check generated files are up to date
+        run: |
+          if ! git diff --quiet; then
+            echo "::error::Build changed tracked files. Run 'npm run build' and commit the result."
+            git diff --stat
+            git diff
+            exit 1
+          fi
