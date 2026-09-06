@@ -11,11 +11,13 @@ export default defineRailway(() => {
     env: { DATABASE_URL: preserve(), DIRECT_URL: preserve(), FRONTEND_URL: preserve(), NODE_ENV: preserve(), NODE_OPTIONS: preserve(), REDIS_URL: preserve(), SUPABASE_SECRET_KEY: preserve(), SUPABASE_URL: preserve(), TWITCH_CLIENT_ID: preserve(), TWITCH_CLIENT_SECRET: preserve() },
   });
 
-  // Carried over from railway.json, which `railway config migrate` drops.
-  // railway.json set `builder: "DOCKERFILE"`, but the current Railway API no
-  // longer has that value (Builder is HEROKU | NIXPACKS | PAKETO | RAILPACK).
-  // Pointing at the Dockerfile explicitly is the supported equivalent.
-  trophyRoomsBackend.build = { dockerfilePath: "Dockerfile", buildEnvironment: "V3" };
+  // Carried over from railway.json, which `railway config migrate` drops: it
+  // emits the builder as a comment and omits the restart policy entirely.
+  // The GraphQL Builder enum no longer has a DOCKERFILE value (only HEROKU,
+  // NIXPACKS, PAKETO, RAILPACK), so dockerfilePath is what actually pins the
+  // Dockerfile build. Keep both: without `builder` here, `railway config plan`
+  // wants to null it.
+  trophyRoomsBackend.build = { builder: "DOCKERFILE", dockerfilePath: "Dockerfile", buildEnvironment: "V3" };
   trophyRoomsBackend.deploy = {
     healthcheckPath: "/health",
     restartPolicyType: "ON_FAILURE",
