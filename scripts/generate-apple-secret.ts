@@ -14,6 +14,12 @@
 import { readFileSync } from "node:fs";
 import { SignJWT, importPKCS8 } from "jose";
 
+try {
+  process.loadEnvFile?.();
+} catch {
+  // Ignore missing env file in deployed environments.
+}
+
 async function main() {
   const keyPath = process.env.APPLE_SIWA_KEY_PATH;
   const keyId = process.env.APPLE_SIWA_KEY_ID;
