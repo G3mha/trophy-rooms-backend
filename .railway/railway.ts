@@ -18,11 +18,19 @@ export default defineRailway(() => {
   // Dockerfile build. Keep both: without `builder` here, `railway config plan`
   // wants to null it.
   trophyRoomsBackend.build = { builder: "DOCKERFILE", dockerfilePath: "Dockerfile", buildEnvironment: "V3" };
-  // railway.json also set restartPolicyType ON_FAILURE / maxRetries 10, but
-  // those are the Railway defaults (the Redis service reports the same values
-  // and never had a config file). The importer omits fields at their default,
-  // so declaring them here produces a diff `plan` can never satisfy.
-  trophyRoomsBackend.deploy = { healthcheckPath: "/health" };
+  // The restart policy is pinned deliberately. ON_FAILURE / 10 are Railway's
+  // current defaults, and the graph exporter omits any field sitting at its
+  // default (verified: setting maxRetries to 9 makes it appear in
+  // `railway config pull`; 10 does not). So `railway config plan` will always
+  // report these two as pending. That diff is cosmetic - the service already
+  // holds these values and applying it is a no-op. Do not "fix" it by deleting
+  // these lines: they are here so a change to Railway's default cannot silently
+  // alter restart behaviour.
+  trophyRoomsBackend.deploy = {
+    healthcheckPath: "/health",
+    restartPolicyType: "ON_FAILURE",
+    restartPolicyMaxRetries: 10,
+  };
 
   return project("trophy-rooms", {
     resources: [Redis, trophyRoomsBackend, redisVolume],
