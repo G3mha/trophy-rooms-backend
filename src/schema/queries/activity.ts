@@ -1,4 +1,5 @@
 import { builder } from "../builder.js";
+import { USER_EMAIL_DEPRECATION } from "../deprecations.js";
 
 // Activity feed entry type
 const ActivityFeedEntry = builder.objectRef<{
@@ -19,6 +20,11 @@ ActivityFeedEntry.implement({
     id: t.exposeString("id"),
     userId: t.exposeString("userId"),
     userName: t.exposeString("userName", { nullable: true }),
+    // Compatibility shim for shipped clients - see ../deprecations.js
+    userEmail: t.string({
+      deprecationReason: USER_EMAIL_DEPRECATION,
+      resolve: () => "",
+    }),
     achievementId: t.exposeString("achievementId"),
     achievementTitle: t.exposeString("achievementTitle"),
     achievementTier: t.exposeString("achievementTier"),
@@ -45,6 +51,11 @@ TrophyActivityEntry.implement({
     id: t.exposeString("id"),
     userId: t.exposeString("userId"),
     userName: t.exposeString("userName", { nullable: true }),
+    // Compatibility shim for shipped clients - see ../deprecations.js
+    userEmail: t.string({
+      deprecationReason: USER_EMAIL_DEPRECATION,
+      resolve: () => "",
+    }),
     gameId: t.exposeString("gameId"),
     gameFamilyId: t.exposeString("gameFamilyId"),
     gameTitle: t.exposeString("gameTitle"),
@@ -76,6 +87,11 @@ CombinedActivityEntry.implement({
     type: t.exposeString("type"),
     userId: t.exposeString("userId"),
     userName: t.exposeString("userName", { nullable: true }),
+    // Compatibility shim for shipped clients - see ../deprecations.js
+    userEmail: t.string({
+      deprecationReason: USER_EMAIL_DEPRECATION,
+      resolve: () => "",
+    }),
     achievementId: t.exposeString("achievementId", { nullable: true }),
     achievementTitle: t.exposeString("achievementTitle", { nullable: true }),
     achievementTier: t.exposeString("achievementTier", { nullable: true }),
