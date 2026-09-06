@@ -18,11 +18,11 @@ export default defineRailway(() => {
   // Dockerfile build. Keep both: without `builder` here, `railway config plan`
   // wants to null it.
   trophyRoomsBackend.build = { builder: "DOCKERFILE", dockerfilePath: "Dockerfile", buildEnvironment: "V3" };
-  trophyRoomsBackend.deploy = {
-    healthcheckPath: "/health",
-    restartPolicyType: "ON_FAILURE",
-    restartPolicyMaxRetries: 10,
-  };
+  // railway.json also set restartPolicyType ON_FAILURE / maxRetries 10, but
+  // those are the Railway defaults (the Redis service reports the same values
+  // and never had a config file). The importer omits fields at their default,
+  // so declaring them here produces a diff `plan` can never satisfy.
+  trophyRoomsBackend.deploy = { healthcheckPath: "/health" };
 
   return project("trophy-rooms", {
     resources: [Redis, trophyRoomsBackend, redisVolume],
