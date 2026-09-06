@@ -5,7 +5,6 @@ const LeaderboardEntry = builder.objectRef<{
   rank: number;
   userId: string;
   userName: string | null;
-  userEmail: string;
   value: number;
   secondaryValue?: number;
 }>("LeaderboardEntry");
@@ -15,7 +14,6 @@ LeaderboardEntry.implement({
     rank: t.exposeInt("rank"),
     userId: t.exposeString("userId"),
     userName: t.exposeString("userName", { nullable: true }),
-    userEmail: t.exposeString("userEmail"),
     value: t.exposeInt("value"),
     secondaryValue: t.exposeInt("secondaryValue", { nullable: true }),
   }),
@@ -26,7 +24,6 @@ const FastestCompletionEntry = builder.objectRef<{
   rank: number;
   userId: string;
   userName: string | null;
-  userEmail: string;
   gameId: string;
   gameTitle: string;
   completionTimeHours: number;
@@ -38,7 +35,6 @@ FastestCompletionEntry.implement({
     rank: t.exposeInt("rank"),
     userId: t.exposeString("userId"),
     userName: t.exposeString("userName", { nullable: true }),
-    userEmail: t.exposeString("userEmail"),
     gameId: t.exposeString("gameId"),
     gameTitle: t.exposeString("gameTitle"),
     completionTimeHours: t.exposeFloat("completionTimeHours"),
@@ -66,7 +62,7 @@ builder.queryField("leaderboardByTrophies", (t) =>
       const userIds = results.map((r) => r.userId);
       const users = await ctx.prisma.user.findMany({
         where: { id: { in: userIds } },
-        select: { id: true, name: true, email: true },
+        select: { id: true, name: true },
       });
 
       const userMap = new Map(users.map((u) => [u.id, u]));
@@ -87,7 +83,6 @@ builder.queryField("leaderboardByTrophies", (t) =>
           rank: index + 1,
           userId: r.userId,
           userName: user?.name || null,
-          userEmail: user?.email || "",
           value: r._count.id,
           secondaryValue: achievementMap.get(r.userId) || 0,
         };
@@ -116,7 +111,7 @@ builder.queryField("leaderboardByAchievements", (t) =>
       const userIds = results.map((r) => r.userId);
       const users = await ctx.prisma.user.findMany({
         where: { id: { in: userIds } },
-        select: { id: true, name: true, email: true },
+        select: { id: true, name: true },
       });
 
       const userMap = new Map(users.map((u) => [u.id, u]));
@@ -137,7 +132,6 @@ builder.queryField("leaderboardByAchievements", (t) =>
           rank: index + 1,
           userId: r.userId,
           userName: user?.name || null,
-          userEmail: user?.email || "",
           value: r._count.id,
           secondaryValue: trophyMap.get(r.userId) || 0,
         };
@@ -181,7 +175,7 @@ builder.queryField("leaderboardByPoints", (t) =>
       const userIds = sortedUsers.map(([userId]) => userId);
       const users = await ctx.prisma.user.findMany({
         where: { id: { in: userIds } },
-        select: { id: true, name: true, email: true },
+        select: { id: true, name: true },
       });
 
       const userMap = new Map(users.map((u) => [u.id, u]));
@@ -202,7 +196,6 @@ builder.queryField("leaderboardByPoints", (t) =>
           rank: index + 1,
           userId,
           userName: user?.name || null,
-          userEmail: user?.email || "",
           value: points,
           secondaryValue: achievementMap.get(userId) || 0,
         };
@@ -224,7 +217,7 @@ builder.queryField("fastestCompletions", (t) =>
       // Get all trophies with their game info
       const trophies = await ctx.prisma.trophy.findMany({
         include: {
-          user: { select: { id: true, name: true, email: true } },
+          user: { select: { id: true, name: true } },
           game: {
             select: {
               id: true,
@@ -241,7 +234,6 @@ builder.queryField("fastestCompletions", (t) =>
         rank: number;
         userId: string;
         userName: string | null;
-        userEmail: string;
         gameId: string;
         gameTitle: string;
         completionTimeHours: number;
@@ -277,7 +269,6 @@ builder.queryField("fastestCompletions", (t) =>
               rank: 0,
               userId: trophy.user.id,
               userName: trophy.user.name,
-              userEmail: trophy.user.email,
               gameId: trophy.game.id,
               gameTitle: trophy.game.gameFamily?.title ?? "Unknown",
               completionTimeHours: Math.round(completionTimeHours * 10) / 10,
@@ -343,7 +334,7 @@ builder.queryField("leaderboardByGamesPlayed", (t) =>
       const userIds = sortedUsers.map((u) => u.userId);
       const users = await ctx.prisma.user.findMany({
         where: { id: { in: userIds } },
-        select: { id: true, name: true, email: true },
+        select: { id: true, name: true },
       });
 
       const userMap = new Map(users.map((u) => [u.id, u]));
@@ -364,7 +355,6 @@ builder.queryField("leaderboardByGamesPlayed", (t) =>
           rank: index + 1,
           userId: u.userId,
           userName: user?.name || null,
-          userEmail: user?.email || "",
           value: u.gamesCount,
           secondaryValue: trophyMap.get(u.userId) || 0,
         };
