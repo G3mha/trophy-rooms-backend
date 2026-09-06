@@ -1,7 +1,18 @@
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { logger } from "./logger.js";
 
-const SUPABASE_URL = process.env.SUPABASE_URL ?? "https://bsccjdiirlvpfwtqqbgz.supabase.co";
+// A wrong or missing project URL silently breaks every token verification, so
+// resolve it at boot: a misconfigured deploy fails its healthcheck instead of
+// rejecting logins against the wrong project.
+function requireSupabaseUrl(): string {
+  const url = process.env.SUPABASE_URL;
+  if (!url) {
+    throw new Error("SUPABASE_URL is required");
+  }
+  return url;
+}
+
+const SUPABASE_URL = requireSupabaseUrl();
 
 export interface SupabaseUser {
   id: string;
