@@ -1,4 +1,5 @@
-import { createYoga } from "graphql-yoga";
+import { createYoga, type Plugin } from "graphql-yoga";
+import { NoSchemaIntrospectionCustomRule } from "graphql";
 import { schema } from "./schema/index.js";
 import { createContext } from "./context.js";
 import { logger } from "./lib/logger.js";
@@ -13,6 +14,19 @@ function getCorsOrigins(): string[] {
 }
 
 const allowedOrigins = new Set(getCorsOrigins());
+
+const isDevelopment = process.env.NODE_ENV === "development";
+
+// Introspection hands a stranger the entire schema, including every admin
+// mutation and the shape of every type. It is a development convenience, so
+// it stays in development only. Setting graphiql to false hides the IDE but
+// does not stop an introspection query, which is why this rule exists as
+// well as that flag.
+const disableIntrospection: Plugin = {
+  onValidate({ addValidationRule }) {
+    addValidationRule(NoSchemaIntrospectionCustomRule);
+  },
+};
 
 function isAllowedOrigin(origin: string): boolean {
   if (allowedOrigins.has(origin)) return true;
@@ -86,9 +100,10 @@ export const yoga = createYoga({
     error: (...args) => logger.error(args, "GraphQL error"),
   },
   maskedErrors: {
-    isDev: process.env.NODE_ENV === "development",
+    isDev: isDevelopment,
   },
-  graphiql: {
+  plugins: isDevelopment ? [] : [disableIntrospection],
+  graphiql: isDevelopment && {
     title: "Trophy Rooms GraphQL API",
     defaultQuery: `# Welcome to Trophy Rooms GraphQL API
 #
