@@ -48,7 +48,22 @@ builder.prismaObject("User", {
           : "",
     }),
     name: t.exposeString("name", { nullable: true }),
-    role: t.expose("role", { type: UserRole }),
+    // Role tells a caller which accounts are worth attacking, so it is gated
+    // the same way email is, and for the same reason: User is reachable from
+    // the public user(id:) query and from public relations, so the field has
+    // to carry the check rather than the queries leading to it.
+    //
+    // Unauthorised callers get USER rather than null. Both shipped clients
+    // decode this into a non-optional enum (Models.swift declares
+    // `let role: UserRole` twice), so null would fail the whole decode.
+    // USER is the least-privileged value and is what most accounts are.
+    role: t.field({
+      type: UserRole,
+      resolve: (user, _args, ctx) =>
+        ctx.user?.id === user.id || hasRequiredRole(ctx.user, UserRole.ADMIN)
+          ? user.role
+          : UserRole.USER,
+    }),
     achievements: t.relation("achievements", {
       query: {
         orderBy: { createdAt: "desc" },
