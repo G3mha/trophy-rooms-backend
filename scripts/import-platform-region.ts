@@ -4,7 +4,9 @@ import {
   getCoverUrl,
   IGDBGameCategory,
   IGDB_PLATFORM_MAP,
+  isShippedRelease,
   type IGDBGame,
+  type IGDBReleaseDate,
 } from "../src/lib/igdb.js";
 
 const prisma = new PrismaClient();
@@ -30,10 +32,25 @@ const IGDB_RELEASE_REGION_IDS: Record<string, { id: number; name: string }> = {
   brazil: { id: 10, name: "Brazil" },
 };
 
-interface IGDBReleaseDate {
+interface IGDBGameReleaseDate extends IGDBReleaseDate {
   game: number;
-  date?: number;
   release_region?: number;
+}
+
+// Keep each game's earliest shipped release. Cancelled, alpha, beta and
+// next-gen patch releases don't count (isShippedRelease), so a game with only
+// those, or only undated entries, is left out of the import instead of
+// arriving with a date it never shipped on.
+function recordEarliestShippedRelease(
+  earliestByGame: Map<number, number>,
+  releaseDates: IGDBGameReleaseDate[]
+) {
+  for (const release of releaseDates.filter(isShippedRelease)) {
+    const current = earliestByGame.get(release.game);
+    if (current === undefined || release.date < current) {
+      earliestByGame.set(release.game, release.date);
+    }
+  }
 }
 
 const WESTERN_RELEASE_REGION_IDS = [1, 2, 3, 4, 8, 10];
@@ -178,27 +195,23 @@ async function fetchAllReleaseDatesForPlatformRegion(
   igdbPlatformIds: number[],
   regionId: number,
   limit?: number
-): Promise<Map<number, number | null>> {
-  const gameReleaseMap = new Map<number, number | null>();
+): Promise<Map<number, number>> {
+  const gameReleaseMap = new Map<number, number>();
   let offset = 0;
   const pageSize = 500;
   let hasMore = true;
 
   while (hasMore) {
     const query = `
-      fields game, date;
+      fields game, date, platform, status.name;
       where game.platforms = (${igdbPlatformIds.join(", ")}) & release_region = ${regionId};
       sort date asc;
       offset ${offset};
       limit ${pageSize};
     `;
 
-    const releaseDates = await igdbRequest<IGDBReleaseDate[]>("release_dates", query);
-    for (const releaseDate of releaseDates) {
-      if (!gameReleaseMap.has(releaseDate.game)) {
-        gameReleaseMap.set(releaseDate.game, releaseDate.date ?? null);
-      }
-    }
+    const releaseDates = await igdbRequest<IGDBGameReleaseDate[]>("release_dates", query);
+    recordEarliestShippedRelease(gameReleaseMap, releaseDates);
 
     process.stdout.write(`\r   Fetched ${gameReleaseMap.size} unique release entries...`);
 
@@ -224,12 +237,12 @@ async function fetchAllReleaseDatesForPlatformRegion(
 async function fetchReleaseDatesByRegionsForGames(
   gameIds: number[],
   regionIds: number[]
-): Promise<Map<number, number | null>> {
+): Promise<Map<number, number>> {
   if (gameIds.length === 0) {
     return new Map();
   }
 
-  const releaseDatesByGame = new Map<number, number | null>();
+  const releaseDatesByGame = new Map<number, number>();
   const chunkSize = 200;
 
   const pageSize = 500;
@@ -241,19 +254,15 @@ async function fetchReleaseDatesByRegionsForGames(
     // 200 PS4 games have about 1,000), so page until IGDB runs out
     for (let offset = 0; ; offset += pageSize) {
       const query = `
-        fields game, date, release_region;
+        fields game, date, release_region, platform, status.name;
         where game = (${chunk.join(", ")}) & release_region = (${regionIds.join(", ")});
         sort date asc;
         offset ${offset};
         limit ${pageSize};
       `;
 
-      const releaseDates = await igdbRequest<IGDBReleaseDate[]>("release_dates", query);
-      for (const releaseDate of releaseDates) {
-        if (!releaseDatesByGame.has(releaseDate.game)) {
-          releaseDatesByGame.set(releaseDate.game, releaseDate.date ?? null);
-        }
-      }
+      const releaseDates = await igdbRequest<IGDBGameReleaseDate[]>("release_dates", query);
+      recordEarliestShippedRelease(releaseDatesByGame, releaseDates);
 
       await new Promise((resolve) => setTimeout(resolve, 250));
       if (releaseDates.length < pageSize) break;
@@ -409,7 +418,7 @@ async function main() {
   console.log(`Resolved IGDB platform IDs: ${igdbPlatformIds.join(", ")}`);
   console.log("");
 
-  let releaseDates = new Map<number, number | null>();
+  let releaseDates = new Map<number, number>();
   let igdbGames: IGDBGame[] = [];
 
   if (regionSlug) {
@@ -447,7 +456,7 @@ async function main() {
 
     const westernReleaseFilteredGames = igdbGames.filter((game) => releaseDates.has(game.id));
     const excludedWithoutWesternRelease = igdbGames.length - westernReleaseFilteredGames.length;
-    console.log(`Excluded ${excludedWithoutWesternRelease} titles without a Western release`);
+    console.log(`Excluded ${excludedWithoutWesternRelease} titles without a shipped Western release`);
     igdbGames = westernReleaseFilteredGames;
   }
 
