@@ -2,11 +2,16 @@
  * Delete Game rows for platform releases that were cancelled.
  *
  * A Game entry needs a platform release someone can own (see CLAUDE.md,
- * Backward Compatibility). check-family-release-dates.ts found these 29
- * editions marked Cancelled on IGDB on 2026-10-05. Most came in because the
- * importer adds a game to an existing family by title, so a cancelled game
- * landed inside a released one that shares its name (the 2007 Dirty Harry,
- * IGDB #78566, inside the 1990 NES family).
+ * Backward Compatibility). The editions come from a JSON file written by
+ * check-family-release-dates.ts --cancelled-out, which marks an edition
+ * cancelled when IGDB has no shipped release for it on that platform and
+ * records the release, or the whole game, as Cancelled. Most of these came in
+ * because the importer counted cancelled releases as releases, and because it
+ * adds a game to an existing family by title, so a cancelled game could land
+ * inside a released one that shares its name (the 2007 Dirty Harry, IGDB
+ * #78566, inside the 1990 NES family). Lists that have been applied are kept
+ * in scripts/data/; the first batch of 29 is in this file's history at
+ * ac34ff8.
  *
  * Families left with no games are deleted too. Everything is checked again
  * inside the delete transaction: the script stops if any edition doesn't
@@ -15,46 +20,37 @@
  * achievement sets, DLC, buylist entries, bundles or base/derived links.
  *
  * Usage:
- *   npx tsx scripts/fix-cancelled-editions.ts           # dry run, prints the plan
- *   npx tsx scripts/fix-cancelled-editions.ts --apply   # deletes, in one transaction
+ *   npx tsx scripts/fix-cancelled-editions.ts --editions <file>           # dry run, prints the plan
+ *   npx tsx scripts/fix-cancelled-editions.ts --editions <file> --apply   # deletes, in one transaction
  */
 
+import { readFileSync } from "node:fs";
 import { Prisma, PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-// [family slug, platform name, IGDB game the cancellation is recorded on]
-const CANCELLED_EDITIONS: Array<[string, string, string]> = [
-  ["100-bullets", "Game Boy Advance", "100-bullets #90935"],
-  ["100-bullets", "Nintendo DS", "100-bullets #90935"],
-  ["100-bullets", "PlayStation 2", "100-bullets #90935"],
-  ["100-bullets", "PlayStation Portable", "100-bullets #90935"],
-  ["air-nights", "Dreamcast", "air-nights #145516"],
-  ["air-nights", "Sega Saturn", "air-nights #145516"],
-  ["dirty-harry-1", "PlayStation 2", "dirty-harry--1 #78566"],
-  ["dirty-harry-1", "PlayStation Portable", "dirty-harry--1 #78566"],
-  ["dirty-harry-excessive-force", "PlayStation 2", "dirty-harry-excessive-force #291010"],
-  ["dirty-harry-excessive-force", "PlayStation Portable", "dirty-harry-excessive-force #291010"],
-  ["gauntlet-3", "Nintendo DS", "gauntlet--3 #81204"],
-  ["journey-to-the-center-of-the-earth-4", "Game Boy", "journey-to-the-center-of-the-earth--7 #350128"],
-  ["kameo-elements-of-power", "Nintendo 64", "kameo-elements-of-power--1 #279354"],
-  ["omikron-2-nomad-soul-exodus", "Dreamcast", "omikron-2-nomad-soul-exodus #67717"],
-  ["omikron-2-nomad-soul-exodus", "PlayStation 2", "omikron-2-nomad-soul-exodus #67717"],
-  ["rayman-2", "PlayStation", "rayman-2 #193310"],
-  ["rayman-2", "Sega Saturn", "rayman-2 #193310"],
-  ["the-incredible-shrinking-character", "PlayStation", "the-incredible-shrinking-character #287836"],
-  ["the-incredible-shrinking-character", "Sega Saturn", "the-incredible-shrinking-character #287836"],
-  ["the-sacred-pools", "PlayStation", "the-sacred-pools #223823"],
-  ["the-sacred-pools", "Sega Saturn", "the-sacred-pools #223823"],
-  ["too-human-1", "GameCube", "too-human--1 #292152"],
-  ["too-human-1", "PlayStation", "too-human--1 #292152"],
-  ["wacky-races-3", "Sega Genesis", "wacky-races--4 #214981"],
-  ["x", "Super Nintendo", "x--1 #172448"],
-  ["x10", "GameCube", "x10 #307828"],
-  ["x10", "PlayStation 2", "x10 #307828"],
-  ["x10", "Xbox", "x10 #307828"],
-  ["yoshi-touch-and-go", "GameCube", "yoshi-touch-and-go--1 #231475"],
-];
+interface CancelledEdition {
+  family: string;
+  platform: string;
+  // IGDB game(s) the cancellation is recorded on, for the log
+  igdb: string;
+}
+
+function readEditions(path: string): CancelledEdition[] {
+  const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
+  if (
+    !Array.isArray(parsed) ||
+    !parsed.every(
+      (entry) =>
+        typeof entry?.family === "string" &&
+        typeof entry?.platform === "string" &&
+        typeof entry?.igdb === "string"
+    )
+  ) {
+    throw new Error(`${path} must be an array of { family, platform, igdb } strings`);
+  }
+  return parsed as CancelledEdition[];
+}
 
 interface Plan {
   gameIds: string[];
@@ -62,12 +58,12 @@ interface Plan {
   problems: string[];
 }
 
-async function buildPlan(db: Prisma.TransactionClient): Promise<Plan> {
+async function buildPlan(db: Prisma.TransactionClient, editions: CancelledEdition[]): Promise<Plan> {
   const problems: string[] = [];
   const gameIds: string[] = [];
   const familyIdsTouched = new Set<string>();
 
-  for (const [familySlug, platformName, igdbSource] of CANCELLED_EDITIONS) {
+  for (const { family: familySlug, platform: platformName, igdb: igdbSource } of editions) {
     const games = await db.game.findMany({
       where: { gameFamily: { slug: familySlug }, platform: { name: platformName } },
       select: {
@@ -145,9 +141,9 @@ async function buildPlan(db: Prisma.TransactionClient): Promise<Plan> {
   return { gameIds, familyIds, problems };
 }
 
-function report(plan: Plan) {
+function report(plan: Plan, editions: CancelledEdition[]) {
   console.log("");
-  console.log(`Editions listed: ${CANCELLED_EDITIONS.length}`);
+  console.log(`Editions listed: ${editions.length}`);
   console.log(`Games to delete: ${plan.gameIds.length}`);
   console.log(`Families to delete: ${plan.familyIds.length}`);
   if (plan.problems.length > 0) {
@@ -157,7 +153,16 @@ function report(plan: Plan) {
 }
 
 async function main() {
-  const apply = process.argv.slice(2).includes("--apply");
+  const args = process.argv.slice(2);
+  const apply = args.includes("--apply");
+  const editionsIndex = args.indexOf("--editions");
+  const editionsPath = editionsIndex >= 0 ? args[editionsIndex + 1] : undefined;
+  if (!editionsPath) {
+    console.error("Usage: npx tsx scripts/fix-cancelled-editions.ts --editions <file> [--apply]");
+    process.exitCode = 1;
+    return;
+  }
+  const editions = readEditions(editionsPath);
 
   console.log("=== Fix Cancelled Editions ===\n");
   console.log(`Mode: ${apply ? "apply" : "dry run"}`);
@@ -165,18 +170,19 @@ async function main() {
   if (databaseUrl) {
     console.log(`Database host: ${new URL(databaseUrl).host}`);
   }
+  console.log(`Editions file: ${editionsPath}`);
   console.log("");
 
   if (!apply) {
-    report(await buildPlan(prisma));
+    report(await buildPlan(prisma, editions), editions);
     console.log("\n[DRY RUN] Nothing was deleted. Run with --apply to delete.");
     return;
   }
 
   const result = await prisma.$transaction(
     async (tx) => {
-      const plan = await buildPlan(tx);
-      report(plan);
+      const plan = await buildPlan(tx, editions);
+      report(plan, editions);
       if (plan.problems.length > 0) {
         throw new Error("Stopped before deleting anything. See problems above.");
       }
