@@ -6,6 +6,7 @@ import {
 } from "../types/achievement-set.js";
 import { ErrorCode } from "../../lib/errors.js";
 import { hasRequiredRole } from "../../context.js";
+import { invalidateAchievementCaches } from "../../lib/cache.js";
 import {
   AchievementSetVisibility,
   AchievementSetType,
@@ -350,6 +351,13 @@ builder.mutationField("updateAchievementSet", (t) =>
         data: updateData,
       });
 
+      // Cached search results are shared by every viewer; drop them before
+      // responding when a set's visibility may have changed, so a set made
+      // private can't linger in anyone's suggestions
+      if (updateData.visibility !== undefined) {
+        await invalidateAchievementCaches().catch(() => {});
+      }
+
       return {
         success: true,
         achievementSetId: updated.id,
@@ -427,6 +435,8 @@ builder.mutationField("publishAchievementSet", (t) =>
           visibility: AchievementSetVisibility.PUBLIC,
         },
       });
+
+      await invalidateAchievementCaches().catch(() => {});
 
       return {
         success: true,
@@ -569,6 +579,8 @@ builder.mutationField("setAchievementSetType", (t) =>
               : AchievementSetVisibility.PUBLIC,
         },
       });
+
+      await invalidateAchievementCaches().catch(() => {});
 
       return {
         success: true,
