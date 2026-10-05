@@ -5,7 +5,7 @@ import {
   UserAchievementMutationResult,
   DeleteResult,
 } from "../types/user-achievement.js";
-import { AchievementSetType, AchievementSetVisibility } from "@prisma/client";
+import { trophyEligibleSetWhere } from "../../lib/trophies.js";
 
 // Mark achievement as complete
 builder.mutationField("markAchievementComplete", (t) =>
@@ -100,10 +100,7 @@ builder.mutationField("markAchievementComplete", (t) =>
           where: {
             achievementSet: {
               gameFamilyId,
-              OR: [
-                { type: { in: [AchievementSetType.OFFICIAL, AchievementSetType.COMPLETIONIST] } },
-                { type: AchievementSetType.CUSTOM, visibility: AchievementSetVisibility.PUBLIC },
-              ],
+              ...trophyEligibleSetWhere,
             },
           },
         });
@@ -115,10 +112,7 @@ builder.mutationField("markAchievementComplete", (t) =>
               achievement: {
                 achievementSet: {
                   gameFamilyId,
-                  OR: [
-                    { type: { in: [AchievementSetType.OFFICIAL, AchievementSetType.COMPLETIONIST] } },
-                    { type: AchievementSetType.CUSTOM, visibility: AchievementSetVisibility.PUBLIC },
-                  ],
+                  ...trophyEligibleSetWhere,
                 },
               },
             },
@@ -228,10 +222,7 @@ builder.mutationField("unmarkAchievementComplete", (t) =>
           where: {
             achievementSet: {
               gameFamilyId,
-              OR: [
-                { type: { in: [AchievementSetType.OFFICIAL, AchievementSetType.COMPLETIONIST] } },
-                { type: AchievementSetType.CUSTOM, visibility: AchievementSetVisibility.PUBLIC },
-              ],
+              ...trophyEligibleSetWhere,
             },
           },
         });
@@ -243,10 +234,7 @@ builder.mutationField("unmarkAchievementComplete", (t) =>
               achievement: {
                 achievementSet: {
                   gameFamilyId,
-                  OR: [
-                    { type: { in: [AchievementSetType.OFFICIAL, AchievementSetType.COMPLETIONIST] } },
-                    { type: AchievementSetType.CUSTOM, visibility: AchievementSetVisibility.PUBLIC },
-                  ],
+                  ...trophyEligibleSetWhere,
                 },
               },
             },
