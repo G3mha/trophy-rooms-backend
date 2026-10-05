@@ -4,6 +4,7 @@ import {
   AchievementSetType,
 } from "@prisma/client";
 import { builder } from "../builder.js";
+import { visibleSetWhere } from "../../lib/achievement-visibility.js";
 
 builder.queryField("achievementSet", (t) =>
   t.prismaField({
@@ -13,9 +14,9 @@ builder.queryField("achievementSet", (t) =>
       id: t.arg.id({ required: true }),
     },
     resolve: async (query, _root, args, ctx) => {
-      return ctx.prisma.achievementSet.findUnique({
+      return ctx.prisma.achievementSet.findFirst({
         ...query,
-        where: { id: String(args.id) },
+        where: { id: String(args.id), AND: [visibleSetWhere(ctx.user)] },
       });
     },
   })
@@ -31,7 +32,9 @@ builder.queryField("achievementSets", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       try {
-        const where: Prisma.AchievementSetWhereInput = {};
+        const where: Prisma.AchievementSetWhereInput = {
+          AND: [visibleSetWhere(ctx.user)],
+        };
 
         if (args.gameFamilyId) {
           where.gameFamilyId = args.gameFamilyId;
