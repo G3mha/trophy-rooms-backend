@@ -1,6 +1,7 @@
 import { builder, MutationErrorRef } from "../builder.js";
 import { DLCType } from "@prisma/client";
 import { ErrorCode } from "../../lib/errors.js";
+import { visibleSetWhere } from "../../lib/achievement-visibility.js";
 
 // Register the DLCType enum
 builder.enumType(DLCType, {
@@ -30,9 +31,10 @@ builder.prismaObject("DLC", {
     }),
 
     achievementSets: t.relation("achievementSets", {
-      query: {
+      query: (_args, ctx) => ({
+        where: visibleSetWhere(ctx.user),
         orderBy: { title: "asc" },
-      },
+      }),
     }),
     achievementSetCount: t.relationCount("achievementSets"),
     gameVersions: t.relation("gameVersions", {

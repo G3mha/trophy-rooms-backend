@@ -1,5 +1,6 @@
 import { builder, MutationErrorRef } from "../builder.js";
 import { ErrorCode } from "../../lib/errors.js";
+import { visibleSetWhere } from "../../lib/achievement-visibility.js";
 import { GameTypeEnum } from "./game.js";
 
 // GameFamily Prisma Object
@@ -48,9 +49,10 @@ builder.prismaObject("GameFamily", {
     }),
 
     achievementSets: t.relation("achievementSets", {
-      query: {
+      query: (_args, ctx) => ({
+        where: visibleSetWhere(ctx.user),
         orderBy: { title: "asc" },
-      },
+      }),
     }),
     achievementSetCount: t.relationCount("achievementSets"),
 

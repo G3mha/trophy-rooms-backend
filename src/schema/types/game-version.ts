@@ -1,5 +1,6 @@
 import { builder, MutationErrorRef } from "../builder.js";
 import { ErrorCode } from "../../lib/errors.js";
+import { visibleSetWhere } from "../../lib/achievement-visibility.js";
 
 // Per-platform release date override for a shared version (e.g. Sifu
 // Vengeance Edition shipped on PS5 months before Switch)
@@ -68,9 +69,10 @@ builder.prismaObject("GameVersion", {
       },
     }),
     achievementSets: t.relation("achievementSets", {
-      query: {
+      query: (_args, ctx) => ({
+        where: visibleSetWhere(ctx.user),
         orderBy: { title: "asc" },
-      },
+      }),
     }),
     achievementSetCount: t.relationCount("achievementSets"),
     versionReleaseDates: t.relation("versionReleaseDates"),
