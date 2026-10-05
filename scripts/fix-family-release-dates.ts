@@ -2,9 +2,12 @@
  * Fill in missing release dates for one GameFamily from IGDB.
  *
  * Each Game gets the earliest IGDB release date on its platform, in any
- * region. The family gets IGDB's first_release_date. Only null dates are
- * filled: dates already set are never overwritten, and games IGDB has no
- * release for on their platform are reported and left alone.
+ * region, and the family gets the earliest across all platforms. Only
+ * releases that put the game on sale count (isShippedRelease in
+ * src/lib/igdb.ts): cancelled, alpha, beta and next-gen patch releases are
+ * skipped. Only null dates are filled: dates already set are
+ * never overwritten, and games IGDB has no release for on their platform are
+ * reported and left alone.
  *
  * pickTrophyGames (src/lib/trophies.ts) falls back to a family's earliest
  * release, so families without dates fall through to import order.
@@ -16,7 +19,13 @@
  */
 
 import { PrismaClient } from "@prisma/client";
-import { IGDB_PLATFORM_MAP, fetchGameBySlug, igdbRequest } from "../src/lib/igdb.js";
+import {
+  IGDB_PLATFORM_MAP,
+  fetchGameBySlug,
+  igdbRequest,
+  isShippedRelease,
+  type IGDBReleaseDate,
+} from "../src/lib/igdb.js";
 
 const prisma = new PrismaClient();
 
@@ -25,12 +34,6 @@ const prisma = new PrismaClient();
 const EXTRA_IGDB_PLATFORM_IDS: Record<string, number[]> = {
   windows: [6],
 };
-
-interface IGDBReleaseDate {
-  platform?: number;
-  date?: number;
-  human?: string;
-}
 
 function parseArgs() {
   const args = process.argv.slice(2);
@@ -101,14 +104,15 @@ async function main() {
 
   const releaseDates = await igdbRequest<IGDBReleaseDate[]>(
     "release_dates",
-    `fields platform, date, human; where game = ${igdbGame.id}; sort date asc; limit 500;`
+    `fields platform, date, human, status.name; where game = ${igdbGame.id}; sort date asc; limit 500;`
   );
   const earliestByIgdbPlatform = new Map<number, Date>();
-  for (const release of releaseDates) {
-    if (release.platform === undefined || release.date === undefined) continue;
-    if (!earliestByIgdbPlatform.has(release.platform)) {
-      earliestByIgdbPlatform.set(release.platform, new Date(release.date * 1000));
-    }
+  let earliestShipped: Date | null = null;
+  for (const release of releaseDates.filter(isShippedRelease)) {
+    const date = new Date(release.date * 1000);
+    const current = earliestByIgdbPlatform.get(release.platform);
+    if (!current || date < current) earliestByIgdbPlatform.set(release.platform, date);
+    if (!earliestShipped || date < earliestShipped) earliestShipped = date;
   }
 
   const gameUpdates: Array<{ id: string; releaseDate: Date }> = [];
@@ -137,14 +141,14 @@ async function main() {
     }
   }
 
-  const setFamilyDate = !family.releaseDate && firstRelease !== null;
+  const setFamilyDate = !family.releaseDate && earliestShipped !== null;
   console.log(
     `\n  Family release     ${
       family.releaseDate
         ? `keep ${formatDate(family.releaseDate)} (already set)`
         : setFamilyDate
-          ? `set  ${formatDate(firstRelease)}`
-          : "skip: IGDB has no first release date"
+          ? `set  ${formatDate(earliestShipped)}`
+          : "skip: IGDB has no shipped release"
     }`
   );
 
@@ -168,7 +172,7 @@ async function main() {
       })
     ),
     ...(setFamilyDate
-      ? [prisma.gameFamily.update({ where: { id: family.id }, data: { releaseDate: firstRelease } })]
+      ? [prisma.gameFamily.update({ where: { id: family.id }, data: { releaseDate: earliestShipped } })]
       : []),
   ]);
 
