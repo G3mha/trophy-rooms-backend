@@ -32,6 +32,41 @@ export interface IGDBGame {
   platforms?: { id: number; name: string }[];
 }
 
+export interface IGDBReleaseDate {
+  platform?: number;
+  date?: number;
+  human?: string;
+  status?: { name: string };
+}
+
+// Release statuses that don't put a new edition on sale on the platform: the
+// release never shipped (Alpha, Beta, Cancelled), or an existing game got a
+// next-gen patch, which CLAUDE.md doesn't count as a release. "Digital
+// Compatibility Release" is not here: IGDB uses it for store re-releases you
+// buy separately (PS one Classics on PS3, Wii games on the Wii U eShop), which
+// the catalog carries as editions. Names are IGDB's release_date_statuses as
+// of 2026-10-05.
+const NON_RELEASE_STATUSES = new Set([
+  "Alpha",
+  "Beta",
+  "Cancelled",
+  "Next-Gen Optimization Patch Release",
+]);
+
+/**
+ * Whether an IGDB release date marks the game going on sale on its platform.
+ * Most release dates carry no status, and those count.
+ */
+export function isShippedRelease(
+  release: IGDBReleaseDate
+): release is IGDBReleaseDate & { platform: number; date: number } {
+  return (
+    release.platform !== undefined &&
+    release.date !== undefined &&
+    !NON_RELEASE_STATUSES.has(release.status?.name ?? "")
+  );
+}
+
 // IGDB Platform IDs mapped to our slugs
 export const IGDB_PLATFORM_MAP: Record<string, number[]> = {
   // Nintendo Consoles
