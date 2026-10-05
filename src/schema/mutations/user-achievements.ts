@@ -5,7 +5,7 @@ import {
   UserAchievementMutationResult,
   DeleteResult,
 } from "../types/user-achievement.js";
-import { trophyEligibleSetWhere } from "../../lib/trophies.js";
+import { pickTrophyGames, trophyEligibleSetWhere } from "../../lib/trophies.js";
 
 // Mark achievement as complete
 builder.mutationField("markAchievementComplete", (t) =>
@@ -80,9 +80,9 @@ builder.mutationField("markAchievementComplete", (t) =>
         },
       });
 
-      // Award trophy if all official/completionist achievements are complete
-      // Note: Achievements are linked to GameFamily, but trophies are awarded per Game (platform instance)
-      // For now, we'll award trophies for all games in the family when achievements are complete
+      // Award a trophy once every trophy-eligible achievement in the family is
+      // complete. Achievements belong to the GameFamily but trophies belong to
+      // a Game, so pickTrophyGames decides which editions carry it.
       const achievementWithSet = await ctx.prisma.achievement.findUnique({
         where: { id: achievementId },
         select: {
@@ -94,8 +94,9 @@ builder.mutationField("markAchievementComplete", (t) =>
         },
       });
 
-      if (achievementWithSet?.achievementSet) {
-        const gameFamilyId = achievementWithSet.achievementSet.gameFamilyId;
+      // A set without a family would match every unlinked game below
+      const gameFamilyId = achievementWithSet?.achievementSet.gameFamilyId;
+      if (gameFamilyId) {
         const totalAchievements = await ctx.prisma.achievement.count({
           where: {
             achievementSet: {
@@ -119,27 +120,26 @@ builder.mutationField("markAchievementComplete", (t) =>
           });
 
           if (completedCount >= totalAchievements) {
-            // Award trophies for all games in this family that the user has in their library
-            const userGamesInFamily = await ctx.prisma.game.findMany({
+            const gamesInFamily = await ctx.prisma.game.findMany({
               where: { gameFamilyId },
-              select: { id: true },
+              select: {
+                id: true,
+                releaseDate: true,
+                createdAt: true,
+                userGames: { where: { userId: user.id }, select: { id: true } },
+              },
             });
+            const libraryGameIds = new Set(
+              gamesInFamily.filter((game) => game.userGames.length > 0).map((game) => game.id)
+            );
 
-            for (const game of userGamesInFamily) {
-              await ctx.prisma.trophy.upsert({
-                where: {
-                  userId_gameId: {
-                    userId: user.id,
-                    gameId: game.id,
-                  },
-                },
-                update: {},
-                create: {
-                  userId: user.id,
-                  gameId: game.id,
-                },
-              });
-            }
+            await ctx.prisma.trophy.createMany({
+              data: pickTrophyGames(gamesInFamily, libraryGameIds).map((game) => ({
+                userId: user.id,
+                gameId: game.id,
+              })),
+              skipDuplicates: true,
+            });
           }
         }
       }
