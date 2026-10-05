@@ -1,6 +1,7 @@
 import { builder, MutationErrorRef } from "../builder.js";
-import { BuylistPriority as PrismaBuylistPriority } from "@prisma/client";
+import { BuylistPriority as PrismaBuylistPriority, type Prisma } from "@prisma/client";
 import { ErrorCode } from "../../lib/errors.js";
+import { pickFirstReleasedPlatform } from "../../lib/platforms.js";
 import { GameRegionEnum } from "./collection-item.js";
 
 // Register the BuylistPriority enum
@@ -12,6 +13,12 @@ export const BuylistPriority = builder.enumType(PrismaBuylistPriority, {
 export const BuylistItemType = builder.enumType("BuylistItemType", {
   values: ["GAME", "DLC", "BUNDLE"] as const,
 });
+
+// What pickFirstReleasedPlatform needs from each candidate platform
+const platformReleaseDates = {
+  id: true,
+  releases: { select: { releaseDate: true } },
+} satisfies Prisma.PlatformSelect;
 
 builder.prismaObject("BuylistItem", {
   fields: (t) => ({
@@ -110,9 +117,12 @@ builder.prismaObject("BuylistItem", {
         dlcId: true,
         bundleId: true,
       },
-      // The platform is loaded through the item's game, DLC or bundle, so the
-      // query Pothos builds from the selection goes on that nested relation
+      // A game has one platform, loaded with the query Pothos builds from the
+      // selection. A DLC or bundle shows the platform that launched first.
       resolve: async (query, item, _args, ctx) => {
+        const loadPlatform = (id: string | undefined) =>
+          id ? ctx.prisma.platform.findUnique({ ...query, where: { id } }) : null;
+
         if (item.gameId) {
           const game = await ctx.prisma.game.findUnique({
             where: { id: item.gameId },
@@ -123,16 +133,16 @@ builder.prismaObject("BuylistItem", {
         if (item.dlcId) {
           const dlc = await ctx.prisma.dLC.findUnique({
             where: { id: item.dlcId },
-            select: { platforms: { ...query, take: 1 } },
+            select: { platforms: { select: platformReleaseDates } },
           });
-          return dlc?.platforms[0] ?? null;
+          return loadPlatform(pickFirstReleasedPlatform(dlc?.platforms ?? [])?.id);
         }
         if (item.bundleId) {
           const bundle = await ctx.prisma.bundle.findUnique({
             where: { id: item.bundleId },
-            select: { platforms: { ...query, take: 1 } },
+            select: { platforms: { select: platformReleaseDates } },
           });
-          return bundle?.platforms[0] ?? null;
+          return loadPlatform(pickFirstReleasedPlatform(bundle?.platforms ?? [])?.id);
         }
         return null;
       },
