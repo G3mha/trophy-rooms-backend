@@ -23,11 +23,16 @@
  *   no-igdb-date  IGDB lists the platform with no shipped release date
  *   not-on-igdb   no IGDB game with this title lists the platform
  *
+ * --cancelled-out <file> writes the cancelled editions as JSON, the input
+ * fix-cancelled-editions.ts takes.
+ *
  * Usage:
  *   npx tsx scripts/check-family-release-dates.ts
  *   npx tsx scripts/check-family-release-dates.ts --family watch-dogs --family x10
+ *   npx tsx scripts/check-family-release-dates.ts --family x10 --cancelled-out scripts/data/cancelled.json
  */
 
+import { writeFileSync } from "node:fs";
 import { PrismaClient } from "@prisma/client";
 import {
   IGDB_PLATFORM_MAP,
@@ -54,14 +59,16 @@ interface IGDBCandidate {
 
 type Verdict = "ok" | "backfill" | "differs" | "cancelled" | "no-igdb-date" | "not-on-igdb";
 
-function parseFamilySlugs(): string[] {
+function parseArgs() {
   const args = process.argv.slice(2);
   const slugs: string[] = [];
+  let cancelledOut: string | undefined;
   args.forEach((arg, index) => {
     const next = args[index + 1];
     if (arg === "--family" && next) slugs.push(next);
+    if (arg === "--cancelled-out" && next) cancelledOut = next;
   });
-  return slugs;
+  return { slugs, cancelledOut };
 }
 
 function formatDate(date: Date | null): string {
@@ -86,7 +93,7 @@ async function findCandidates(title: string): Promise<IGDBCandidate[]> {
 }
 
 async function main() {
-  const requestedSlugs = parseFamilySlugs();
+  const { slugs: requestedSlugs, cancelledOut } = parseArgs();
 
   console.log("=== Check Family Release Dates (read-only) ===\n");
   const databaseUrl = process.env.DATABASE_URL;
@@ -116,6 +123,7 @@ async function main() {
   ).filter((family) => requestedSlugs.length > 0 || family.games.length >= 2);
 
   const summary = new Map<Verdict, string[]>();
+  const cancelledEditions: Array<{ family: string; platform: string; igdb: string }> = [];
 
   for (const family of families) {
     console.log(`${family.title} (${family.slug})`);
@@ -176,6 +184,9 @@ async function main() {
       const entries = summary.get(verdict) ?? [];
       entries.push(`${family.title} / ${game.platform?.name ?? "no platform"}`);
       summary.set(verdict, entries);
+      if (verdict === "cancelled" && game.platform) {
+        cancelledEditions.push({ family: family.slug, platform: game.platform.name, igdb: source });
+      }
     }
     console.log("");
   }
@@ -183,6 +194,11 @@ async function main() {
   console.log(`Families checked: ${families.length}`);
   for (const verdict of ["ok", "backfill", "differs", "cancelled", "no-igdb-date", "not-on-igdb"] as Verdict[]) {
     console.log(`  ${verdict.padEnd(13)} ${summary.get(verdict)?.length ?? 0}`);
+  }
+
+  if (cancelledOut) {
+    writeFileSync(cancelledOut, `${JSON.stringify(cancelledEditions, null, 2)}\n`);
+    console.log(`\nWrote ${cancelledEditions.length} cancelled editions to ${cancelledOut}`);
   }
 }
 
