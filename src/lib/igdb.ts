@@ -57,9 +57,9 @@ const NON_RELEASE_STATUSES = new Set([
  * Whether an IGDB release date marks the game going on sale on its platform.
  * Most release dates carry no status, and those count.
  */
-export function isShippedRelease(
-  release: IGDBReleaseDate
-): release is IGDBReleaseDate & { platform: number; date: number } {
+export function isShippedRelease<T extends IGDBReleaseDate>(
+  release: T
+): release is T & { platform: number; date: number } {
   return (
     release.platform !== undefined &&
     release.date !== undefined &&
