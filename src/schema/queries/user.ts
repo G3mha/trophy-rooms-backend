@@ -1,4 +1,12 @@
+import type { User } from "@prisma/client";
 import { builder } from "../builder.js";
+import { visibleSetWhere } from "../../lib/achievement-visibility.js";
+
+// Completions whose achievement the viewer can see. A user's list leaves out
+// achievements in other users' private sets, even ones they completed.
+function visibleCompletionWhere(viewer: User | null) {
+  return { achievement: { achievementSet: visibleSetWhere(viewer) } };
+}
 
 // Public user profile by ID
 builder.queryField("user", (t) =>
@@ -27,13 +35,13 @@ builder.queryField("userAchievements", (t) =>
     },
     totalCount: (_connection, args, ctx) => {
       return ctx.prisma.userAchievement.count({
-        where: { userId: args.userId },
+        where: { userId: args.userId, ...visibleCompletionWhere(ctx.user) },
       });
     },
     resolve: async (query, _root, args, ctx) => {
       return ctx.prisma.userAchievement.findMany({
         ...query,
-        where: { userId: args.userId },
+        where: { userId: args.userId, ...visibleCompletionWhere(ctx.user) },
         orderBy: { createdAt: "desc" },
       });
     },
@@ -88,7 +96,7 @@ builder.queryField("myAchievements", (t) =>
     totalCount: (_connection, _args, ctx) => {
       if (!ctx.user) return 0;
       return ctx.prisma.userAchievement.count({
-        where: { userId: ctx.user.id },
+        where: { userId: ctx.user.id, ...visibleCompletionWhere(ctx.user) },
       });
     },
     resolve: async (query, _root, _args, ctx) => {
@@ -97,7 +105,7 @@ builder.queryField("myAchievements", (t) =>
       }
       return ctx.prisma.userAchievement.findMany({
         ...query,
-        where: { userId: ctx.user.id },
+        where: { userId: ctx.user.id, ...visibleCompletionWhere(ctx.user) },
         orderBy: { createdAt: "desc" },
       });
     },

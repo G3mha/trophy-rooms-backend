@@ -1,6 +1,7 @@
 import { builder } from "../builder.js";
 import { UserRole, AchievementTier } from "@prisma/client";
 import { hasRequiredRole } from "../../context.js";
+import { visibleSetWhere } from "../../lib/achievement-visibility.js";
 
 builder.enumType(UserRole, {
   name: "UserRole",
@@ -65,9 +66,10 @@ builder.prismaObject("User", {
           : UserRole.USER,
     }),
     achievements: t.relation("achievements", {
-      query: {
+      query: (_args, ctx) => ({
+        where: { achievement: { achievementSet: visibleSetWhere(ctx.user) } },
         orderBy: { createdAt: "desc" },
-      },
+      }),
     }),
     trophies: t.relation("trophies", {
       query: {
