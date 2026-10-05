@@ -248,7 +248,7 @@ builder.queryField("adminGames", (t) =>
                   select: { id: true },
                 },
                 _count: {
-                  select: { achievementSets: true },
+                  select: { achievementSets: { where: visibleSetWhere(ctx.user) } },
                 },
               },
             },
@@ -487,9 +487,10 @@ builder.queryField("gamesPage", (t) =>
                   select: { id: true },
                 },
                 _count: {
-                  select: { achievementSets: true },
+                  select: { achievementSets: { where: visibleSetWhere(ctx.user) } },
                 },
                 achievementSets: {
+                  where: visibleSetWhere(ctx.user),
                   select: {
                     _count: {
                       select: { achievements: true },
@@ -586,10 +587,11 @@ builder.queryField("gamesByTitle", (t) =>
           },
           _count: {
             select: {
-              achievementSets: true,
+              achievementSets: { where: visibleSetWhere(ctx.user) },
             },
           },
           achievementSets: {
+            where: visibleSetWhere(ctx.user),
             select: {
               _count: {
                 select: { achievements: true },
@@ -849,11 +851,12 @@ builder.queryField("gameFamiliesPage", (t) =>
             },
             _count: {
               select: {
-                achievementSets: true,
+                achievementSets: { where: visibleSetWhere(ctx.user) },
                 games: true,
               },
             },
             achievementSets: {
+              where: visibleSetWhere(ctx.user),
               select: {
                 _count: {
                   select: { achievements: true },
