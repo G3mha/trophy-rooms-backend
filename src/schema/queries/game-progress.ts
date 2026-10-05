@@ -1,4 +1,5 @@
 import { builder } from "../builder.js";
+import { trophyEligibleSetWhere } from "../../lib/trophies.js";
 
 function computePercentComplete(earnedCount: number, totalCount: number): number {
   if (totalCount <= 0) return 0;
@@ -45,9 +46,14 @@ builder.queryField("myGameProgress", (t) =>
         return [];
       }
 
-      // Get all user achievements with game family info
+      // Get the user's trophy-eligible achievements with game family info.
+      // Earned and total counts must use the same sets as trophy awarding,
+      // or a finished game can read under (or over) 100%.
       const userAchievements = await ctx.prisma.userAchievement.findMany({
-        where: { userId: ctx.user.id },
+        where: {
+          userId: ctx.user.id,
+          achievement: { achievementSet: trophyEligibleSetWhere },
+        },
         include: {
           achievement: {
             include: {
@@ -129,6 +135,7 @@ builder.queryField("myGameProgress", (t) =>
         where: {
           achievementSet: {
             gameFamilyId: { in: gameFamilyIds },
+            ...trophyEligibleSetWhere,
           },
         },
         _count: { id: true },
@@ -213,9 +220,14 @@ builder.queryField("userGameProgress", (t) =>
       userId: t.arg.string({ required: true }),
     },
     resolve: async (_root, args, ctx) => {
-      // Get all user achievements with game family info
+      // Get the user's trophy-eligible achievements with game family info.
+      // Earned and total counts must use the same sets as trophy awarding,
+      // or a finished game can read under (or over) 100%.
       const userAchievements = await ctx.prisma.userAchievement.findMany({
-        where: { userId: args.userId },
+        where: {
+          userId: args.userId,
+          achievement: { achievementSet: trophyEligibleSetWhere },
+        },
         include: {
           achievement: {
             include: {
@@ -297,6 +309,7 @@ builder.queryField("userGameProgress", (t) =>
         where: {
           achievementSet: {
             gameFamilyId: { in: gameFamilyIds },
+            ...trophyEligibleSetWhere,
           },
         },
         _count: { id: true },
