@@ -108,10 +108,12 @@ builder.prismaObject("SellListItem", {
       select: {
         collectionItemId: true,
       },
-      resolve: async (_query, item, _args, ctx) => {
+      // The platform is loaded through the collection item, so the query
+      // Pothos builds from the selection goes on that nested relation
+      resolve: async (query, item, _args, ctx) => {
         const collectionItem = await ctx.prisma.collectionItem.findUnique({
           where: { id: item.collectionItemId },
-          select: { platform: true },
+          select: { platform: query },
         });
         return collectionItem?.platform ?? null;
       },
