@@ -151,9 +151,9 @@ builder.queryField("achievement", (t) =>
       id: t.arg.id({ required: true }),
     },
     resolve: async (query, _root, args, ctx) => {
-      return ctx.prisma.achievement.findUnique({
+      return ctx.prisma.achievement.findFirst({
         ...query,
-        where: { id: args.id },
+        where: { id: args.id, achievementSet: visibleSetWhere(ctx.user) },
       });
     },
   })
