@@ -196,7 +196,8 @@ export async function searchGames(
 
 /**
  * Search achievements using PostgreSQL full-text search.
- * Results are cached for performance.
+ * Results are cached for performance, shared by every viewer, so they only
+ * include achievements anyone can see: none from private custom sets.
  */
 export async function searchAchievementsFullText(
   prisma: PrismaClient,
@@ -211,10 +212,12 @@ export async function searchAchievementsFullText(
 
     try {
       const results = await prisma.$queryRaw<{ id: string }[]>`
-        SELECT id
-        FROM "Achievement"
-        WHERE search_vector @@ to_tsquery('english', ${tsquery})
-        ORDER BY ts_rank(search_vector, to_tsquery('english', ${tsquery})) DESC
+        SELECT a.id
+        FROM "Achievement" a
+        JOIN "AchievementSet" s ON s.id = a."achievementSetId"
+        WHERE a.search_vector @@ to_tsquery('english', ${tsquery})
+          AND (s.type <> 'CUSTOM' OR s.visibility = 'PUBLIC')
+        ORDER BY ts_rank(a.search_vector, to_tsquery('english', ${tsquery})) DESC
         LIMIT ${limit}
       `;
 
@@ -225,11 +228,13 @@ export async function searchAchievementsFullText(
       }
 
       const fallbackResults = await prisma.$queryRaw<{ id: string }[]>`
-        SELECT id
-        FROM "Achievement"
-        WHERE LOWER(title) LIKE ${likePattern(search)}
-           OR LOWER(COALESCE(description, '')) LIKE ${likePattern(search)}
-        ORDER BY title ASC
+        SELECT a.id
+        FROM "Achievement" a
+        JOIN "AchievementSet" s ON s.id = a."achievementSetId"
+        WHERE (LOWER(a.title) LIKE ${likePattern(search)}
+           OR LOWER(COALESCE(a.description, '')) LIKE ${likePattern(search)})
+          AND (s.type <> 'CUSTOM' OR s.visibility = 'PUBLIC')
+        ORDER BY a.title ASC
         LIMIT ${limit}
       `;
 
