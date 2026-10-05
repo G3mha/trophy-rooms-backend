@@ -11,12 +11,16 @@
  * Harry and the cancelled 2007 one). Each edition is matched on its own
  * platform against every IGDB game with the family's title.
  *
+ * Only releases that put the game on sale count (isShippedRelease in
+ * src/lib/igdb.ts, shared with fix-family-release-dates.ts): cancelled,
+ * alpha, beta and next-gen patch releases are skipped.
+ *
  * Verdicts per edition:
- *   ok            our date matches IGDB's earliest release on the platform
+ *   ok            our date matches IGDB's earliest shipped release on the platform
  *   backfill      we have no date, IGDB has one
  *   differs       we have a date, IGDB's earliest is different
  *   cancelled     IGDB lists the platform, but the release was cancelled
- *   no-igdb-date  IGDB lists the platform with no release date
+ *   no-igdb-date  IGDB lists the platform with no shipped release date
  *   not-on-igdb   no IGDB game with this title lists the platform
  *
  * Usage:
@@ -25,7 +29,12 @@
  */
 
 import { PrismaClient } from "@prisma/client";
-import { IGDB_PLATFORM_MAP, igdbRequest } from "../src/lib/igdb.js";
+import {
+  IGDB_PLATFORM_MAP,
+  igdbRequest,
+  isShippedRelease,
+  type IGDBReleaseDate,
+} from "../src/lib/igdb.js";
 
 const prisma = new PrismaClient();
 
@@ -34,21 +43,13 @@ const EXTRA_IGDB_PLATFORM_IDS: Record<string, number[]> = {
   windows: [6],
 };
 
-// IGDB release statuses that never put a copy on shelves
-const UNRELEASED_STATUSES = new Set(["Cancelled", "Rumored", "Alpha", "Beta"]);
-
 interface IGDBCandidate {
   id: number;
   name: string;
   slug: string;
   game_status?: { status: string };
   platforms?: { id: number }[];
-  release_dates?: {
-    platform?: number;
-    date?: number;
-    human?: string;
-    status?: { name: string };
-  }[];
+  release_dates?: IGDBReleaseDate[];
 }
 
 type Verdict = "ok" | "backfill" | "differs" | "cancelled" | "no-igdb-date" | "not-on-igdb";
@@ -134,14 +135,9 @@ async function main() {
 
       const releases = onPlatform.flatMap((candidate) =>
         (candidate.release_dates ?? [])
-          .filter(
-            (release) =>
-              release.platform !== undefined &&
-              platformIds.has(release.platform) &&
-              release.date !== undefined &&
-              !UNRELEASED_STATUSES.has(release.status?.name ?? "")
-          )
-          .map((release) => ({ candidate, date: new Date(release.date! * 1000), human: release.human ?? "" }))
+          .filter(isShippedRelease)
+          .filter((release) => platformIds.has(release.platform))
+          .map((release) => ({ candidate, date: new Date(release.date * 1000), human: release.human ?? "" }))
       );
       releases.sort((a, b) => a.date.getTime() - b.date.getTime());
       const earliest = releases[0];
