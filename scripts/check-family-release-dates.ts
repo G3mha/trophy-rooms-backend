@@ -1,0 +1,198 @@
+/**
+ * Compare each edition's release date against IGDB. Read-only.
+ *
+ * Without arguments it checks every family that has two or more editions and
+ * at least one without a release date. pickTrophyGames (src/lib/trophies.ts)
+ * falls back to a family's earliest release, so these are the families where
+ * that pick can go wrong.
+ *
+ * Importers add games to an existing family by title, so one family can hold
+ * editions of different IGDB games that share a name (the 1990 NES Dirty
+ * Harry and the cancelled 2007 one). Each edition is matched on its own
+ * platform against every IGDB game with the family's title.
+ *
+ * Verdicts per edition:
+ *   ok            our date matches IGDB's earliest release on the platform
+ *   backfill      we have no date, IGDB has one
+ *   differs       we have a date, IGDB's earliest is different
+ *   cancelled     IGDB lists the platform, but the release was cancelled
+ *   no-igdb-date  IGDB lists the platform with no release date
+ *   not-on-igdb   no IGDB game with this title lists the platform
+ *
+ * Usage:
+ *   npx tsx scripts/check-family-release-dates.ts
+ *   npx tsx scripts/check-family-release-dates.ts --family watch-dogs --family x10
+ */
+
+import { PrismaClient } from "@prisma/client";
+import { IGDB_PLATFORM_MAP, igdbRequest } from "../src/lib/igdb.js";
+
+const prisma = new PrismaClient();
+
+// Same alias as fix-family-release-dates.ts
+const EXTRA_IGDB_PLATFORM_IDS: Record<string, number[]> = {
+  windows: [6],
+};
+
+// IGDB release statuses that never put a copy on shelves
+const UNRELEASED_STATUSES = new Set(["Cancelled", "Rumored", "Alpha", "Beta"]);
+
+interface IGDBCandidate {
+  id: number;
+  name: string;
+  slug: string;
+  game_status?: { status: string };
+  platforms?: { id: number }[];
+  release_dates?: {
+    platform?: number;
+    date?: number;
+    human?: string;
+    status?: { name: string };
+  }[];
+}
+
+type Verdict = "ok" | "backfill" | "differs" | "cancelled" | "no-igdb-date" | "not-on-igdb";
+
+function parseFamilySlugs(): string[] {
+  const args = process.argv.slice(2);
+  const slugs: string[] = [];
+  args.forEach((arg, index) => {
+    const next = args[index + 1];
+    if (arg === "--family" && next) slugs.push(next);
+  });
+  return slugs;
+}
+
+function formatDate(date: Date | null): string {
+  return date ? date.toISOString().split("T")[0]! : "none";
+}
+
+function normalizeName(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+async function findCandidates(title: string): Promise<IGDBCandidate[]> {
+  const fields =
+    "fields id, name, slug, game_status.status, platforms.id, release_dates.platform, release_dates.date, release_dates.human, release_dates.status.name;";
+  const escaped = title.replace(/"/g, '\\"');
+  const exact = await igdbRequest<IGDBCandidate[]>("games", `${fields} where name ~ "${escaped}"; limit 50;`);
+  if (exact.length > 0) return exact;
+
+  // Fall back to search, keeping only names equal up to case and punctuation
+  await new Promise((resolve) => setTimeout(resolve, 250));
+  const searched = await igdbRequest<IGDBCandidate[]>("games", `${fields} search "${escaped}"; limit 20;`);
+  return searched.filter((game) => normalizeName(game.name) === normalizeName(title));
+}
+
+async function main() {
+  const requestedSlugs = parseFamilySlugs();
+
+  console.log("=== Check Family Release Dates (read-only) ===\n");
+  const databaseUrl = process.env.DATABASE_URL;
+  if (databaseUrl) {
+    console.log(`Database host: ${new URL(databaseUrl).host}\n`);
+  }
+
+  const families = (
+    await prisma.gameFamily.findMany({
+      where:
+        requestedSlugs.length > 0
+          ? { slug: { in: requestedSlugs } }
+          : { games: { some: { releaseDate: null } } },
+      select: {
+        title: true,
+        slug: true,
+        games: {
+          select: {
+            releaseDate: true,
+            platform: { select: { name: true, slug: true } },
+          },
+          orderBy: { createdAt: "asc" },
+        },
+      },
+      orderBy: { title: "asc" },
+    })
+  ).filter((family) => requestedSlugs.length > 0 || family.games.length >= 2);
+
+  const summary = new Map<Verdict, string[]>();
+
+  for (const family of families) {
+    console.log(`${family.title} (${family.slug})`);
+    const candidates = await findCandidates(family.title);
+    await new Promise((resolve) => setTimeout(resolve, 250));
+
+    for (const game of family.games) {
+      const platformSlug = game.platform?.slug ?? "";
+      const platformIds = new Set(
+        IGDB_PLATFORM_MAP[platformSlug] ?? EXTRA_IGDB_PLATFORM_IDS[platformSlug] ?? []
+      );
+      const onPlatform = candidates.filter(
+        (candidate) =>
+          candidate.platforms?.some((platform) => platformIds.has(platform.id)) ||
+          candidate.release_dates?.some((release) => release.platform !== undefined && platformIds.has(release.platform))
+      );
+
+      const releases = onPlatform.flatMap((candidate) =>
+        (candidate.release_dates ?? [])
+          .filter(
+            (release) =>
+              release.platform !== undefined &&
+              platformIds.has(release.platform) &&
+              release.date !== undefined &&
+              !UNRELEASED_STATUSES.has(release.status?.name ?? "")
+          )
+          .map((release) => ({ candidate, date: new Date(release.date! * 1000), human: release.human ?? "" }))
+      );
+      releases.sort((a, b) => a.date.getTime() - b.date.getTime());
+      const earliest = releases[0];
+
+      let verdict: Verdict;
+      if (earliest) {
+        if (!game.releaseDate) verdict = "backfill";
+        else verdict = formatDate(game.releaseDate) === formatDate(earliest.date) ? "ok" : "differs";
+      } else if (onPlatform.length === 0) {
+        verdict = "not-on-igdb";
+      } else if (
+        onPlatform.every(
+          (candidate) =>
+            candidate.game_status?.status === "Cancelled" ||
+            candidate.release_dates?.some(
+              (release) =>
+                release.platform !== undefined &&
+                platformIds.has(release.platform) &&
+                release.status?.name === "Cancelled"
+            )
+        )
+      ) {
+        verdict = "cancelled";
+      } else {
+        verdict = "no-igdb-date";
+      }
+
+      const source = earliest
+        ? `${earliest.candidate.slug} #${earliest.candidate.id}, "${earliest.human}"`
+        : onPlatform.map((candidate) => `${candidate.slug} #${candidate.id}${candidate.game_status ? ` ${candidate.game_status.status}` : ""}`).join("; ");
+      console.log(
+        `  ${(game.platform?.name ?? "no platform").padEnd(22)} ours ${formatDate(game.releaseDate).padEnd(10)}  ` +
+          `IGDB ${formatDate(earliest?.date ?? null).padEnd(10)}  ${verdict.padEnd(12)}${source ? `  [${source}]` : ""}`
+      );
+
+      const entries = summary.get(verdict) ?? [];
+      entries.push(`${family.title} / ${game.platform?.name ?? "no platform"}`);
+      summary.set(verdict, entries);
+    }
+    console.log("");
+  }
+
+  console.log(`Families checked: ${families.length}`);
+  for (const verdict of ["ok", "backfill", "differs", "cancelled", "no-igdb-date", "not-on-igdb"] as Verdict[]) {
+    console.log(`  ${verdict.padEnd(13)} ${summary.get(verdict)?.length ?? 0}`);
+  }
+}
+
+main()
+  .catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  })
+  .finally(() => prisma.$disconnect());
