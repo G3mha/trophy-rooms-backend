@@ -327,7 +327,10 @@ builder.prismaObject("Game", {
       resolve: async (game, _args, ctx) => {
         if (!game.gameFamilyId) return 0;
         return ctx.prisma.achievementSet.count({
-          where: { gameFamilyId: game.gameFamilyId },
+          where: {
+            gameFamilyId: game.gameFamilyId,
+            AND: [visibleSetWhere(ctx.user)],
+          },
         });
       },
     }),
@@ -335,7 +338,12 @@ builder.prismaObject("Game", {
       resolve: async (game, _args, ctx) => {
         if (!game.gameFamilyId) return 0;
         return ctx.prisma.achievement.count({
-          where: { achievementSet: { gameFamilyId: game.gameFamilyId } },
+          where: {
+            achievementSet: {
+              gameFamilyId: game.gameFamilyId,
+              AND: [visibleSetWhere(ctx.user)],
+            },
+          },
         });
       },
     }),

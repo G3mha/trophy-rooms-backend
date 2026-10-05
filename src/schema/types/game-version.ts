@@ -74,7 +74,9 @@ builder.prismaObject("GameVersion", {
         orderBy: { title: "asc" },
       }),
     }),
-    achievementSetCount: t.relationCount("achievementSets"),
+    achievementSetCount: t.relationCount("achievementSets", {
+      where: (_args, ctx) => visibleSetWhere(ctx.user),
+    }),
     versionReleaseDates: t.relation("versionReleaseDates"),
     // Computed field: the release date of this version for a specific game
     // (platform), falling back to the version's canonical releaseDate

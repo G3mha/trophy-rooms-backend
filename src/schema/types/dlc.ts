@@ -36,7 +36,9 @@ builder.prismaObject("DLC", {
         orderBy: { title: "asc" },
       }),
     }),
-    achievementSetCount: t.relationCount("achievementSets"),
+    achievementSetCount: t.relationCount("achievementSets", {
+      where: (_args, ctx) => visibleSetWhere(ctx.user),
+    }),
     gameVersions: t.relation("gameVersions", {
       query: {
         orderBy: { name: "asc" },

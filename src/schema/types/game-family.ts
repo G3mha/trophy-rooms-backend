@@ -54,13 +54,20 @@ builder.prismaObject("GameFamily", {
         orderBy: { title: "asc" },
       }),
     }),
-    achievementSetCount: t.relationCount("achievementSets"),
+    achievementSetCount: t.relationCount("achievementSets", {
+      where: (_args, ctx) => visibleSetWhere(ctx.user),
+    }),
 
     // Computed field: total achievement count across all sets
     totalAchievementCount: t.int({
       resolve: async (family, _args, ctx) => {
         const result = await ctx.prisma.achievement.count({
-          where: { achievementSet: { gameFamilyId: family.id } },
+          where: {
+            achievementSet: {
+              gameFamilyId: family.id,
+              AND: [visibleSetWhere(ctx.user)],
+            },
+          },
         });
         return result;
       },
