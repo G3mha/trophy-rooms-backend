@@ -1,11 +1,11 @@
-import { Prisma, AchievementSetVisibility, UserRole } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { builder } from "../builder.js";
 import {
   AchievementsFilterInput,
   AchievementOrderBy,
 } from "../types/achievement.js";
-import { hasRequiredRole } from "../../context.js";
 import { searchAchievementsFullText } from "../../lib/fulltext-search.js";
+import { visibleSetWhere } from "../../lib/achievement-visibility.js";
 
 // Achievements connection with cursor-based pagination
 builder.queryField("achievements", (t) =>
@@ -51,19 +51,10 @@ builder.queryField("achievements", (t) =>
         }
       }
 
-      const visibilityFilter = !ctx.user
-        ? { visibility: AchievementSetVisibility.PUBLIC }
-        : hasRequiredRole(ctx.user, UserRole.TRUSTED)
-          ? {}
-          : {
-              OR: [
-                { visibility: AchievementSetVisibility.PUBLIC },
-                { createdByUserId: ctx.user.id },
-              ],
-            };
+      const visibilityFilter = visibleSetWhere(ctx.user);
 
       if (Object.keys(visibilityFilter).length > 0) {
-        Object.assign(achievementSetWhere, visibilityFilter);
+        achievementSetWhere.AND = [visibilityFilter];
       }
 
       if (Object.keys(achievementSetWhere).length > 0) {
@@ -110,19 +101,10 @@ builder.queryField("achievements", (t) =>
         }
       }
 
-      const visibilityFilter = !ctx.user
-        ? { visibility: AchievementSetVisibility.PUBLIC }
-        : hasRequiredRole(ctx.user, UserRole.TRUSTED)
-          ? {}
-          : {
-              OR: [
-                { visibility: AchievementSetVisibility.PUBLIC },
-                { createdByUserId: ctx.user.id },
-              ],
-            };
+      const visibilityFilter = visibleSetWhere(ctx.user);
 
       if (Object.keys(visibilityFilter).length > 0) {
-        Object.assign(achievementSetWhere, visibilityFilter);
+        achievementSetWhere.AND = [visibilityFilter];
       }
 
       if (Object.keys(achievementSetWhere).length > 0) {

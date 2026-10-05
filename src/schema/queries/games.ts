@@ -1,9 +1,9 @@
-import { Prisma, AchievementSetVisibility, UserRole, GameType } from "@prisma/client";
+import { Prisma, GameType } from "@prisma/client";
 import { builder } from "../builder.js";
 import { GamesFilterInput, GameOrderBy, GameTypeEnum } from "../types/game.js";
 import { GameFamiliesFilterInput, GameFamilyOrderBy } from "../types/game-family.js";
-import { hasRequiredRole } from "../../context.js";
 import { searchGames, searchGameFamilies } from "../../lib/fulltext-search.js";
+import { visibleSetWhere } from "../../lib/achievement-visibility.js";
 
 // Games connection with cursor-based pagination
 builder.queryField("games", (t) =>
@@ -41,16 +41,7 @@ builder.queryField("games", (t) =>
       }
 
       if (filter?.hasAchievements !== undefined) {
-        const visibilityFilter = !ctx.user
-          ? { visibility: AchievementSetVisibility.PUBLIC }
-          : hasRequiredRole(ctx.user, UserRole.TRUSTED)
-            ? {}
-            : {
-                OR: [
-                  { visibility: AchievementSetVisibility.PUBLIC },
-                  { createdByUserId: ctx.user.id },
-                ],
-              };
+        const visibilityFilter = visibleSetWhere(ctx.user);
 
         gameFamilyWhere.achievementSets =
           filter.hasAchievements === true
@@ -81,16 +72,7 @@ builder.queryField("games", (t) =>
       }
 
       if (filter?.hasAchievements !== undefined) {
-        const visibilityFilter = !ctx.user
-          ? { visibility: AchievementSetVisibility.PUBLIC }
-          : hasRequiredRole(ctx.user, UserRole.TRUSTED)
-            ? {}
-            : {
-                OR: [
-                  { visibility: AchievementSetVisibility.PUBLIC },
-                  { createdByUserId: ctx.user.id },
-                ],
-              };
+        const visibilityFilter = visibleSetWhere(ctx.user);
 
         gameFamilyWhere.achievementSets =
           filter.hasAchievements === true
@@ -445,16 +427,7 @@ builder.queryField("gamesPage", (t) =>
       }
 
       if (filter?.hasAchievements !== undefined) {
-        const visibilityFilter = !ctx.user
-          ? { visibility: AchievementSetVisibility.PUBLIC }
-          : hasRequiredRole(ctx.user, UserRole.TRUSTED)
-            ? {}
-            : {
-                OR: [
-                  { visibility: AchievementSetVisibility.PUBLIC },
-                  { createdByUserId: ctx.user.id },
-                ],
-              };
+        const visibilityFilter = visibleSetWhere(ctx.user);
 
         gameFamilyWhere.achievementSets =
           filter.hasAchievements === true
@@ -823,16 +796,7 @@ builder.queryField("gameFamiliesPage", (t) =>
       }
 
       if (filter?.hasAchievements !== undefined) {
-        const visibilityFilter = !ctx.user
-          ? { visibility: AchievementSetVisibility.PUBLIC }
-          : hasRequiredRole(ctx.user, UserRole.TRUSTED)
-            ? {}
-            : {
-                OR: [
-                  { visibility: AchievementSetVisibility.PUBLIC },
-                  { createdByUserId: ctx.user.id },
-                ],
-              };
+        const visibilityFilter = visibleSetWhere(ctx.user);
 
         where.achievementSets =
           filter.hasAchievements === true
