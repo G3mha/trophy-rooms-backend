@@ -6,6 +6,7 @@ import {
   DeleteResult,
 } from "../types/user-achievement.js";
 import { pickTrophyGames, trophyEligibleSetWhere } from "../../lib/trophies.js";
+import { visibleSetWhere } from "../../lib/achievement-visibility.js";
 
 // Mark achievement as complete
 builder.mutationField("markAchievementComplete", (t) =>
@@ -33,9 +34,10 @@ builder.mutationField("markAchievementComplete", (t) =>
 
       const { achievementId } = args;
 
-      // Check if achievement exists
-      const achievement = await ctx.prisma.achievement.findUnique({
-        where: { id: achievementId },
+      // Check if achievement exists. One in another user's private set reads
+      // as missing, so it can't be completed or confirmed to exist.
+      const achievement = await ctx.prisma.achievement.findFirst({
+        where: { id: achievementId, achievementSet: visibleSetWhere(user) },
       });
 
       if (!achievement) {
