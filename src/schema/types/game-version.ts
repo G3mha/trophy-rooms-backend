@@ -158,9 +158,10 @@ GameVersionMutationResult.implement({
     gameVersion: t.prismaField({
       type: "GameVersion",
       nullable: true,
-      resolve: async (_query, result, _args, ctx) => {
+      resolve: async (query, result, _args, ctx) => {
         if (!result.gameVersionId) return null;
         return ctx.prisma.gameVersion.findUnique({
+          ...query,
           where: { id: result.gameVersionId },
         });
       },
