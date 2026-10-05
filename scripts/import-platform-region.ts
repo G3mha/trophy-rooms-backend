@@ -232,26 +232,36 @@ async function fetchReleaseDatesByRegionsForGames(
   const releaseDatesByGame = new Map<number, number | null>();
   const chunkSize = 200;
 
+  const pageSize = 500;
+
   for (let index = 0; index < gameIds.length; index += chunkSize) {
     const chunk = gameIds.slice(index, index + chunkSize);
-    const query = `
-      fields game, date, release_region;
-      where game = (${chunk.join(", ")}) & release_region = (${regionIds.join(", ")});
-      sort date asc;
-      limit 500;
-    `;
 
-    const releaseDates = await igdbRequest<IGDBReleaseDate[]>("release_dates", query);
-    for (const releaseDate of releaseDates) {
-      if (!releaseDatesByGame.has(releaseDate.game)) {
-        releaseDatesByGame.set(releaseDate.game, releaseDate.date ?? null);
+    // 200 games can have well over 500 regional release entries (the first
+    // 200 PS4 games have about 1,000), so page until IGDB runs out
+    for (let offset = 0; ; offset += pageSize) {
+      const query = `
+        fields game, date, release_region;
+        where game = (${chunk.join(", ")}) & release_region = (${regionIds.join(", ")});
+        sort date asc;
+        offset ${offset};
+        limit ${pageSize};
+      `;
+
+      const releaseDates = await igdbRequest<IGDBReleaseDate[]>("release_dates", query);
+      for (const releaseDate of releaseDates) {
+        if (!releaseDatesByGame.has(releaseDate.game)) {
+          releaseDatesByGame.set(releaseDate.game, releaseDate.date ?? null);
+        }
       }
+
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      if (releaseDates.length < pageSize) break;
     }
 
     process.stdout.write(
       `\r   Matched Western releases for ${releaseDatesByGame.size}/${gameIds.length} games...`
     );
-    await new Promise((resolve) => setTimeout(resolve, 250));
   }
 
   console.log("");
