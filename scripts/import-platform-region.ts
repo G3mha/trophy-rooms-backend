@@ -2,7 +2,6 @@ import { Prisma, PrismaClient, GameType } from "@prisma/client";
 import {
   igdbRequest,
   getCoverUrl,
-  IGDBGameCategory,
   IGDB_PLATFORM_MAP,
   isShippedRelease,
   type IGDBGame,
@@ -288,8 +287,8 @@ async function fetchMainGamesByIds(gameIds: number[]): Promise<IGDBGame[]> {
   for (let i = 0; i < gameIds.length; i += chunkSize) {
     const chunk = gameIds.slice(i, i + chunkSize);
     const query = `
-      fields id, name, slug, summary, cover.image_id, first_release_date, category;
-      where id = (${chunk.join(", ")}) & category = ${IGDBGameCategory.MainGame} & version_parent = null;
+      fields id, name, slug, summary, cover.image_id, first_release_date, game_type;
+      where id = (${chunk.join(", ")}) & game_type = 0 & version_parent = null;
       limit ${chunk.length};
     `;
 
