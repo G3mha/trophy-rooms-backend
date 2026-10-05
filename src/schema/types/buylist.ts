@@ -110,25 +110,27 @@ builder.prismaObject("BuylistItem", {
         dlcId: true,
         bundleId: true,
       },
-      resolve: async (_query, item, _args, ctx) => {
+      // The platform is loaded through the item's game, DLC or bundle, so the
+      // query Pothos builds from the selection goes on that nested relation
+      resolve: async (query, item, _args, ctx) => {
         if (item.gameId) {
           const game = await ctx.prisma.game.findUnique({
             where: { id: item.gameId },
-            select: { platform: true },
+            select: { platform: query },
           });
           return game?.platform ?? null;
         }
         if (item.dlcId) {
           const dlc = await ctx.prisma.dLC.findUnique({
             where: { id: item.dlcId },
-            select: { platforms: { take: 1 } },
+            select: { platforms: { ...query, take: 1 } },
           });
           return dlc?.platforms[0] ?? null;
         }
         if (item.bundleId) {
           const bundle = await ctx.prisma.bundle.findUnique({
             where: { id: item.bundleId },
-            select: { platforms: { take: 1 } },
+            select: { platforms: { ...query, take: 1 } },
           });
           return bundle?.platforms[0] ?? null;
         }
