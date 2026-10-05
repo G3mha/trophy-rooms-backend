@@ -1,5 +1,6 @@
 import { builder } from "../builder.js";
 import { USER_EMAIL_DEPRECATION } from "../deprecations.js";
+import { visibleSetWhere } from "../../lib/achievement-visibility.js";
 
 // Activity feed entry type
 const ActivityFeedEntry = builder.objectRef<{
@@ -116,6 +117,8 @@ builder.queryField("recentAchievementActivity", (t) =>
       const limit = Math.min(args.limit || 20, 50);
 
       const recentAchievements = await ctx.prisma.userAchievement.findMany({
+        // Hide completions of achievements in sets this viewer can't see
+        where: { achievement: { achievementSet: visibleSetWhere(ctx.user) } },
         take: limit,
         orderBy: { createdAt: "desc" },
         include: {
@@ -214,6 +217,7 @@ builder.queryField("activityFeed", (t) =>
       // Fetch both achievements and trophies
       const [achievements, trophies] = await Promise.all([
         ctx.prisma.userAchievement.findMany({
+          where: { achievement: { achievementSet: visibleSetWhere(ctx.user) } },
           take: limit,
           orderBy: { createdAt: "desc" },
           include: {
