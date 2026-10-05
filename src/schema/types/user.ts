@@ -145,12 +145,23 @@ builder.prismaObject("User", {
           }
         }
 
-        const trophyCount = await ctx.prisma.trophy.count({
+        // Count completed families, not Trophy rows: a family carries one
+        // trophy per library edition, and a trophy can outlive the
+        // achievements that earned it. Only families the user has played
+        // count, so the rate can't pass 100%.
+        const trophies = await ctx.prisma.trophy.findMany({
           where: { userId: user.id },
+          select: { game: { select: { gameFamilyId: true } } },
         });
+        const completedFamilyIds = new Set(
+          trophies
+            .map((trophy) => trophy.game.gameFamilyId)
+            .filter((id): id is string => id !== null && gameFamilyIds.has(id))
+        );
 
         const gamesPlayed = gameFamilyIds.size;
-        const completionRate = gamesPlayed > 0 ? (trophyCount / gamesPlayed) * 100 : 0;
+        const completionRate =
+          gamesPlayed > 0 ? (completedFamilyIds.size / gamesPlayed) * 100 : 0;
         const averagePointsPerGame = gamesPlayed > 0 ? totalPoints / gamesPlayed : 0;
 
         return {
