@@ -24,7 +24,7 @@
  *   not-on-igdb   no IGDB game with this title lists the platform
  *
  * --cancelled-out <file> writes the cancelled editions as JSON, the input
- * fix-cancelled-editions.ts takes.
+ * fix-unreleased-editions.ts takes.
  *
  * Usage:
  *   npx tsx scripts/check-family-release-dates.ts

@@ -20,8 +20,8 @@
  * achievement sets, DLC, buylist entries, bundles or base/derived links.
  *
  * Usage:
- *   npx tsx scripts/fix-cancelled-editions.ts --editions <file>           # dry run, prints the plan
- *   npx tsx scripts/fix-cancelled-editions.ts --editions <file> --apply   # deletes, in one transaction
+ *   npx tsx scripts/fix-unreleased-editions.ts --editions <file>           # dry run, prints the plan
+ *   npx tsx scripts/fix-unreleased-editions.ts --editions <file> --apply   # deletes, in one transaction
  */
 
 import { readFileSync } from "node:fs";
@@ -158,13 +158,13 @@ async function main() {
   const editionsIndex = args.indexOf("--editions");
   const editionsPath = editionsIndex >= 0 ? args[editionsIndex + 1] : undefined;
   if (!editionsPath) {
-    console.error("Usage: npx tsx scripts/fix-cancelled-editions.ts --editions <file> [--apply]");
+    console.error("Usage: npx tsx scripts/fix-unreleased-editions.ts --editions <file> [--apply]");
     process.exitCode = 1;
     return;
   }
   const editions = readEditions(editionsPath);
 
-  console.log("=== Fix Cancelled Editions ===\n");
+  console.log("=== Fix Unreleased Editions ===\n");
   console.log(`Mode: ${apply ? "apply" : "dry run"}`);
   const databaseUrl = process.env.DATABASE_URL;
   if (databaseUrl) {
