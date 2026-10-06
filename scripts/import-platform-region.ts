@@ -36,20 +36,42 @@ interface IGDBGameReleaseDate extends IGDBReleaseDate {
   release_region?: number;
 }
 
-// Keep each game's earliest shipped release. Cancelled, alpha, beta and
-// next-gen patch releases don't count (isShippedRelease), so a game with only
-// those, or only undated entries, is left out of the import instead of
-// arriving with a date it never shipped on.
-function recordEarliestShippedRelease(
-  earliestByGame: Map<number, number>,
-  releaseDates: IGDBGameReleaseDate[]
+// Earliest shipped release per IGDB game, on any platform and on the platform
+// being imported. The Game gets its own platform's date. The family keeps the
+// first release, which also decides whether a same-titled family is the same
+// game, so a later port still joins its original's family. Cancelled, alpha,
+// beta and next-gen patch releases don't count (isShippedRelease), and a game
+// with no shipped release on the platform is left out of the import.
+interface GameReleaseDates {
+  first: number;
+  onPlatform?: number;
+}
+
+type PlatformReleaseDates = Required<GameReleaseDates>;
+
+function recordEarliestShippedReleases(
+  datesByGame: Map<number, GameReleaseDates>,
+  releaseDates: IGDBGameReleaseDate[],
+  igdbPlatformIds: ReadonlySet<number>
 ) {
   for (const release of releaseDates.filter(isShippedRelease)) {
-    const current = earliestByGame.get(release.game);
-    if (current === undefined || release.date < current) {
-      earliestByGame.set(release.game, release.date);
+    const dates = datesByGame.get(release.game) ?? { first: release.date };
+    dates.first = Math.min(dates.first, release.date);
+    if (igdbPlatformIds.has(release.platform)) {
+      dates.onPlatform = Math.min(dates.onPlatform ?? release.date, release.date);
     }
+    datesByGame.set(release.game, dates);
   }
+}
+
+function releasedOnPlatform(
+  datesByGame: Map<number, GameReleaseDates>
+): Map<number, PlatformReleaseDates> {
+  const released = new Map<number, PlatformReleaseDates>();
+  for (const [gameId, { first, onPlatform }] of datesByGame) {
+    if (onPlatform !== undefined) released.set(gameId, { first, onPlatform });
+  }
+  return released;
 }
 
 const WESTERN_RELEASE_REGION_IDS = [1, 2, 3, 4, 8, 10];
@@ -194,8 +216,9 @@ async function fetchAllReleaseDatesForPlatformRegion(
   igdbPlatformIds: number[],
   regionId: number,
   limit?: number
-): Promise<Map<number, number>> {
-  const gameReleaseMap = new Map<number, number>();
+): Promise<Map<number, PlatformReleaseDates>> {
+  const datesByGame = new Map<number, GameReleaseDates>();
+  const platformIds = new Set(igdbPlatformIds);
   let offset = 0;
   const pageSize = 500;
   let hasMore = true;
@@ -210,13 +233,14 @@ async function fetchAllReleaseDatesForPlatformRegion(
     `;
 
     const releaseDates = await igdbRequest<IGDBGameReleaseDate[]>("release_dates", query);
-    recordEarliestShippedRelease(gameReleaseMap, releaseDates);
+    recordEarliestShippedReleases(datesByGame, releaseDates, platformIds);
+    const releasedCount = releasedOnPlatform(datesByGame).size;
 
-    process.stdout.write(`\r   Fetched ${gameReleaseMap.size} unique release entries...`);
+    process.stdout.write(`\r   Fetched releases for ${releasedCount} games on the platform...`);
 
     if (releaseDates.length < pageSize) {
       hasMore = false;
-    } else if (limit && gameReleaseMap.size >= limit) {
+    } else if (limit && releasedCount >= limit) {
       hasMore = false;
     } else {
       offset += pageSize;
@@ -226,22 +250,25 @@ async function fetchAllReleaseDatesForPlatformRegion(
 
   console.log("");
 
-  if (limit && gameReleaseMap.size > limit) {
-    return new Map(Array.from(gameReleaseMap.entries()).slice(0, limit));
+  const released = releasedOnPlatform(datesByGame);
+  if (limit && released.size > limit) {
+    return new Map(Array.from(released.entries()).slice(0, limit));
   }
 
-  return gameReleaseMap;
+  return released;
 }
 
 async function fetchReleaseDatesByRegionsForGames(
   gameIds: number[],
-  regionIds: number[]
-): Promise<Map<number, number>> {
+  regionIds: number[],
+  igdbPlatformIds: number[]
+): Promise<Map<number, PlatformReleaseDates>> {
   if (gameIds.length === 0) {
     return new Map();
   }
 
-  const releaseDatesByGame = new Map<number, number>();
+  const datesByGame = new Map<number, GameReleaseDates>();
+  const platformIds = new Set(igdbPlatformIds);
   const chunkSize = 200;
 
   const pageSize = 500;
@@ -261,19 +288,19 @@ async function fetchReleaseDatesByRegionsForGames(
       `;
 
       const releaseDates = await igdbRequest<IGDBGameReleaseDate[]>("release_dates", query);
-      recordEarliestShippedRelease(releaseDatesByGame, releaseDates);
+      recordEarliestShippedReleases(datesByGame, releaseDates, platformIds);
 
       await new Promise((resolve) => setTimeout(resolve, 250));
       if (releaseDates.length < pageSize) break;
     }
 
     process.stdout.write(
-      `\r   Matched Western releases for ${releaseDatesByGame.size}/${gameIds.length} games...`
+      `\r   Matched Western releases on the platform for ${releasedOnPlatform(datesByGame).size}/${gameIds.length} games...`
     );
   }
 
   console.log("");
-  return releaseDatesByGame;
+  return releasedOnPlatform(datesByGame);
 }
 
 async function fetchMainGamesByIds(gameIds: number[]): Promise<IGDBGame[]> {
@@ -417,7 +444,7 @@ async function main() {
   console.log(`Resolved IGDB platform IDs: ${igdbPlatformIds.join(", ")}`);
   console.log("");
 
-  let releaseDates = new Map<number, number>();
+  let releaseDates = new Map<number, PlatformReleaseDates>();
   let igdbGames: IGDBGame[] = [];
 
   if (regionSlug) {
@@ -441,7 +468,7 @@ async function main() {
       return;
     }
 
-    console.log(`Found ${releaseDates.size} unique release-date game IDs`);
+    console.log(`Found ${releaseDates.size} games with a shipped ${region.name} release on ${platform.name}`);
     igdbGames = await fetchMainGamesByIds(Array.from(releaseDates.keys()));
     console.log(`Filtered down to ${igdbGames.length} main games with no version parent`);
   } else {
@@ -450,12 +477,15 @@ async function main() {
 
     releaseDates = await fetchReleaseDatesByRegionsForGames(
       igdbGames.map((game) => game.id),
-      WESTERN_RELEASE_REGION_IDS
+      WESTERN_RELEASE_REGION_IDS,
+      igdbPlatformIds
     );
 
     const westernReleaseFilteredGames = igdbGames.filter((game) => releaseDates.has(game.id));
     const excludedWithoutWesternRelease = igdbGames.length - westernReleaseFilteredGames.length;
-    console.log(`Excluded ${excludedWithoutWesternRelease} titles without a shipped Western release`);
+    console.log(
+      `Excluded ${excludedWithoutWesternRelease} titles without a shipped Western release on ${platform.name}`
+    );
     igdbGames = westernReleaseFilteredGames;
   }
 
@@ -551,6 +581,8 @@ async function main() {
     }> = [];
     const familyRowsToCreate: Array<{
       sourceTitle: string;
+      // The new family's game takes its own platform's date, not the family's
+      gameReleaseDate: Date;
       title: string;
       slug: string;
       description: string | null;
@@ -566,17 +598,23 @@ async function main() {
         continue;
       }
 
+      // Every game here was selected for having a shipped release on the platform
+      const dates = releaseDates.get(game.id);
+      if (!dates) {
+        continue;
+      }
+
       const normalizedTitle = normalizeTitle(trimmedTitle);
-      const releaseTimestamp = releaseDates.get(game.id) ?? game.first_release_date ?? null;
-      const releaseDate = releaseTimestamp ? new Date(releaseTimestamp * 1000) : null;
+      const firstRelease = new Date(dates.first * 1000);
+      const platformRelease = new Date(dates.onPlatform * 1000);
       const existingFamily = (existingFamilyByTitle.get(normalizedTitle) ?? []).find((family) =>
-        shouldReuseExistingFamily(family, platform.slug, releaseDate)
+        shouldReuseExistingFamily(family, platform.slug, firstRelease)
       );
 
       if (existingFamily) {
         gameRowsToAttach.push({
           gameFamilyId: existingFamily.id,
-          releaseDate,
+          releaseDate: platformRelease,
         });
         continue;
       }
@@ -586,13 +624,14 @@ async function main() {
 
       familyRowsToCreate.push({
         sourceTitle: normalizedTitle,
+        gameReleaseDate: platformRelease,
         title: trimmedTitle,
         slug,
         description: game.summary?.trim() || null,
         coverUrl: game.cover?.image_id
           ? getCoverUrl(game.cover.image_id, "cover_big")
           : null,
-        releaseDate,
+        releaseDate: firstRelease,
         type: GameType.BASE_GAME,
         screenshots: [],
       });
@@ -605,7 +644,9 @@ async function main() {
     const chunkResult = await prisma.$transaction(async (tx) => {
       const createdGameFamilies = familyRowsToCreate.length > 0
         ? await tx.gameFamily.createManyAndReturn({
-            data: familyRowsToCreate.map(({ sourceTitle: _sourceTitle, ...row }) => row),
+            data: familyRowsToCreate.map(
+              ({ sourceTitle: _sourceTitle, gameReleaseDate: _gameReleaseDate, ...row }) => row
+            ),
             select: {
               id: true,
               slug: true,
@@ -623,13 +664,16 @@ async function main() {
         }
       });
 
+      const gameReleaseDateBySlug = new Map(
+        familyRowsToCreate.map((row) => [row.slug, row.gameReleaseDate])
+      );
       const createdGames = await tx.game.createManyAndReturn({
         data: [
           ...gameRowsToAttach,
           ...createdGameFamilies.map((gameFamily) => ({
             gameFamilyId: gameFamily.id,
             platformId: platform.id,
-            releaseDate: gameFamily.releaseDate,
+            releaseDate: gameReleaseDateBySlug.get(gameFamily.slug) ?? null,
           })),
         ].map((row) => ({
           gameFamilyId: row.gameFamilyId,
