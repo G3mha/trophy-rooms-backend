@@ -14,7 +14,9 @@
  * - Next-gen editions that IGDB only records as a patch to the last-gen game
  *   (a free Switch 2 update, say). These need a person to decide, so they go
  *   through a review sheet: a CSV with decision, family_slug, platform and
- *   igdb_game columns, where only rows marked "delete" are acted on.
+ *   igdb_game columns, where only rows marked "delete" are acted on. Once
+ *   applied, rows are marked "deleted" so the sheet keeps the record; the
+ *   script checks those are really gone and stops if one is still there.
  *
  * Lists that have been applied are kept in scripts/data/. The first batch of
  * 29 is in this file's history, at ac34ff8 under fix-cancelled-editions.ts.
@@ -42,8 +44,16 @@ interface UnreleasedEdition {
   igdb: string;
 }
 
-function readEditions(path: string): UnreleasedEdition[] {
-  return path.endsWith(".csv") ? readReviewSheet(path) : readEditionsJson(path);
+interface EditionList {
+  toDelete: UnreleasedEdition[];
+  // Rows a review sheet marks as already deleted
+  alreadyDeleted: UnreleasedEdition[];
+}
+
+function readEditions(path: string): EditionList {
+  return path.endsWith(".csv")
+    ? readReviewSheet(path)
+    : { toDelete: readEditionsJson(path), alreadyDeleted: [] };
 }
 
 function readEditionsJson(path: string): UnreleasedEdition[] {
@@ -62,9 +72,9 @@ function readEditionsJson(path: string): UnreleasedEdition[] {
   return parsed as UnreleasedEdition[];
 }
 
-// Rows are marked keep, delete or left blank; only delete rows are returned,
-// and anything else in the decision column stops the run
-function readReviewSheet(path: string): UnreleasedEdition[] {
+// Rows are marked keep, delete, deleted (already applied) or left blank;
+// anything else in the decision column stops the run
+function readReviewSheet(path: string): EditionList {
   const [header, ...rows] = parseCsv(readFileSync(path, "utf8"));
   if (!header) throw new Error(`${path} is empty`);
   const column = (name: string) => {
@@ -77,17 +87,19 @@ function readReviewSheet(path: string): UnreleasedEdition[] {
   const platform = column("platform");
   const igdb = column("igdb_game");
 
-  const editions: UnreleasedEdition[] = [];
+  const list: EditionList = { toDelete: [], alreadyDeleted: [] };
   rows.forEach((row, index) => {
     const value = (row[decision] ?? "").trim().toLowerCase();
-    if (value !== "" && value !== "keep" && value !== "delete") {
-      throw new Error(`${path} row ${index + 2}: decision must be keep, delete or blank, got "${row[decision]}"`);
+    if (value !== "" && value !== "keep" && value !== "delete" && value !== "deleted") {
+      throw new Error(
+        `${path} row ${index + 2}: decision must be keep, delete, deleted or blank, got "${row[decision]}"`
+      );
     }
-    if (value === "delete") {
-      editions.push({ family: row[family] ?? "", platform: row[platform] ?? "", igdb: row[igdb] ?? "" });
-    }
+    const edition = { family: row[family] ?? "", platform: row[platform] ?? "", igdb: row[igdb] ?? "" };
+    if (value === "delete") list.toDelete.push(edition);
+    if (value === "deleted") list.alreadyDeleted.push(edition);
   });
-  return editions;
+  return list;
 }
 
 // RFC 4180: quoted fields may hold commas, newlines and doubled quotes
@@ -135,12 +147,24 @@ interface Plan {
   problems: string[];
 }
 
-async function buildPlan(db: Prisma.TransactionClient, editions: UnreleasedEdition[]): Promise<Plan> {
+async function buildPlan(db: Prisma.TransactionClient, editions: EditionList): Promise<Plan> {
   const problems: string[] = [];
   const gameIds: string[] = [];
   const familyIdsTouched = new Set<string>();
 
-  for (const { family: familySlug, platform: platformName, igdb: igdbSource } of editions) {
+  for (const { family: familySlug, platform: platformName } of editions.alreadyDeleted) {
+    const label = `${familySlug} / ${platformName}`;
+    const remaining = await db.game.count({
+      where: { gameFamily: { slug: familySlug }, platform: { name: platformName } },
+    });
+    if (remaining > 0) {
+      problems.push(`${label}: marked deleted, but ${remaining} game${remaining === 1 ? " is" : "s are"} still in the database`);
+      continue;
+    }
+    console.log(`  already gone  ${label}`);
+  }
+
+  for (const { family: familySlug, platform: platformName, igdb: igdbSource } of editions.toDelete) {
     const games = await db.game.findMany({
       where: { gameFamily: { slug: familySlug }, platform: { name: platformName } },
       select: {
@@ -218,9 +242,12 @@ async function buildPlan(db: Prisma.TransactionClient, editions: UnreleasedEditi
   return { gameIds, familyIds, problems };
 }
 
-function report(plan: Plan, editions: UnreleasedEdition[]) {
+function report(plan: Plan, editions: EditionList) {
   console.log("");
-  console.log(`Editions listed: ${editions.length}`);
+  if (editions.alreadyDeleted.length > 0) {
+    console.log(`Editions marked deleted: ${editions.alreadyDeleted.length}`);
+  }
+  console.log(`Editions listed: ${editions.toDelete.length}`);
   console.log(`Games to delete: ${plan.gameIds.length}`);
   console.log(`Families to delete: ${plan.familyIds.length}`);
   if (plan.problems.length > 0) {
