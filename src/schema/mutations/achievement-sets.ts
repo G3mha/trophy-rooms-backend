@@ -6,6 +6,7 @@ import {
 } from "../types/achievement-set.js";
 import { ErrorCode } from "../../lib/errors.js";
 import { hasRequiredRole } from "../../context.js";
+import { visibleSetWhere } from "../../lib/achievement-visibility.js";
 import { invalidateAchievementCaches } from "../../lib/cache.js";
 import {
   AchievementSetVisibility,
@@ -219,8 +220,10 @@ builder.mutationField("updateAchievementSet", (t) =>
         };
       }
 
-      const existing = await ctx.prisma.achievementSet.findUnique({
-        where: { id },
+      // Another user's private set reads as missing, so the answer doesn't
+      // confirm it exists
+      const existing = await ctx.prisma.achievementSet.findFirst({
+        where: { id, AND: [visibleSetWhere(ctx.user)] },
       });
 
       if (!existing) {
@@ -386,8 +389,10 @@ builder.mutationField("publishAchievementSet", (t) =>
         };
       }
 
-      const existing = await ctx.prisma.achievementSet.findUnique({
-        where: { id },
+      // Another user's private set reads as missing, so the answer doesn't
+      // confirm it exists
+      const existing = await ctx.prisma.achievementSet.findFirst({
+        where: { id, AND: [visibleSetWhere(ctx.user)] },
       });
 
       if (!existing) {
@@ -466,8 +471,10 @@ builder.mutationField("deleteAchievementSet", (t) =>
         };
       }
 
-      const existing = await ctx.prisma.achievementSet.findUnique({
-        where: { id },
+      // Another user's private set reads as missing, so the answer doesn't
+      // confirm it exists
+      const existing = await ctx.prisma.achievementSet.findFirst({
+        where: { id, AND: [visibleSetWhere(ctx.user)] },
       });
 
       if (!existing) {
