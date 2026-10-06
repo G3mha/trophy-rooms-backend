@@ -1,13 +1,13 @@
 decision,game,family_slug,platform,our_release_date,igdb_patch_date,igdb_game,other_editions,edition_labels,user_data,notes
-delete,Arms,arms,Nintendo Switch 2,2017-06-16,"Jun 05, 2025",arms #26759,Nintendo Switch,Standard,none,
-delete,Big Brain Academy: Brain vs. Brain,big-brain-academy-brain-vs-brain,Nintendo Switch 2,2021-12-03,"Jun 05, 2025",big-brain-academy-brain-vs-brain #166489,Nintendo Switch,Standard,none,
-delete,Game Builder Garage,game-builder-garage,Nintendo Switch 2,2021-06-11,"Jun 05, 2025",game-builder-garage #146762,Nintendo Switch,Standard,none,
-delete,Pokémon Champions,pokemon-champions,Nintendo Switch 2,2026-04-08,"Apr 08, 2026",pokemon-champions #333568,,Standard,none,Only edition in this family: deleting it also removes the family
-delete,Pokémon Scarlet,pokemon-scarlet,Nintendo Switch 2,2022-11-18,"Jun 05, 2025",pokemon-scarlet #191931,Nintendo Switch,Standard,none,
-delete,Pokémon Violet,pokemon-violet,Nintendo Switch 2,2022-11-18,"Jun 05, 2025",pokemon-violet #191930,Nintendo Switch,Standard,none,
-delete,Splatoon 3,splatoon-3,Nintendo Switch 2,2022-09-09,"Jun 12, 2025",splatoon-3 #143613,Nintendo Switch,Standard,none,
-delete,Storm Lancers,storm-lancers,Nintendo Switch 2,2025-09-12,"Dec 09, 2025",storm-lancers #362635,,Standard,none,Only edition in this family: deleting it also removes the family
-delete,Super Mario Odyssey,super-mario-odyssey,Nintendo Switch 2,2017-10-27,"Jun 05, 2025",super-mario-odyssey #26758,Nintendo Switch,Standard,none,
+deleted,Arms,arms,Nintendo Switch 2,2017-06-16,"Jun 05, 2025",arms #26759,Nintendo Switch,Standard,none,
+deleted,Big Brain Academy: Brain vs. Brain,big-brain-academy-brain-vs-brain,Nintendo Switch 2,2021-12-03,"Jun 05, 2025",big-brain-academy-brain-vs-brain #166489,Nintendo Switch,Standard,none,
+deleted,Game Builder Garage,game-builder-garage,Nintendo Switch 2,2021-06-11,"Jun 05, 2025",game-builder-garage #146762,Nintendo Switch,Standard,none,
+deleted,Pokémon Champions,pokemon-champions,Nintendo Switch 2,2026-04-08,"Apr 08, 2026",pokemon-champions #333568,,Standard,none,Only edition in this family: deleting it also removes the family
+deleted,Pokémon Scarlet,pokemon-scarlet,Nintendo Switch 2,2022-11-18,"Jun 05, 2025",pokemon-scarlet #191931,Nintendo Switch,Standard,none,
+deleted,Pokémon Violet,pokemon-violet,Nintendo Switch 2,2022-11-18,"Jun 05, 2025",pokemon-violet #191930,Nintendo Switch,Standard,none,
+deleted,Splatoon 3,splatoon-3,Nintendo Switch 2,2022-09-09,"Jun 12, 2025",splatoon-3 #143613,Nintendo Switch,Standard,none,
+deleted,Storm Lancers,storm-lancers,Nintendo Switch 2,2025-09-12,"Dec 09, 2025",storm-lancers #362635,,Standard,none,Only edition in this family: deleting it also removes the family
+deleted,Super Mario Odyssey,super-mario-odyssey,Nintendo Switch 2,2017-10-27,"Jun 05, 2025",super-mario-odyssey #26758,Nintendo Switch,Standard,none,
 delete,A Hat in Time,a-hat-in-time,PlayStation 5,2017-10-05,"Mar 31, 2021",a-hat-in-time #6705,Nintendo Switch; PlayStation 4; Xbox One; Xbox Series X|S,Standard,none,
 delete,Amnesia: Rebirth,amnesia-rebirth,PlayStation 5,2020-10-20,"Apr 29, 2021",amnesia-rebirth #131785,Nintendo Switch 2; PlayStation 4; Xbox One; Xbox Series X|S,Standard,none,
 delete,Assassin's Creed Odyssey,assassins-creed-odyssey,PlayStation 5,2018-10-05,"Aug 24, 2021",assassins-creed-odyssey #103054,PlayStation 4; Xbox One; Xbox Series X|S,Standard,none,
