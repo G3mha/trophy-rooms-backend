@@ -40,10 +40,12 @@ const WORLDWIDE_RELEASES: Record<string, { date: string; source: string }> = {
   gog: { date: "2008-10-23", source: "GOG.com press release, open to the public (via GameBanshee)" },
 };
 
-// IGDB rows known to be wrong, replaced by a sourced date
+// IGDB regional dates known to be wrong or missing, set from a sourced date
 const CORRECTIONS: Record<string, Record<string, { date: string; source: string }>> = {
   // IGDB has Wii Australia on 2006-02-07, ten months before any Wii launch
   wii: { AU: { date: "2006-12-07", source: "Wikipedia, Wii: Australia release" } },
+  // IGDB's PS4 has no Japan release
+  ps4: { JP: { date: "2014-02-22", source: "Wikipedia, PlayStation 4: Japan release" } },
 };
 
 // IGDB versions that are separate devices, not a revision of the platform's
