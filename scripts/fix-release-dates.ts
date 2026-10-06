@@ -18,8 +18,8 @@
  * apply).
  *
  * Usage:
- *   npx tsx scripts/fix-edition-release-dates.ts --dates <file>           # dry run, prints the plan
- *   npx tsx scripts/fix-edition-release-dates.ts --dates <file> --apply   # updates, in one transaction
+ *   npx tsx scripts/fix-release-dates.ts --dates <file>           # dry run, prints the plan
+ *   npx tsx scripts/fix-release-dates.ts --dates <file> --apply   # updates, in one transaction
  */
 
 import { readFileSync } from "node:fs";
@@ -157,7 +157,7 @@ async function main() {
   const datesPath = valueOf("--dates");
   const minDays = Number.parseInt(valueOf("--min-days") ?? "0", 10);
   if (!datesPath || !Number.isFinite(minDays) || minDays < 0) {
-    console.error("Usage: npx tsx scripts/fix-edition-release-dates.ts --dates <file> [--min-days <n>] [--apply]");
+    console.error("Usage: npx tsx scripts/fix-release-dates.ts --dates <file> [--min-days <n>] [--apply]");
     process.exitCode = 1;
     return;
   }

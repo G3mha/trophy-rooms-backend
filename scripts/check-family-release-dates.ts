@@ -52,7 +52,7 @@
  * --cancelled-out <file> writes the cancelled editions as JSON, the input
  * fix-unreleased-editions.ts takes. --dates-out <file> writes the backfill
  * and differs editions, and --family-dates-out <file> the backfill and differs
- * families, as JSON, the input fix-edition-release-dates.ts takes.
+ * families, as JSON, the input fix-release-dates.ts takes.
  *
  * Usage:
  *   npx tsx scripts/check-family-release-dates.ts

@@ -7,7 +7,7 @@
  * src/lib/igdb.ts). Only releases that put the game on sale count
  * (isShippedRelease): cancelled, alpha, beta and next-gen patch releases are
  * skipped. Only null dates are filled: dates already set are never
- * overwritten (fix-edition-release-dates.ts corrects those), and games with
+ * overwritten (fix-release-dates.ts corrects those), and games with
  * no Western release on their platform are reported and left alone.
  *
  * pickTrophyGames (src/lib/trophies.ts) falls back to a family's earliest
