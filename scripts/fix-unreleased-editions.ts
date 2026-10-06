@@ -1,17 +1,23 @@
 /**
- * Delete Game rows for platform releases that were cancelled.
+ * Delete Game rows for editions that were never released on their platform.
  *
  * A Game entry needs a platform release someone can own (see CLAUDE.md,
- * Backward Compatibility). The editions come from a JSON file written by
- * check-family-release-dates.ts --cancelled-out, which marks an edition
- * cancelled when IGDB has no shipped release for it on that platform and
- * records the release, or the whole game, as Cancelled. Most of these came in
- * because the importer counted cancelled releases as releases, and because it
- * adds a game to an existing family by title, so a cancelled game could land
- * inside a released one that shares its name (the 2007 Dirty Harry, IGDB
- * #78566, inside the 1990 NES family). Lists that have been applied are kept
- * in scripts/data/; the first batch of 29 is in this file's history at
- * ac34ff8.
+ * Backward Compatibility). Two kinds of edition fail that:
+ *
+ * - Cancelled ports. check-family-release-dates.ts --cancelled-out writes them
+ *   as JSON: editions with no shipped IGDB release on the platform whose
+ *   release, or whole game, IGDB records as Cancelled. Most came in because
+ *   the importer counted cancelled releases as releases, and because it adds
+ *   a game to an existing family by title, so a cancelled game could land
+ *   inside a released one that shares its name (the 2007 Dirty Harry, IGDB
+ *   #78566, inside the 1990 NES family).
+ * - Next-gen editions that IGDB only records as a patch to the last-gen game
+ *   (a free Switch 2 update, say). These need a person to decide, so they go
+ *   through a review sheet: a CSV with decision, family_slug, platform and
+ *   igdb_game columns, where only rows marked "delete" are acted on.
+ *
+ * Lists that have been applied are kept in scripts/data/. The first batch of
+ * 29 is in this file's history, at ac34ff8 under fix-cancelled-editions.ts.
  *
  * Families left with no games are deleted too. Everything is checked again
  * inside the delete transaction: the script stops if any edition doesn't
@@ -19,7 +25,7 @@
  * trophies, play sessions, buylist), or if a family about to be emptied has
  * achievement sets, DLC, buylist entries, bundles or base/derived links.
  *
- * Usage:
+ * Usage (<file> is .json or .csv):
  *   npx tsx scripts/fix-unreleased-editions.ts --editions <file>           # dry run, prints the plan
  *   npx tsx scripts/fix-unreleased-editions.ts --editions <file> --apply   # deletes, in one transaction
  */
@@ -29,14 +35,18 @@ import { Prisma, PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-interface CancelledEdition {
+interface UnreleasedEdition {
   family: string;
   platform: string;
-  // IGDB game(s) the cancellation is recorded on, for the log
+  // IGDB game(s) the evidence is recorded on, for the log
   igdb: string;
 }
 
-function readEditions(path: string): CancelledEdition[] {
+function readEditions(path: string): UnreleasedEdition[] {
+  return path.endsWith(".csv") ? readReviewSheet(path) : readEditionsJson(path);
+}
+
+function readEditionsJson(path: string): UnreleasedEdition[] {
   const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
   if (
     !Array.isArray(parsed) ||
@@ -49,7 +59,74 @@ function readEditions(path: string): CancelledEdition[] {
   ) {
     throw new Error(`${path} must be an array of { family, platform, igdb } strings`);
   }
-  return parsed as CancelledEdition[];
+  return parsed as UnreleasedEdition[];
+}
+
+// Rows are marked keep, delete or left blank; only delete rows are returned,
+// and anything else in the decision column stops the run
+function readReviewSheet(path: string): UnreleasedEdition[] {
+  const [header, ...rows] = parseCsv(readFileSync(path, "utf8"));
+  if (!header) throw new Error(`${path} is empty`);
+  const column = (name: string) => {
+    const index = header.indexOf(name);
+    if (index < 0) throw new Error(`${path} has no "${name}" column`);
+    return index;
+  };
+  const decision = column("decision");
+  const family = column("family_slug");
+  const platform = column("platform");
+  const igdb = column("igdb_game");
+
+  const editions: UnreleasedEdition[] = [];
+  rows.forEach((row, index) => {
+    const value = (row[decision] ?? "").trim().toLowerCase();
+    if (value !== "" && value !== "keep" && value !== "delete") {
+      throw new Error(`${path} row ${index + 2}: decision must be keep, delete or blank, got "${row[decision]}"`);
+    }
+    if (value === "delete") {
+      editions.push({ family: row[family] ?? "", platform: row[platform] ?? "", igdb: row[igdb] ?? "" });
+    }
+  });
+  return editions;
+}
+
+// RFC 4180: quoted fields may hold commas, newlines and doubled quotes
+function parseCsv(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = "";
+  let quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    const char = text.charAt(i);
+    if (quoted) {
+      if (char === '"' && text.charAt(i + 1) === '"') {
+        field += '"';
+        i++;
+      } else if (char === '"') {
+        quoted = false;
+      } else {
+        field += char;
+      }
+    } else if (char === '"') {
+      quoted = true;
+    } else if (char === ",") {
+      row.push(field);
+      field = "";
+    } else if (char === "\n" || char === "\r") {
+      if (char === "\r" && text.charAt(i + 1) === "\n") i++;
+      row.push(field);
+      rows.push(row);
+      row = [];
+      field = "";
+    } else {
+      field += char;
+    }
+  }
+  if (field !== "" || row.length > 0) {
+    row.push(field);
+    rows.push(row);
+  }
+  return rows.filter((cells) => cells.some((cell) => cell !== ""));
 }
 
 interface Plan {
@@ -58,7 +135,7 @@ interface Plan {
   problems: string[];
 }
 
-async function buildPlan(db: Prisma.TransactionClient, editions: CancelledEdition[]): Promise<Plan> {
+async function buildPlan(db: Prisma.TransactionClient, editions: UnreleasedEdition[]): Promise<Plan> {
   const problems: string[] = [];
   const gameIds: string[] = [];
   const familyIdsTouched = new Set<string>();
@@ -141,7 +218,7 @@ async function buildPlan(db: Prisma.TransactionClient, editions: CancelledEditio
   return { gameIds, familyIds, problems };
 }
 
-function report(plan: Plan, editions: CancelledEdition[]) {
+function report(plan: Plan, editions: UnreleasedEdition[]) {
   console.log("");
   console.log(`Editions listed: ${editions.length}`);
   console.log(`Games to delete: ${plan.gameIds.length}`);
