@@ -15,43 +15,30 @@ builder.prismaObject("Game", {
     gameFamily: t.relation("gameFamily", { nullable: true }),
     gameFamilyId: t.exposeString("gameFamilyId", { nullable: true }),
 
-    // Delegated fields from GameFamily (with platform override for coverUrl)
+    // Delegated fields from GameFamily (with platform override for coverUrl).
+    // Each one selects what it needs from the family, and Pothos merges those
+    // selections into the query that loads the game, so a game page reads its
+    // family once rather than once per field.
     title: t.string({
-      resolve: async (game, _args, ctx) => {
-        if (!game.gameFamilyId) return "Unknown";
-        const family = await ctx.prisma.gameFamily.findUnique({
-          where: { id: game.gameFamilyId },
-          select: { title: true },
-        });
-        return family?.title ?? "Unknown";
-      },
+      select: { gameFamily: { select: { title: true } } },
+      resolve: (game) => game.gameFamily?.title ?? "Unknown",
     }),
     // Platform-specific description override, falls back to family description
     description: t.string({
       nullable: true,
-      resolve: async (game, _args, ctx) => {
+      select: { gameFamily: { select: { description: true } } },
+      resolve: (game) => {
         if (game.description) return game.description;
-        if (!game.gameFamilyId) return null;
-        const family = await ctx.prisma.gameFamily.findUnique({
-          where: { id: game.gameFamilyId },
-          select: { description: true },
-        });
-        return family?.description ?? null;
+        return game.gameFamily?.description ?? null;
       },
     }),
     // Platform-specific coverUrl override, falls back to family coverUrl
     coverUrl: t.string({
       nullable: true,
-      resolve: async (game, _args, ctx) => {
-        // Use platform-specific override if set
+      select: { gameFamily: { select: { coverUrl: true } } },
+      resolve: (game) => {
         if (game.coverUrl) return game.coverUrl;
-        // Fall back to family coverUrl
-        if (!game.gameFamilyId) return null;
-        const family = await ctx.prisma.gameFamily.findUnique({
-          where: { id: game.gameFamilyId },
-          select: { coverUrl: true },
-        });
-        return family?.coverUrl ?? null;
+        return game.gameFamily?.coverUrl ?? null;
       },
     }),
     releaseDate: t.expose("releaseDate", { type: "DateTime", nullable: true }),
@@ -60,83 +47,43 @@ builder.prismaObject("Game", {
     platformDescription: t.exposeString("description", { nullable: true }),
     developer: t.string({
       nullable: true,
-      resolve: async (game, _args, ctx) => {
-        if (!game.gameFamilyId) return null;
-        const family = await ctx.prisma.gameFamily.findUnique({
-          where: { id: game.gameFamilyId },
-          select: { developer: true },
-        });
-        return family?.developer ?? null;
-      },
+      select: { gameFamily: { select: { developer: true } } },
+      resolve: (game) => game.gameFamily?.developer ?? null,
     }),
     publisher: t.string({
       nullable: true,
-      resolve: async (game, _args, ctx) => {
-        if (!game.gameFamilyId) return null;
-        const family = await ctx.prisma.gameFamily.findUnique({
-          where: { id: game.gameFamilyId },
-          select: { publisher: true },
-        });
-        return family?.publisher ?? null;
-      },
+      select: { gameFamily: { select: { publisher: true } } },
+      resolve: (game) => game.gameFamily?.publisher ?? null,
     }),
     genre: t.string({
       nullable: true,
-      resolve: async (game, _args, ctx) => {
-        if (!game.gameFamilyId) return null;
-        const family = await ctx.prisma.gameFamily.findUnique({
-          where: { id: game.gameFamilyId },
-          select: { genre: true },
-        });
-        return family?.genre ?? null;
-      },
+      select: { gameFamily: { select: { genre: true } } },
+      resolve: (game) => game.gameFamily?.genre ?? null,
     }),
     esrbRating: t.string({
       nullable: true,
-      resolve: async (game, _args, ctx) => {
-        if (!game.gameFamilyId) return null;
-        const family = await ctx.prisma.gameFamily.findUnique({
-          where: { id: game.gameFamilyId },
-          select: { esrbRating: true },
-        });
-        return family?.esrbRating ?? null;
-      },
+      select: { gameFamily: { select: { esrbRating: true } } },
+      resolve: (game) => game.gameFamily?.esrbRating ?? null,
     }),
     screenshots: t.stringList({
-      resolve: async (game, _args, ctx) => {
-        if (!game.gameFamilyId) return [];
-        const family = await ctx.prisma.gameFamily.findUnique({
-          where: { id: game.gameFamilyId },
-          select: { screenshots: true },
-        });
-        return family?.screenshots ?? [];
-      },
+      select: { gameFamily: { select: { screenshots: true } } },
+      resolve: (game) => game.gameFamily?.screenshots ?? [],
     }),
     type: t.field({
       type: GameTypeEnum,
-      resolve: async (game, _args, ctx) => {
-        if (!game.gameFamilyId) return "BASE_GAME";
-        const family = await ctx.prisma.gameFamily.findUnique({
-          where: { id: game.gameFamilyId },
-          select: { type: true },
-        });
-        return family?.type ?? "BASE_GAME";
-      },
+      select: { gameFamily: { select: { type: true } } },
+      resolve: (game) => game.gameFamily?.type ?? "BASE_GAME",
     }),
 
-    // Base game families of this game's family (fangames, ROM hacks, mods)
+    // Base game families of this game's family (fangames, ROM hacks, mods):
+    // the families that list this family among their derived ones
     baseGameFamilies: t.prismaField({
       type: ["GameFamily"],
       resolve: async (query, game, _args, ctx) => {
         if (!game.gameFamilyId) return [];
-        const family = await ctx.prisma.gameFamily.findUnique({
-          where: { id: game.gameFamilyId },
-          include: { baseGameFamilies: { select: { id: true } } },
-        });
-        if (!family || family.baseGameFamilies.length === 0) return [];
         return ctx.prisma.gameFamily.findMany({
           ...query,
-          where: { id: { in: family.baseGameFamilies.map((f) => f.id) } },
+          where: { derivedGameFamilies: { some: { id: game.gameFamilyId } } },
         });
       },
     }),
@@ -146,26 +93,15 @@ builder.prismaObject("Game", {
       type: ["GameFamily"],
       resolve: async (query, game, _args, ctx) => {
         if (!game.gameFamilyId) return [];
-        const family = await ctx.prisma.gameFamily.findUnique({
-          where: { id: game.gameFamilyId },
-          include: { derivedGameFamilies: { select: { id: true } } },
-        });
-        if (!family || family.derivedGameFamilies.length === 0) return [];
         return ctx.prisma.gameFamily.findMany({
           ...query,
-          where: { id: { in: family.derivedGameFamilies.map((f) => f.id) } },
+          where: { baseGameFamilies: { some: { id: game.gameFamilyId } } },
         });
       },
     }),
     derivedGameFamilyCount: t.int({
-      resolve: async (game, _args, ctx) => {
-        if (!game.gameFamilyId) return 0;
-        const family = await ctx.prisma.gameFamily.findUnique({
-          where: { id: game.gameFamilyId },
-          include: { _count: { select: { derivedGameFamilies: true } } },
-        });
-        return family?._count.derivedGameFamilies ?? 0;
-      },
+      select: { gameFamily: { select: { _count: { select: { derivedGameFamilies: true } } } } },
+      resolve: (game) => game.gameFamily?._count.derivedGameFamilies ?? 0,
     }),
 
     // Base games via family
@@ -173,28 +109,15 @@ builder.prismaObject("Game", {
       type: ["Game"],
       resolve: async (query, game, _args, ctx) => {
         if (!game.gameFamilyId) return [];
-        const family = await ctx.prisma.gameFamily.findUnique({
-          where: { id: game.gameFamilyId },
-          include: { baseGameFamilies: { select: { id: true } } },
-        });
-        if (!family || family.baseGameFamilies.length === 0) return [];
         return ctx.prisma.game.findMany({
           ...query,
-          where: {
-            gameFamilyId: { in: family.baseGameFamilies.map((f) => f.id) },
-          },
+          where: { gameFamily: { derivedGameFamilies: { some: { id: game.gameFamilyId } } } },
         });
       },
     }),
     baseGameCount: t.int({
-      resolve: async (game, _args, ctx) => {
-        if (!game.gameFamilyId) return 0;
-        const family = await ctx.prisma.gameFamily.findUnique({
-          where: { id: game.gameFamilyId },
-          include: { _count: { select: { baseGameFamilies: true } } },
-        });
-        return family?._count.baseGameFamilies ?? 0;
-      },
+      select: { gameFamily: { select: { _count: { select: { baseGameFamilies: true } } } } },
+      resolve: (game) => game.gameFamily?._count.baseGameFamilies ?? 0,
     }),
 
     // Derived games via family
@@ -202,28 +125,15 @@ builder.prismaObject("Game", {
       type: ["Game"],
       resolve: async (query, game, _args, ctx) => {
         if (!game.gameFamilyId) return [];
-        const family = await ctx.prisma.gameFamily.findUnique({
-          where: { id: game.gameFamilyId },
-          include: { derivedGameFamilies: { select: { id: true } } },
-        });
-        if (!family || family.derivedGameFamilies.length === 0) return [];
         return ctx.prisma.game.findMany({
           ...query,
-          where: {
-            gameFamilyId: { in: family.derivedGameFamilies.map((f) => f.id) },
-          },
+          where: { gameFamily: { baseGameFamilies: { some: { id: game.gameFamilyId } } } },
         });
       },
     }),
     derivedGameCount: t.int({
-      resolve: async (game, _args, ctx) => {
-        if (!game.gameFamilyId) return 0;
-        const family = await ctx.prisma.gameFamily.findUnique({
-          where: { id: game.gameFamilyId },
-          include: { _count: { select: { derivedGameFamilies: true } } },
-        });
-        return family?._count.derivedGameFamilies ?? 0;
-      },
+      select: { gameFamily: { select: { _count: { select: { derivedGameFamilies: true } } } } },
+      resolve: (game) => game.gameFamily?._count.derivedGameFamilies ?? 0,
     }),
 
     platform: t.prismaField({
