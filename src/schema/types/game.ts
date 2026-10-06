@@ -453,9 +453,10 @@ GameMutationResult.implement({
     game: t.prismaField({
       type: "Game",
       nullable: true,
-      resolve: async (_query, result, _args, ctx) => {
+      resolve: async (query, result, _args, ctx) => {
         if (!result.gameId) return null;
         return ctx.prisma.game.findUnique({
+          ...query,
           where: { id: result.gameId },
         });
       },
