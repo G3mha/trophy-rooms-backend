@@ -36,15 +36,30 @@
  * Cancelled looks at every region, so a game that shipped in Japan and was
  * cancelled in the West is never reported as cancelled.
  *
+ * Each family is checked too, against its IGDB game's earliest shipped
+ * Western release on any platform: the canonical first release, which the
+ * importer also compares when deciding whether to reuse a same-titled family.
+ * The family's IGDB game is the single game its editions matched, or, when no
+ * edition matched one, the game whose slug matches the family's. Slugs come
+ * second because importers add a suffix on collisions, so "dirty-harry-1" (the
+ * 1990 NES game) normalizes like IGDB's "dirty-harry--1" (a cancelled 2007
+ * game). A family whose editions matched several games is reported as
+ * ambiguous. When a family date differs, the
+ * check records which IGDB release our date matches: non-western-date,
+ * unshipped-date (alpha, beta, cancelled or a patch), later-western (a
+ * Western release that wasn't the first) or unmatched.
+ *
  * --cancelled-out <file> writes the cancelled editions as JSON, the input
  * fix-unreleased-editions.ts takes. --dates-out <file> writes the backfill
- * and differs editions as JSON, the input fix-edition-release-dates.ts takes.
+ * and differs editions, and --family-dates-out <file> the backfill and differs
+ * families, as JSON, the input fix-edition-release-dates.ts takes.
  *
  * Usage:
  *   npx tsx scripts/check-family-release-dates.ts
  *   npx tsx scripts/check-family-release-dates.ts --family watch-dogs --family x10
  *   npx tsx scripts/check-family-release-dates.ts --family x10 --cancelled-out scripts/data/cancelled.json
  *   npx tsx scripts/check-family-release-dates.ts --all --dates-out scripts/data/release-dates.json
+ *   npx tsx scripts/check-family-release-dates.ts --all --family-dates-out scripts/data/family-dates.json
  */
 
 import { writeFileSync } from "node:fs";
@@ -88,6 +103,21 @@ type Verdict =
   | "no-igdb-date"
   | "not-on-igdb";
 
+type FamilyVerdict = "ok" | "backfill" | "differs" | "non-western" | "ambiguous" | "no-igdb-date" | "not-on-igdb";
+
+const FAMILY_VERDICTS: FamilyVerdict[] = [
+  "ok",
+  "backfill",
+  "differs",
+  "non-western",
+  "ambiguous",
+  "no-igdb-date",
+  "not-on-igdb",
+];
+
+// Which of the IGDB game's releases a differing family date matches
+type DateMatch = "non-western-date" | "unshipped-date" | "later-western" | "unmatched";
+
 const VERDICTS: Verdict[] = [
   "ok",
   "backfill",
@@ -104,13 +134,15 @@ function parseArgs() {
   const slugs: string[] = [];
   let cancelledOut: string | undefined;
   let datesOut: string | undefined;
+  let familyDatesOut: string | undefined;
   args.forEach((arg, index) => {
     const next = args[index + 1];
     if (arg === "--family" && next) slugs.push(next);
     if (arg === "--cancelled-out" && next) cancelledOut = next;
     if (arg === "--dates-out" && next) datesOut = next;
+    if (arg === "--family-dates-out" && next) familyDatesOut = next;
   });
-  return { slugs, all: args.includes("--all"), cancelledOut, datesOut };
+  return { slugs, all: args.includes("--all"), cancelledOut, datesOut, familyDatesOut };
 }
 
 const sleep = () => new Promise((resolve) => setTimeout(resolve, 250));
@@ -181,8 +213,19 @@ function withinIgdbPrecision(ours: Date, igdbDate: Date, human: string): boolean
   return false;
 }
 
+function matchOurDate(game: IGDBCandidate, ours: Date): DateMatch {
+  const day = formatDate(ours);
+  const sameDay = (game.release_dates ?? []).filter(
+    (release) => release.date !== undefined && formatDate(new Date(release.date * 1000)) === day
+  );
+  if (sameDay.some((release) => isShippedRelease(release) && isWesternRelease(release))) return "later-western";
+  if (sameDay.some((release) => isShippedRelease(release))) return "non-western-date";
+  if (sameDay.length > 0) return "unshipped-date";
+  return "unmatched";
+}
+
 async function main() {
-  const { slugs: requestedSlugs, all, cancelledOut, datesOut } = parseArgs();
+  const { slugs: requestedSlugs, all, cancelledOut, datesOut, familyDatesOut } = parseArgs();
 
   console.log("=== Check Family Release Dates (read-only) ===\n");
   const databaseUrl = process.env.DATABASE_URL;
@@ -199,8 +242,10 @@ async function main() {
             ? { games: { some: {} } }
             : { games: { some: { releaseDate: null } } },
       select: {
+        id: true,
         title: true,
         slug: true,
+        releaseDate: true,
         games: {
           select: {
             id: true,
@@ -234,10 +279,21 @@ async function main() {
     to: string;
     igdb: string;
   }> = [];
+  const familySummary = new Map<FamilyVerdict, number>();
+  const familyDateCorrections: Array<{
+    familyId: string;
+    family: string;
+    from: string | null;
+    to: string;
+    igdb: string;
+    match: DateMatch | "backfill";
+  }> = [];
 
   for (const family of families) {
     const candidates = candidatesByTitle.get(family.title) ?? [];
     const lines: string[] = [];
+    // IGDB games the family's editions were matched to
+    const editionGameIds = new Set<number>();
 
     for (const game of family.games) {
       const platformSlug = game.platform?.slug ?? "";
@@ -310,6 +366,8 @@ async function main() {
       }
 
       summary.set(verdict, (summary.get(verdict) ?? 0) + 1);
+      const matchedGame = verdict === "ambiguous" ? undefined : earliest?.candidate ?? shippedCandidates[0];
+      if (matchedGame) editionGameIds.add(matchedGame.id);
       if (verdict === "cancelled" && game.platform) {
         cancelledEditions.push({ family: family.slug, platform: game.platform.name, igdb: source });
       }
@@ -325,6 +383,62 @@ async function main() {
       }
     }
 
+    const familySlugMatches = candidates.filter((candidate) => normalizeSlug(candidate.slug) === family.slug);
+    const familyGame =
+      editionGameIds.size === 1
+        ? candidates.find((candidate) => editionGameIds.has(candidate.id))
+        : editionGameIds.size === 0 && familySlugMatches.length === 1
+          ? familySlugMatches[0]
+          : undefined;
+
+    let familyVerdict: FamilyVerdict;
+    let firstWestern: { date: Date; human: string } | undefined;
+    let match: DateMatch | undefined;
+    if (!familyGame) {
+      familyVerdict = candidates.length === 0 ? "not-on-igdb" : "ambiguous";
+    } else {
+      const shipped = (familyGame.release_dates ?? []).filter(isShippedRelease);
+      firstWestern = shipped
+        .filter(isWesternRelease)
+        .map((release) => ({ date: new Date(release.date * 1000), human: release.human ?? "" }))
+        .sort((a, b) => a.date.getTime() - b.date.getTime())[0];
+      if (!firstWestern) {
+        familyVerdict = shipped.length > 0 ? "non-western" : "no-igdb-date";
+      } else if (!family.releaseDate) {
+        familyVerdict = "backfill";
+      } else if (
+        formatDate(family.releaseDate) === formatDate(firstWestern.date) ||
+        withinIgdbPrecision(family.releaseDate, firstWestern.date, firstWestern.human)
+      ) {
+        familyVerdict = "ok";
+      } else {
+        familyVerdict = "differs";
+        match = matchOurDate(familyGame, family.releaseDate);
+      }
+    }
+
+    familySummary.set(familyVerdict, (familySummary.get(familyVerdict) ?? 0) + 1);
+    const familySource = familyGame
+      ? `${familyGame.slug} #${familyGame.id}${firstWestern ? `, "${firstWestern.human}"` : ""}`
+      : "";
+    if (!all || familyVerdict !== "ok") {
+      lines.unshift(
+        `  ${"(family)".padEnd(22)} ours ${formatDate(family.releaseDate).padEnd(10)}  ` +
+          `IGDB ${formatDate(firstWestern?.date ?? null).padEnd(10)}  ${familyVerdict.padEnd(12)}` +
+          `${match ? ` (${match})` : ""}${familySource ? `  [${familySource}]` : ""}`
+      );
+    }
+    if ((familyVerdict === "backfill" || familyVerdict === "differs") && firstWestern) {
+      familyDateCorrections.push({
+        familyId: family.id,
+        family: family.slug,
+        from: family.releaseDate ? formatDate(family.releaseDate) : null,
+        to: formatDate(firstWestern.date),
+        igdb: familySource,
+        match: match ?? "backfill",
+      });
+    }
+
     if (lines.length > 0) {
       console.log(`${family.title} (${family.slug})`);
       for (const line of lines) console.log(line);
@@ -333,9 +447,17 @@ async function main() {
   }
 
   console.log(`Families checked: ${families.length}`);
+  console.log("Editions:");
   for (const verdict of VERDICTS) {
     console.log(`  ${verdict.padEnd(13)} ${summary.get(verdict) ?? 0}`);
   }
+  console.log("Families:");
+  for (const verdict of FAMILY_VERDICTS) {
+    console.log(`  ${verdict.padEnd(13)} ${familySummary.get(verdict) ?? 0}`);
+  }
+  const matches = new Map<string, number>();
+  for (const correction of familyDateCorrections) matches.set(correction.match, (matches.get(correction.match) ?? 0) + 1);
+  for (const [name, count] of matches) console.log(`    ${name.padEnd(17)} ${count}`);
 
   if (cancelledOut) {
     writeFileSync(cancelledOut, `${JSON.stringify(cancelledEditions, null, 2)}\n`);
@@ -344,6 +466,10 @@ async function main() {
   if (datesOut) {
     writeFileSync(datesOut, `${JSON.stringify(dateCorrections, null, 2)}\n`);
     console.log(`\nWrote ${dateCorrections.length} date corrections to ${datesOut}`);
+  }
+  if (familyDatesOut) {
+    writeFileSync(familyDatesOut, `${JSON.stringify(familyDateCorrections, null, 2)}\n`);
+    console.log(`\nWrote ${familyDateCorrections.length} family date corrections to ${familyDatesOut}`);
   }
 }
 
