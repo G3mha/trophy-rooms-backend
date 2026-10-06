@@ -1,13 +1,14 @@
 /**
  * Fill in missing release dates for one GameFamily from IGDB.
  *
- * Each Game gets the earliest IGDB release date on its platform, in any
- * region, and the family gets the earliest across all platforms. Only
- * releases that put the game on sale count (isShippedRelease in
- * src/lib/igdb.ts): cancelled, alpha, beta and next-gen patch releases are
- * skipped. Only null dates are filled: dates already set are
- * never overwritten, and games IGDB has no release for on their platform are
- * reported and left alone.
+ * Each Game gets its earliest Western IGDB release on its platform, and the
+ * family gets the earliest Western release across all platforms, the same
+ * rule as import-platform-region.ts (WESTERN_RELEASE_REGION_IDS in
+ * src/lib/igdb.ts). Only releases that put the game on sale count
+ * (isShippedRelease): cancelled, alpha, beta and next-gen patch releases are
+ * skipped. Only null dates are filled: dates already set are never
+ * overwritten (fix-edition-release-dates.ts corrects those), and games with
+ * no Western release on their platform are reported and left alone.
  *
  * pickTrophyGames (src/lib/trophies.ts) falls back to a family's earliest
  * release, so families without dates fall through to import order.
@@ -24,6 +25,7 @@ import {
   fetchGameBySlug,
   igdbRequest,
   isShippedRelease,
+  isWesternRelease,
   type IGDBReleaseDate,
 } from "../src/lib/igdb.js";
 
@@ -104,11 +106,11 @@ async function main() {
 
   const releaseDates = await igdbRequest<IGDBReleaseDate[]>(
     "release_dates",
-    `fields platform, date, human, status.name; where game = ${igdbGame.id}; sort date asc; limit 500;`
+    `fields platform, date, human, release_region, status.name; where game = ${igdbGame.id}; sort date asc; limit 500;`
   );
   const earliestByIgdbPlatform = new Map<number, Date>();
   let earliestShipped: Date | null = null;
-  for (const release of releaseDates.filter(isShippedRelease)) {
+  for (const release of releaseDates.filter(isShippedRelease).filter(isWesternRelease)) {
     const date = new Date(release.date * 1000);
     const current = earliestByIgdbPlatform.get(release.platform);
     if (!current || date < current) earliestByIgdbPlatform.set(release.platform, date);
@@ -134,7 +136,7 @@ async function main() {
     } else if (igdbPlatformIds.length === 0) {
       console.log(`  ${label} skip: no IGDB platform mapping for slug "${platformSlug}"`);
     } else if (!igdbDate) {
-      console.log(`  ${label} skip: IGDB has no release on this platform`);
+      console.log(`  ${label} skip: IGDB has no Western release on this platform`);
     } else {
       console.log(`  ${label} set  ${formatDate(igdbDate)}`);
       gameUpdates.push({ id: game.id, releaseDate: igdbDate });
@@ -148,7 +150,7 @@ async function main() {
         ? `keep ${formatDate(family.releaseDate)} (already set)`
         : setFamilyDate
           ? `set  ${formatDate(earliestShipped)}`
-          : "skip: IGDB has no shipped release"
+          : "skip: IGDB has no shipped Western release"
     }`
   );
 
