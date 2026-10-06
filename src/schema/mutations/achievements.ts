@@ -8,6 +8,7 @@ import {
   BulkAchievementResult,
 } from "../types/achievement.js";
 import { hasRequiredRole } from "../../context.js";
+import { visibleSetWhere } from "../../lib/achievement-visibility.js";
 import { AchievementSetType, UserRole } from "@prisma/client";
 import { invalidateAchievementCaches } from "../../lib/cache.js";
 
@@ -47,8 +48,10 @@ builder.mutationField("createAchievement", (t) =>
       }
 
       // Check if achievement set exists
-      const achievementSet = await ctx.prisma.achievementSet.findUnique({
-        where: { id: achievementSetId },
+      // Another user's private set reads as missing, so the answer doesn't
+      // confirm it exists
+      const achievementSet = await ctx.prisma.achievementSet.findFirst({
+        where: { id: achievementSetId, AND: [visibleSetWhere(ctx.user)] },
       });
 
       if (!achievementSet) {
@@ -157,8 +160,9 @@ builder.mutationField("updateAchievement", (t) =>
         };
       }
 
-      const existing = await ctx.prisma.achievement.findUnique({
-        where: { id },
+      // An achievement in another user's private set reads as missing
+      const existing = await ctx.prisma.achievement.findFirst({
+        where: { id, achievementSet: visibleSetWhere(ctx.user) },
         include: { achievementSet: true },
       });
 
@@ -282,8 +286,9 @@ builder.mutationField("deleteAchievement", (t) =>
         };
       }
 
-      const existing = await ctx.prisma.achievement.findUnique({
-        where: { id },
+      // An achievement in another user's private set reads as missing
+      const existing = await ctx.prisma.achievement.findFirst({
+        where: { id, achievementSet: visibleSetWhere(ctx.user) },
         include: { achievementSet: true },
       });
 
@@ -375,8 +380,10 @@ builder.mutationField("bulkCreateAchievements", (t) =>
         };
       }
 
-      const achievementSet = await ctx.prisma.achievementSet.findUnique({
-        where: { id: achievementSetId },
+      // Another user's private set reads as missing, so the answer doesn't
+      // confirm it exists
+      const achievementSet = await ctx.prisma.achievementSet.findFirst({
+        where: { id: achievementSetId, AND: [visibleSetWhere(ctx.user)] },
       });
 
       if (!achievementSet) {
