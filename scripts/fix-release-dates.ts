@@ -13,6 +13,11 @@
  * familyId. Each has the date the check saw ("from", null when there was none)
  * and IGDB's Western date ("to"). A file may mix both kinds.
  *
+ * Family dates can also come from a review sheet (a .csv like
+ * scripts/data/family-dates-review-2026-10-06.csv): only rows marked "change"
+ * are applied. Once applied, rows are marked "changed"; the script checks
+ * those are really at their new date and stops if one isn't.
+ *
  * Everything is checked again inside the update transaction: the script stops
  * if a game or family is gone, no longer matches the family (and platform) the
  * check saw, or its date has changed since the check. Updates run in batches
@@ -22,13 +27,14 @@
  * --min-days <n> skips differences smaller than n days (backfills always
  * apply).
  *
- * Usage:
+ * Usage (<file> is .json or a .csv review sheet):
  *   npx tsx scripts/fix-release-dates.ts --dates <file>           # dry run, prints the plan
  *   npx tsx scripts/fix-release-dates.ts --dates <file> --apply   # updates, in one transaction
  */
 
 import { readFileSync } from "node:fs";
 import { Prisma, PrismaClient } from "@prisma/client";
+import { readReviewSheet } from "./lib/review-sheet.js";
 
 const prisma = new PrismaClient();
 
@@ -62,7 +68,45 @@ function isFamilyCorrection(correction: DateCorrection): correction is FamilyCor
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
-function readCorrections(path: string): DateCorrection[] {
+interface CorrectionList {
+  corrections: DateCorrection[];
+  // Review sheet rows marked as already applied
+  alreadyChanged: FamilyCorrection[];
+}
+
+function readCorrections(path: string): CorrectionList {
+  return path.endsWith(".csv")
+    ? readFamilyReviewSheet(path)
+    : { corrections: readCorrectionsJson(path), alreadyChanged: [] };
+}
+
+// Rows are marked keep, change, changed (already applied) or left blank
+function readFamilyReviewSheet(path: string): CorrectionList {
+  const list: CorrectionList = { corrections: [], alreadyChanged: [] };
+  const rows = readReviewSheet(
+    path,
+    ["family_slug", "our_date", "igdb_first_western", "igdb_game", "match", "family_id"],
+    ["keep", "change", "changed"]
+  );
+  for (const { line, decision, values } of rows) {
+    if (decision !== "change" && decision !== "changed") continue;
+    if (!DATE_PATTERN.test(values.our_date) || !DATE_PATTERN.test(values.igdb_first_western) || !values.family_id) {
+      throw new Error(`${path} row ${line}: needs our_date and igdb_first_western as YYYY-MM-DD and a family_id`);
+    }
+    const correction: FamilyCorrection = {
+      familyId: values.family_id,
+      family: values.family_slug,
+      from: values.our_date,
+      to: values.igdb_first_western,
+      igdb: values.igdb_game,
+      match: values.match,
+    };
+    (decision === "change" ? list.corrections : list.alreadyChanged).push(correction);
+  }
+  return list;
+}
+
+function readCorrectionsJson(path: string): DateCorrection[] {
   const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
   const valid =
     Array.isArray(parsed) &&
@@ -101,10 +145,26 @@ interface Plan {
 
 async function buildPlan(
   db: Prisma.TransactionClient,
-  corrections: DateCorrection[],
+  { corrections, alreadyChanged }: CorrectionList,
   minDays: number
 ): Promise<Plan> {
   const plan: Plan = { editions: [], families: [], skipped: 0, problems: [] };
+
+  if (alreadyChanged.length > 0) {
+    const rows = await db.gameFamily.findMany({
+      where: { id: { in: alreadyChanged.map((correction) => correction.familyId) } },
+      select: { id: true, releaseDate: true },
+    });
+    const currentById = new Map(rows.map((family) => [family.id, formatDate(family.releaseDate)]));
+    for (const correction of alreadyChanged) {
+      const current = currentById.get(correction.familyId);
+      if (current !== correction.to) {
+        plan.problems.push(
+          `${correction.family} (family): marked changed, but its date is ${current ?? "missing"}, not ${correction.to}`
+        );
+      }
+    }
+  }
   const tooClose = (correction: DateCorrection) =>
     correction.from !== null && daysBetween(correction.from, correction.to) < minDays;
 
@@ -200,7 +260,8 @@ function reportUpdates(title: string, updates: DateCorrection[]) {
   bucket("more than 1 year", (days) => days > 366);
 }
 
-function report(plan: Plan, corrections: DateCorrection[], minDays: number) {
+function report(plan: Plan, { corrections, alreadyChanged }: CorrectionList, minDays: number) {
+  if (alreadyChanged.length > 0) console.log(`Families marked changed: ${alreadyChanged.length}`);
   console.log(`Corrections listed: ${corrections.length}`);
   reportUpdates("Edition updates planned", plan.editions);
   reportUpdates("Family updates planned", plan.families);
