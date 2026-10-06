@@ -36,7 +36,16 @@ export interface IGDBReleaseDate {
   platform?: number;
   date?: number;
   human?: string;
+  release_region?: number;
   status?: { name: string };
+}
+
+// IGDB release regions the catalog dates editions by: Europe, North America,
+// Australia, New Zealand, Worldwide and Brazil
+export const WESTERN_RELEASE_REGION_IDS = [1, 2, 3, 4, 8, 10];
+
+export function isWesternRelease(release: IGDBReleaseDate): boolean {
+  return release.release_region !== undefined && WESTERN_RELEASE_REGION_IDS.includes(release.release_region);
 }
 
 // Release statuses that don't put a new edition on sale on the platform: the

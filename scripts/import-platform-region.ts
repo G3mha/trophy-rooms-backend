@@ -4,6 +4,7 @@ import {
   getCoverUrl,
   IGDB_PLATFORM_MAP,
   isShippedRelease,
+  WESTERN_RELEASE_REGION_IDS,
   type IGDBGame,
   type IGDBReleaseDate,
 } from "../src/lib/igdb.js";
@@ -33,7 +34,6 @@ const IGDB_RELEASE_REGION_IDS: Record<string, { id: number; name: string }> = {
 
 interface IGDBGameReleaseDate extends IGDBReleaseDate {
   game: number;
-  release_region?: number;
 }
 
 // Earliest shipped release per IGDB game, on any platform and on the platform
@@ -74,7 +74,6 @@ function releasedOnPlatform(
   return released;
 }
 
-const WESTERN_RELEASE_REGION_IDS = [1, 2, 3, 4, 8, 10];
 const RERELEASE_PLATFORM_SLUGS = new Set([
   "3ds",
   "wii",
