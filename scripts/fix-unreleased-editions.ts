@@ -34,6 +34,7 @@
 
 import { readFileSync } from "node:fs";
 import { Prisma, PrismaClient } from "@prisma/client";
+import { readReviewSheet } from "./lib/review-sheet.js";
 
 const prisma = new PrismaClient();
 
@@ -52,7 +53,7 @@ interface EditionList {
 
 function readEditions(path: string): EditionList {
   return path.endsWith(".csv")
-    ? readReviewSheet(path)
+    ? readReviewSheetEditions(path)
     : { toDelete: readEditionsJson(path), alreadyDeleted: [] };
 }
 
@@ -72,73 +73,19 @@ function readEditionsJson(path: string): UnreleasedEdition[] {
   return parsed as UnreleasedEdition[];
 }
 
-// Rows are marked keep, delete, deleted (already applied) or left blank;
-// anything else in the decision column stops the run
-function readReviewSheet(path: string): EditionList {
-  const [header, ...rows] = parseCsv(readFileSync(path, "utf8"));
-  if (!header) throw new Error(`${path} is empty`);
-  const column = (name: string) => {
-    const index = header.indexOf(name);
-    if (index < 0) throw new Error(`${path} has no "${name}" column`);
-    return index;
-  };
-  const decision = column("decision");
-  const family = column("family_slug");
-  const platform = column("platform");
-  const igdb = column("igdb_game");
-
+// Rows are marked keep, delete, deleted (already applied) or left blank
+function readReviewSheetEditions(path: string): EditionList {
   const list: EditionList = { toDelete: [], alreadyDeleted: [] };
-  rows.forEach((row, index) => {
-    const value = (row[decision] ?? "").trim().toLowerCase();
-    if (value !== "" && value !== "keep" && value !== "delete" && value !== "deleted") {
-      throw new Error(
-        `${path} row ${index + 2}: decision must be keep, delete, deleted or blank, got "${row[decision]}"`
-      );
-    }
-    const edition = { family: row[family] ?? "", platform: row[platform] ?? "", igdb: row[igdb] ?? "" };
-    if (value === "delete") list.toDelete.push(edition);
-    if (value === "deleted") list.alreadyDeleted.push(edition);
-  });
+  for (const { decision, values } of readReviewSheet(
+    path,
+    ["family_slug", "platform", "igdb_game"],
+    ["keep", "delete", "deleted"]
+  )) {
+    const edition = { family: values.family_slug, platform: values.platform, igdb: values.igdb_game };
+    if (decision === "delete") list.toDelete.push(edition);
+    if (decision === "deleted") list.alreadyDeleted.push(edition);
+  }
   return list;
-}
-
-// RFC 4180: quoted fields may hold commas, newlines and doubled quotes
-function parseCsv(text: string): string[][] {
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let field = "";
-  let quoted = false;
-  for (let i = 0; i < text.length; i++) {
-    const char = text.charAt(i);
-    if (quoted) {
-      if (char === '"' && text.charAt(i + 1) === '"') {
-        field += '"';
-        i++;
-      } else if (char === '"') {
-        quoted = false;
-      } else {
-        field += char;
-      }
-    } else if (char === '"') {
-      quoted = true;
-    } else if (char === ",") {
-      row.push(field);
-      field = "";
-    } else if (char === "\n" || char === "\r") {
-      if (char === "\r" && text.charAt(i + 1) === "\n") i++;
-      row.push(field);
-      rows.push(row);
-      row = [];
-      field = "";
-    } else {
-      field += char;
-    }
-  }
-  if (field !== "" || row.length > 0) {
-    row.push(field);
-    rows.push(row);
-  }
-  return rows.filter((cells) => cells.some((cell) => cell !== ""));
 }
 
 interface Plan {
