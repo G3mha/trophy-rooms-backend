@@ -141,7 +141,7 @@ model PlatformRelease {
   id          String   @id @default(cuid())
   platform    Platform @relation(fields: [platformId], references: [id], onDelete: Cascade)
   platformId  String
-  region      String   // "NA", "EU", "JP", "AU", "OTHER"
+  region      String   // "NA", "EU", "JP", "AU", "WW" (worldwide, one date everywhere), "OTHER"
   releaseDate DateTime
 
   createdAt   DateTime @default(now())
