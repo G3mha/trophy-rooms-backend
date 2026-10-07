@@ -273,6 +273,23 @@ async function verify() {
     leaderboard.leaderboardByTrophies.find((entry) => entry.userId === user.id)?.value;
   check("leaderboard counts bob once, not once per platform", leaderboardValue(bob), 1);
 
+  console.log("Trophy counts are finished games, not trophy rows");
+
+  check("leaderboard counts carol's two library editions as one game", leaderboardValue(carol), 1);
+  const carolCounts = await run<{ user: { trophyCount: number }; myStats: { totalTrophies: number } }>(
+    carol,
+    `query ($id: ID!) { user(id: $id) { trophyCount } myStats { totalTrophies } }`,
+    { id: carol.id }
+  );
+  check("carol's trophyCount is 1 with two library editions", carolCounts.user.trophyCount, 1);
+  check("carol's myStats.totalTrophies is 1 with two library editions", carolCounts.myStats.totalTrophies, 1);
+  const familyCounts = await run<{ gameFamily: { totalTrophyCount: number } }>(
+    null,
+    `query ($id: ID!) { gameFamily(id: $id) { totalTrophyCount } }`,
+    { id: family.id }
+  );
+  check("the family's totalTrophyCount is 3 players, not 4 trophy rows", familyCounts.gameFamily.totalTrophyCount, 3);
+
   check("alice completionRate is 100", await completionRate(alice), 100);
   check("carol completionRate is 100 with two library editions", await completionRate(carol), 100);
   // A trophy on a family carol never played (e.g. its achievements were deleted)
