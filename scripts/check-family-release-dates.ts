@@ -52,7 +52,12 @@
  * --cancelled-out <file> writes the cancelled editions as JSON, the input
  * fix-unreleased-editions.ts takes. --dates-out <file> writes the backfill
  * and differs editions, and --family-dates-out <file> the backfill and differs
- * families, as JSON, the input fix-release-dates.ts takes.
+ * families, as JSON, the input fix-release-dates.ts takes. --igdb-ids-out
+ * <file> writes the IGDB game each edition and family matched, the input
+ * fix-igdb-ids.ts takes: an edition's is the game it matched on its platform
+ * (or the only one IGDB lists there), a family's is the single game its
+ * editions matched or, for a family holding a remake or port too, the
+ * original: the game first released on the family's date, else the earliest.
  *
  * Usage:
  *   npx tsx scripts/check-family-release-dates.ts
@@ -60,6 +65,7 @@
  *   npx tsx scripts/check-family-release-dates.ts --family x10 --cancelled-out scripts/data/cancelled.json
  *   npx tsx scripts/check-family-release-dates.ts --all --dates-out scripts/data/release-dates.json
  *   npx tsx scripts/check-family-release-dates.ts --all --family-dates-out scripts/data/family-dates.json
+ *   npx tsx scripts/check-family-release-dates.ts --all --igdb-ids-out scripts/data/igdb-ids.json
  */
 
 import { writeFileSync } from "node:fs";
@@ -135,14 +141,16 @@ function parseArgs() {
   let cancelledOut: string | undefined;
   let datesOut: string | undefined;
   let familyDatesOut: string | undefined;
+  let igdbIdsOut: string | undefined;
   args.forEach((arg, index) => {
     const next = args[index + 1];
     if (arg === "--family" && next) slugs.push(next);
     if (arg === "--cancelled-out" && next) cancelledOut = next;
     if (arg === "--dates-out" && next) datesOut = next;
     if (arg === "--family-dates-out" && next) familyDatesOut = next;
+    if (arg === "--igdb-ids-out" && next) igdbIdsOut = next;
   });
-  return { slugs, all: args.includes("--all"), cancelledOut, datesOut, familyDatesOut };
+  return { slugs, all: args.includes("--all"), cancelledOut, datesOut, familyDatesOut, igdbIdsOut };
 }
 
 const sleep = () => new Promise((resolve) => setTimeout(resolve, 250));
@@ -224,8 +232,16 @@ function matchOurDate(game: IGDBCandidate, ours: Date): DateMatch {
   return "unmatched";
 }
 
+function firstWesternDate(candidate: IGDBCandidate): Date | undefined {
+  const dates = (candidate.release_dates ?? [])
+    .filter(isShippedRelease)
+    .filter(isWesternRelease)
+    .map((release) => release.date * 1000);
+  return dates.length > 0 ? new Date(Math.min(...dates)) : undefined;
+}
+
 async function main() {
-  const { slugs: requestedSlugs, all, cancelledOut, datesOut, familyDatesOut } = parseArgs();
+  const { slugs: requestedSlugs, all, cancelledOut, datesOut, familyDatesOut, igdbIdsOut } = parseArgs();
 
   console.log("=== Check Family Release Dates (read-only) ===\n");
   const databaseUrl = process.env.DATABASE_URL;
@@ -288,6 +304,8 @@ async function main() {
     igdb: string;
     match: DateMatch | "backfill";
   }> = [];
+  const editionIgdbIds: Array<{ gameId: string; family: string; platform: string; igdbId: number; igdb: string }> = [];
+  const familyIgdbIds: Array<{ familyId: string; family: string; igdbId: number; igdb: string }> = [];
 
   for (const family of families) {
     const candidates = candidatesByTitle.get(family.title) ?? [];
@@ -368,6 +386,18 @@ async function main() {
       summary.set(verdict, (summary.get(verdict) ?? 0) + 1);
       const matchedGame = verdict === "ambiguous" ? undefined : earliest?.candidate ?? shippedCandidates[0];
       if (matchedGame) editionGameIds.add(matchedGame.id);
+      // An edition IGDB lists on the platform without a shipped date is still that game
+      const editionGame =
+        matchedGame ?? ((verdict === "no-igdb-date" || verdict === "cancelled") && pool.length === 1 ? pool[0] : undefined);
+      if (editionGame && game.platform) {
+        editionIgdbIds.push({
+          gameId: game.id,
+          family: family.slug,
+          platform: game.platform.name,
+          igdbId: editionGame.id,
+          igdb: editionGame.slug,
+        });
+      }
       if (verdict === "cancelled" && game.platform) {
         cancelledEditions.push({ family: family.slug, platform: game.platform.name, igdb: source });
       }
@@ -390,6 +420,21 @@ async function main() {
         : editionGameIds.size === 0 && familySlugMatches.length === 1
           ? familySlugMatches[0]
           : undefined;
+
+    // A family holding a remake or port as well is the original: the game first
+    // released on the family's date, else the earliest
+    const editionGames = candidates.filter((candidate) => editionGameIds.has(candidate.id));
+    const familyIdGame =
+      familyGame ??
+      editionGames.find(
+        (candidate) => family.releaseDate && formatDate(firstWesternDate(candidate) ?? null) === formatDate(family.releaseDate)
+      ) ??
+      [...editionGames]
+        .filter((candidate) => firstWesternDate(candidate))
+        .sort((a, b) => firstWesternDate(a)!.getTime() - firstWesternDate(b)!.getTime())[0];
+    if (familyIdGame) {
+      familyIgdbIds.push({ familyId: family.id, family: family.slug, igdbId: familyIdGame.id, igdb: familyIdGame.slug });
+    }
 
     let familyVerdict: FamilyVerdict;
     let firstWestern: { date: Date; human: string } | undefined;
@@ -470,6 +515,10 @@ async function main() {
   if (familyDatesOut) {
     writeFileSync(familyDatesOut, `${JSON.stringify(familyDateCorrections, null, 2)}\n`);
     console.log(`\nWrote ${familyDateCorrections.length} family date corrections to ${familyDatesOut}`);
+  }
+  if (igdbIdsOut) {
+    writeFileSync(igdbIdsOut, `${JSON.stringify({ families: familyIgdbIds, editions: editionIgdbIds }, null, 2)}\n`);
+    console.log(`\nWrote IGDB ids for ${familyIgdbIds.length} families and ${editionIgdbIds.length} editions to ${igdbIdsOut}`);
   }
 }
 
