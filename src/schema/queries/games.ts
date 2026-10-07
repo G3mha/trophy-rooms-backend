@@ -4,6 +4,7 @@ import { GamesFilterInput, GameOrderBy, GameTypeEnum } from "../types/game.js";
 import { GameFamiliesFilterInput, GameFamilyOrderBy } from "../types/game-family.js";
 import { searchGames, searchGameFamilies } from "../../lib/fulltext-search.js";
 import { visibleSetWhere } from "../../lib/achievement-visibility.js";
+import { countTrophyHolders } from "../../lib/trophies.js";
 
 // Games connection with cursor-based pagination
 builder.queryField("games", (t) =>
@@ -871,36 +872,12 @@ builder.queryField("gameFamiliesPage", (t) =>
 
       const totalPages = Math.ceil(totalCount / pageSize);
 
-      // Get trophy counts per family
-      const familyIds = families.map(f => f.id);
-      const trophyCounts = await ctx.prisma.trophy.groupBy({
-        by: ["gameId"],
-        where: {
-          game: {
-            gameFamilyId: { in: familyIds },
-          },
-        },
-        _count: true,
-      });
-
-      // Map gameId to gameFamilyId for trophy counts
-      const gameToFamily = new Map<string, string>();
-      families.forEach(f => {
-        f.games.forEach(g => {
-          gameToFamily.set(g.id, f.id);
-        });
-      });
-
-      const familyTrophyCounts = new Map<string, number>();
-      trophyCounts.forEach(tc => {
-        const familyId = gameToFamily.get(tc.gameId);
-        if (familyId) {
-          familyTrophyCounts.set(
-            familyId,
-            (familyTrophyCounts.get(familyId) || 0) + tc._count
-          );
-        }
-      });
+      // Players who finished each family, not Trophy rows: a player who owns
+      // two editions has a trophy on each (see ../../lib/trophies.js)
+      const familyTrophyCounts = await countTrophyHolders(
+        ctx.prisma,
+        families.map((f) => f.id)
+      );
 
       return {
         items: families.map((family) => {

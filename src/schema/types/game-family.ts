@@ -1,6 +1,7 @@
 import { builder, MutationErrorRef } from "../builder.js";
 import { ErrorCode } from "../../lib/errors.js";
 import { visibleSetWhere } from "../../lib/achievement-visibility.js";
+import { countTrophyHolders } from "../../lib/trophies.js";
 import { GameTypeEnum } from "./game.js";
 
 // GameFamily Prisma Object
@@ -73,14 +74,11 @@ builder.prismaObject("GameFamily", {
       },
     }),
 
-    // Computed field: total trophy count across all platform games
+    // Players who finished the game, across all its editions. Not Trophy rows:
+    // a player who owns two editions has a trophy on each (see ../../lib/trophies.js)
     totalTrophyCount: t.int({
-      resolve: async (family, _args, ctx) => {
-        const result = await ctx.prisma.trophy.count({
-          where: { game: { gameFamilyId: family.id } },
-        });
-        return result;
-      },
+      resolve: async (family, _args, ctx) =>
+        (await countTrophyHolders(ctx.prisma, [family.id])).get(family.id) ?? 0,
     }),
 
     dlcs: t.relation("dlcs", {
