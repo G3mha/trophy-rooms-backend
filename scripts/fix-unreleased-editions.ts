@@ -2,7 +2,7 @@
  * Delete Game rows for editions that were never released on their platform.
  *
  * A Game entry needs a platform release someone can own (see CLAUDE.md,
- * Backward Compatibility). Two kinds of edition fail that:
+ * Backward Compatibility). Three kinds of edition fail that:
  *
  * - Cancelled ports. check-family-release-dates.ts --cancelled-out writes them
  *   as JSON: editions with no shipped IGDB release on the platform whose
@@ -17,6 +17,9 @@
  *   igdb_game columns, where only rows marked "delete" are acted on. Once
  *   applied, rows are marked "deleted" so the sheet keeps the record; the
  *   script checks those are really gone and stops if one is still there.
+ * - Backward-compatibility listings: a game IGDB lists on a newer console it
+ *   only runs on through compatibility (the original Xbox Splinter Cell on
+ *   Xbox One). These are picked by hand and listed as JSON.
  *
  * Lists that have been applied are kept in scripts/data/. The first batch of
  * 29 is in this file's history, at ac34ff8 under fix-cancelled-editions.ts.
