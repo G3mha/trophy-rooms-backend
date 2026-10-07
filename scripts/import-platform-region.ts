@@ -39,6 +39,23 @@ interface IGDBGameReleaseDate extends IGDBReleaseDate {
   game: number;
 }
 
+// IGDB sometimes lists one game more than once: a port under its own entry
+// (Star Wars: The Clone Wars - Republic Heroes on DS), one entry per platform
+// (Rodea the Sky Soldier on Wii), or plain duplicates (ATV Quad Power Racing
+// 2). The importer reads IGDB's links between games and who made them to
+// recognise those, so they don't become second families.
+interface ImportGame extends IGDBGame {
+  ports?: number[];
+  involved_companies?: Array<{ company: number }>;
+}
+
+const RELATION_FIELDS = "ports, involved_companies.company";
+const A_YEAR_MS = 366 * 24 * 60 * 60 * 1000;
+
+function withinAYear(date: Date | null, other: Date): boolean {
+  return date !== null && Math.abs(date.getTime() - other.getTime()) <= A_YEAR_MS;
+}
+
 // Earliest shipped release per IGDB game, on any platform and on the platform
 // being imported. The Game gets its own platform's date. The family keeps the
 // first release, which also decides whether a same-titled family is the same
@@ -312,23 +329,23 @@ async function fetchReleaseDatesByRegionsForGames(
   return releasedOnPlatform(datesByGame);
 }
 
-async function fetchMainGamesByIds(gameIds: number[]): Promise<IGDBGame[]> {
+async function fetchMainGamesByIds(gameIds: number[]): Promise<ImportGame[]> {
   if (gameIds.length === 0) {
     return [];
   }
 
-  const allGames: IGDBGame[] = [];
+  const allGames: ImportGame[] = [];
   const chunkSize = 200;
 
   for (let i = 0; i < gameIds.length; i += chunkSize) {
     const chunk = gameIds.slice(i, i + chunkSize);
     const query = `
-      fields id, name, slug, summary, cover.image_id, first_release_date, game_type, rating_count;
+      fields id, name, slug, summary, cover.image_id, first_release_date, game_type, rating_count, ${RELATION_FIELDS};
       where id = (${chunk.join(", ")}) & game_type = 0 & version_parent = null;
       limit ${chunk.length};
     `;
 
-    const games = await igdbRequest<IGDBGame[]>("games", query);
+    const games = await igdbRequest<ImportGame[]>("games", query);
     allGames.push(...games);
 
     process.stdout.write(`\r   Loaded ${allGames.length}/${gameIds.length} game records...`);
@@ -342,22 +359,22 @@ async function fetchMainGamesByIds(gameIds: number[]): Promise<IGDBGame[]> {
 async function fetchAllMainGamesForPlatform(
   igdbPlatformIds: number[],
   limit?: number
-): Promise<IGDBGame[]> {
-  const allGames: IGDBGame[] = [];
+): Promise<ImportGame[]> {
+  const allGames: ImportGame[] = [];
   let offset = 0;
   const pageSize = 500;
   let hasMore = true;
 
   while (hasMore) {
     const query = `
-      fields id, name, slug, summary, cover.image_id, first_release_date, category, game_type, rating_count, keywords.name, websites.url;
+      fields id, name, slug, summary, cover.image_id, first_release_date, category, game_type, rating_count, keywords.name, websites.url, ${RELATION_FIELDS};
       where platforms = (${igdbPlatformIds.join(", ")}) & game_type = 0 & version_parent = null;
       sort name asc;
       offset ${offset};
       limit ${pageSize};
     `;
 
-    const games = await igdbRequest<IGDBGame[]>("games", query);
+    const games = await igdbRequest<ImportGame[]>("games", query);
     const retailLikeGames = games.filter((game) => !looksNonRetailIGDBEntry(game));
     allGames.push(...retailLikeGames);
 
@@ -375,6 +392,25 @@ async function fetchAllMainGamesForPlatform(
 
   console.log("");
   return limit ? allGames.slice(0, limit) : allGames;
+}
+
+async function fetchCompanies(gameIds: number[]): Promise<Map<number, Set<number>>> {
+  const companies = new Map<number, Set<number>>();
+  const chunkSize = 500;
+
+  for (let index = 0; index < gameIds.length; index += chunkSize) {
+    const chunk = gameIds.slice(index, index + chunkSize);
+    const games = await igdbRequest<ImportGame[]>(
+      "games",
+      `fields involved_companies.company; where id = (${chunk.join(", ")}); limit ${chunk.length};`
+    );
+    for (const game of games) {
+      companies.set(game.id, new Set((game.involved_companies ?? []).map((involved) => involved.company)));
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+
+  return companies;
 }
 
 function looksJapaneseTitle(title: string): boolean {
@@ -413,16 +449,31 @@ function looksNonRetailIGDBEntry(game: IGDBGame): boolean {
 // Where each new game goes. Worked out before anything is written, so a dry
 // run shows exactly what an import would do.
 interface PlannedGame {
-  game: IGDBGame;
+  game: ImportGame;
   title: string;
   firstRelease: Date;
   platformRelease: Date;
   // join-by-id: the family is this IGDB game, or holds an edition of it
+  // join-by-link: IGDB lists a port of it that's in the family
   // join-by-title: a same-titled family with no IGDB id
+  // join-by-company: a same-titled family of another IGDB game, released
+  //   within a year by a company this game shares
   // family-on-platform: its family already has an edition here, so it's skipped
-  kind: "join-by-id" | "join-by-title" | "family-on-platform" | "new-family";
+  // title-on-platform: a same-titled game came out here within a year, so
+  //   this is a second IGDB entry for it and it's skipped
+  kind:
+    | "join-by-id"
+    | "join-by-link"
+    | "join-by-title"
+    | "join-by-company"
+    | "family-on-platform"
+    | "title-on-platform"
+    | "new-family";
   familyId?: string;
+  note?: string;
 }
+
+const SKIPPED_KINDS = new Set<PlannedGame["kind"]>(["family-on-platform", "title-on-platform"]);
 
 interface FamilySummary {
   slug: string;
@@ -447,7 +498,8 @@ function reportPlan(
   const describe = (row: PlannedGame) => {
     const family = row.familyId ? familyById.get(row.familyId) : undefined;
     const target = family ? ` -> ${family.title} [${family.slug}] (${formatDay(family.releaseDate)})` : "";
-    return `${row.title} #${row.game.id} (first ${formatDay(row.firstRelease)}, here ${formatDay(row.platformRelease)})${target}`;
+    const note = row.note ? ` (${row.note})` : "";
+    return `${row.title} #${row.game.id} (first ${formatDay(row.firstRelease)}, here ${formatDay(row.platformRelease)})${target}${note}`;
   };
   const list = (heading: string, rows: PlannedGame[]) => {
     console.log(`\n${heading} (${rows.length}):`);
@@ -456,13 +508,19 @@ function reportPlan(
   };
 
   console.log("\nPlan:");
-  console.log(`  join a family by IGDB id:   ${count("join-by-id")}`);
-  console.log(`  join a family by title:     ${count("join-by-title")}`);
-  console.log(`  new family:                 ${count("new-family")}`);
+  console.log(`  join a family by IGDB id:            ${count("join-by-id")}`);
+  console.log(`  join a family IGDB links it to:      ${count("join-by-link")}`);
+  console.log(`  join a family by title:              ${count("join-by-title")}`);
+  console.log(`  join a family by title and company:  ${count("join-by-company")}`);
+  console.log(`  new family:                          ${count("new-family")}`);
   console.log(`  skipped, family already has a ${platformName} edition: ${count("family-on-platform")}`);
+  console.log(`  skipped, a same-titled game came out here within a year: ${count("title-on-platform")}`);
 
+  list("Joining a family IGDB links it to", plan.filter((row) => row.kind === "join-by-link"));
   list("Joining a family by title", plan.filter((row) => row.kind === "join-by-title"));
+  list("Joining a family by title and company", plan.filter((row) => row.kind === "join-by-company"));
   list("Skipped, family already has an edition here", plan.filter((row) => row.kind === "family-on-platform"));
+  list("Skipped, a same-titled game came out here within a year", plan.filter((row) => row.kind === "title-on-platform"));
   list(
     "New families titled like an existing family",
     plan.filter((row) => row.kind === "new-family" && existingTitles.has(normalizeTitle(row.title)))
@@ -471,7 +529,7 @@ function reportPlan(
   list(
     `Re-releases, ${RERELEASE_REPORT_YEARS}+ years after the first release`,
     plan.filter(
-      (row) => row.kind !== "family-on-platform" && row.platformRelease.getTime() - row.firstRelease.getTime() > rereleaseGap
+      (row) => !SKIPPED_KINDS.has(row.kind) && row.platformRelease.getTime() - row.firstRelease.getTime() > rereleaseGap
     )
   );
   list("New families", plan.filter((row) => row.kind === "new-family"));
@@ -487,6 +545,7 @@ function writePlan(path: string, plan: PlannedGame[], familyById: Map<string, Fa
       firstRelease: formatDay(row.firstRelease),
       platformRelease: formatDay(row.platformRelease),
       kind: row.kind,
+      note: row.note ?? null,
       family: family ? { id: row.familyId, slug: family.slug, title: family.title, releaseDate: formatDay(family.releaseDate) } : null,
     };
   });
@@ -539,7 +598,7 @@ async function main() {
   console.log("");
 
   let releaseDates = new Map<number, PlatformReleaseDates>();
-  let igdbGames: IGDBGame[] = [];
+  let igdbGames: ImportGame[] = [];
 
   if (regionSlug) {
     const region = IGDB_RELEASE_REGION_IDS[regionSlug] ?? null;
@@ -590,6 +649,7 @@ async function main() {
       select: {
         igdbId: true,
         gameFamilyId: true,
+        releaseDate: true,
         gameFamily: {
           select: {
             title: true,
@@ -657,6 +717,29 @@ async function main() {
     existingFamilyByTitle.set(normalizedTitle, families);
   }
 
+  // Families of a known IGDB game by title, for a game IGDB lists once per
+  // platform
+  const identifiedFamiliesByTitle = new Map<
+    string,
+    Array<{ id: string; igdbId: number; releaseDate: Date | null }>
+  >();
+  for (const family of existingGameFamilies) {
+    if (family.igdbId === null || family.type !== GameType.BASE_GAME) continue;
+    const normalizedTitle = normalizeTitle(family.title);
+    const families = identifiedFamiliesByTitle.get(normalizedTitle) ?? [];
+    families.push({ id: family.id, igdbId: family.igdbId, releaseDate: family.releaseDate });
+    identifiedFamiliesByTitle.set(normalizedTitle, families);
+  }
+
+  // Release dates of games on the platform by title, for a second IGDB entry
+  // of a game that's already here
+  const platformDatesByTitle = new Map<string, Date[]>();
+  for (const game of existingGames) {
+    if (!game.gameFamily || !game.releaseDate) continue;
+    const normalizedTitle = normalizeTitle(game.gameFamily.title);
+    platformDatesByTitle.set(normalizedTitle, [...(platformDatesByTitle.get(normalizedTitle) ?? []), game.releaseDate]);
+  }
+
   const seenIgdbIds = new Set(igdbIdsOnPlatform);
   let newGames = filteredByLanguage.filter((game) => {
     if (seenIgdbIds.has(game.id) || unidentifiedPlatformTitles.has(normalizeTitle(game.name))) {
@@ -686,6 +769,18 @@ async function main() {
 
   console.log(`New ${platform.name} games to import: ${newGames.length}`);
 
+  // Companies of the same-titled families a new game might be a second IGDB
+  // entry of
+  const companyCandidates = new Set<number>();
+  for (const game of newGames) {
+    const dates = releaseDates.get(game.id);
+    if (!dates) continue;
+    for (const family of identifiedFamiliesByTitle.get(normalizeTitle(game.name)) ?? []) {
+      if (withinAYear(family.releaseDate, new Date(dates.first * 1000))) companyCandidates.add(family.igdbId);
+    }
+  }
+  const familyCompanies = await fetchCompanies(Array.from(companyCandidates));
+
   const plan: PlannedGame[] = [];
   for (const game of newGames) {
     const title = game.name.trim();
@@ -695,32 +790,62 @@ async function main() {
       continue;
     }
 
+    const normalizedTitle = normalizeTitle(title);
     const row = {
       game,
       title,
       firstRelease: new Date(dates.first * 1000),
       platformRelease: new Date(dates.onPlatform * 1000),
     };
-
     // A family has one edition per platform
+    const place = (kind: PlannedGame["kind"], familyId?: string, note?: string) => {
+      const skipped = kind === "title-on-platform" || (familyId !== undefined && familiesOnPlatform.has(familyId));
+      plan.push({ ...row, kind: skipped && kind !== "title-on-platform" ? "family-on-platform" : kind, familyId, note });
+      if (skipped) return;
+      if (familyId) familiesOnPlatform.add(familyId);
+      platformDatesByTitle.set(normalizedTitle, [...(platformDatesByTitle.get(normalizedTitle) ?? []), row.platformRelease]);
+    };
+
+    // The family is this IGDB game or holds an edition of it, or IGDB lists a
+    // port of this game that's in the family. Remakes and remasters aren't
+    // followed: the catalog often keeps them as their own family (Final
+    // Fantasy VII Remake), and the original doesn't belong under that title
     const knownFamilyId = familyIdByIgdbId.get(game.id);
     if (knownFamilyId) {
-      const kind = familiesOnPlatform.has(knownFamilyId) ? "family-on-platform" : "join-by-id";
-      familiesOnPlatform.add(knownFamilyId);
-      plan.push({ ...row, kind, familyId: knownFamilyId });
+      place("join-by-id", knownFamilyId);
+      continue;
+    }
+    const linkedIgdbId = (game.ports ?? []).find((id) => familyIdByIgdbId.has(id));
+    if (linkedIgdbId !== undefined) {
+      place("join-by-link", familyIdByIgdbId.get(linkedIgdbId), `IGDB lists #${linkedIgdbId} as its port`);
       continue;
     }
 
-    const titleFamilyId = (existingFamilyByTitle.get(normalizeTitle(title)) ?? []).find(
+    if ((platformDatesByTitle.get(normalizedTitle) ?? []).some((date) => withinAYear(date, row.platformRelease))) {
+      place("title-on-platform");
+      continue;
+    }
+
+    const titleFamilyId = (existingFamilyByTitle.get(normalizedTitle) ?? []).find(
       (family) => !familiesOnPlatform.has(family.id) && shouldReuseExistingFamily(family, platform.slug, row.firstRelease)
     )?.id;
     if (titleFamilyId) {
-      familiesOnPlatform.add(titleFamilyId);
-      plan.push({ ...row, kind: "join-by-title", familyId: titleFamilyId });
+      place("join-by-title", titleFamilyId);
       continue;
     }
 
-    plan.push({ ...row, kind: "new-family" });
+    const gameCompanies = new Set((game.involved_companies ?? []).map((involved) => involved.company));
+    const companyFamily = (identifiedFamiliesByTitle.get(normalizedTitle) ?? []).find(
+      (family) =>
+        withinAYear(family.releaseDate, row.firstRelease) &&
+        Array.from(familyCompanies.get(family.igdbId) ?? []).some((company) => gameCompanies.has(company))
+    );
+    if (companyFamily) {
+      place("join-by-company", companyFamily.id, `shares a company with #${companyFamily.igdbId}`);
+      continue;
+    }
+
+    place("new-family");
   }
 
   const familyById = new Map<string, FamilySummary>(existingGameFamilies.map((family) => [family.id, family]));
@@ -736,7 +861,7 @@ async function main() {
     writePlan(planOut, plan, familyById);
   }
 
-  const toWrite = plan.filter((row) => row.kind !== "family-on-platform");
+  const toWrite = plan.filter((row) => !SKIPPED_KINDS.has(row.kind));
   if (dryRun || toWrite.length === 0) {
     return;
   }
