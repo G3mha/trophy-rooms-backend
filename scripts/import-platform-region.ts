@@ -102,28 +102,6 @@ function releasedOnPlatform(
   return released;
 }
 
-const RERELEASE_PLATFORM_SLUGS = new Set([
-  "3ds",
-  "wii",
-  "wii-u",
-  "switch",
-  "switch-2",
-  "ps3",
-  "ps4",
-  "ps5",
-  "psp",
-  "vita",
-  "xbox-360",
-  "xbox-one",
-  "xbox-series",
-  "steam",
-  "windows",
-  "pc",
-  "macos",
-  "ios",
-  "android",
-]);
-
 function parseArgs() {
   const args = process.argv.slice(2);
   const options = {
@@ -196,15 +174,13 @@ function normalizeTitle(title: string): string {
   return normalizeForSearch(title) || title.trim().toLowerCase();
 }
 
+// The game's first release, not its date on this platform, so a re-release
+// (ActRaiser on the Wii U Virtual Console) still finds its 1991 family while a
+// new game of the same name (Alone in the Dark, 2008) doesn't join the 1992 one
 function shouldReuseExistingFamily(
   family: { id: string; releaseDate: Date | null },
-  platformSlug: string,
   releaseDate: Date | null
 ): boolean {
-  if (RERELEASE_PLATFORM_SLUGS.has(platformSlug)) {
-    return true;
-  }
-
   if (!family.releaseDate || !releaseDate) {
     return false;
   }
@@ -669,6 +645,7 @@ async function main() {
         gameFamily: {
           select: {
             title: true,
+            releaseDate: true,
           },
         },
       },
@@ -747,13 +724,16 @@ async function main() {
     identifiedFamiliesByTitle.set(normalizedTitle, families);
   }
 
-  // Release dates of games on the platform by title, for a second IGDB entry
-  // of a game that's already here
-  const platformDatesByTitle = new Map<string, Date[]>();
+  // Games on the platform by title, with their date here and their first
+  // release, for a second IGDB entry of a game that's already here
+  const platformDatesByTitle = new Map<string, Array<{ here: Date; first: Date | null }>>();
   for (const game of existingGames) {
     if (!game.gameFamily || !game.releaseDate) continue;
     const normalizedTitle = normalizeTitle(game.gameFamily.title);
-    platformDatesByTitle.set(normalizedTitle, [...(platformDatesByTitle.get(normalizedTitle) ?? []), game.releaseDate]);
+    platformDatesByTitle.set(normalizedTitle, [
+      ...(platformDatesByTitle.get(normalizedTitle) ?? []),
+      { here: game.releaseDate, first: game.gameFamily.releaseDate },
+    ]);
   }
 
   const seenIgdbIds = new Set(igdbIdsOnPlatform);
@@ -840,7 +820,10 @@ async function main() {
       plan.push({ ...row, kind, familyId, note });
       if (kind === "title-on-platform") return;
       if (familyId) familiesOnPlatform.add(familyId);
-      platformDatesByTitle.set(normalizedTitle, [...(platformDatesByTitle.get(normalizedTitle) ?? []), row.platformRelease]);
+      platformDatesByTitle.set(normalizedTitle, [
+        ...(platformDatesByTitle.get(normalizedTitle) ?? []),
+        { here: row.platformRelease, first: row.firstRelease },
+      ]);
     };
 
     // The family is this IGDB game or holds an edition of it, or IGDB lists a
@@ -865,22 +848,31 @@ async function main() {
       continue;
     }
 
-    if ((platformDatesByTitle.get(normalizedTitle) ?? []).some((date) => withinAYear(date, row.platformRelease))) {
+    // Both dates: Sonic the Hedgehog (2006) on Xbox 360 isn't the 1991 game's
+    // 2007 Xbox Live Arcade release
+    if (
+      (platformDatesByTitle.get(normalizedTitle) ?? []).some(
+        (other) => withinAYear(other.here, row.platformRelease) && withinAYear(other.first, row.firstRelease)
+      )
+    ) {
       place("title-on-platform");
       continue;
     }
 
     const titleFamilyId = (existingFamilyByTitle.get(normalizedTitle) ?? []).find(
-      (family) => !familiesOnPlatform.has(family.id) && shouldReuseExistingFamily(family, platform.slug, row.firstRelease)
+      (family) => !familiesOnPlatform.has(family.id) && shouldReuseExistingFamily(family, row.firstRelease)
     )?.id;
     if (titleFamilyId) {
       place("join-by-title", titleFamilyId);
       continue;
     }
 
+    // Not for a re-release: the arcade Teenage Mutant Ninja Turtles (1989) on
+    // Xbox 360 shares Konami and its year with the different NES game
     const gameCompanies = new Set((game.involved_companies ?? []).map((involved) => involved.company));
     const companyFamily = (identifiedFamiliesByTitle.get(normalizedTitle) ?? []).find(
       (family) =>
+        withinAYear(row.platformRelease, row.firstRelease) &&
         withinAYear(family.releaseDate, row.firstRelease) &&
         Array.from(familyCompanies.get(family.igdbId) ?? []).some((company) => gameCompanies.has(company))
     );
