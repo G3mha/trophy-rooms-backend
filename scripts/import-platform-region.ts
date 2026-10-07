@@ -975,7 +975,10 @@ async function main() {
         continue;
       }
 
-      const preferredSlug = generateSlug(game.slug?.trim() || title) || `game-${game.id}`;
+      // IGDB tells same-named games apart with a UUID suffix
+      // ("twisted-metal-3bd4555a-3fd8-41bd-a0d7-d47d8c707651"); a counter reads better
+      const igdbSlug = game.slug?.trim().replace(/-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/, "");
+      const preferredSlug = generateSlug(igdbSlug || title) || `game-${game.id}`;
       const slug = ensureUniqueGameFamilySlug(preferredSlug, existingSlugs);
 
       familyRowsToCreate.push({
