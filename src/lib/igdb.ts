@@ -76,6 +76,45 @@ export function isShippedRelease<T extends IGDBReleaseDate>(
   );
 }
 
+// Platforms where IGDB lists a lot of shovelware, so a game there needs this
+// many ratings to be catalogued. "windows" is the database's slug for PC.
+export const HIGH_SHOVELWARE_PLATFORM_SLUGS = [
+  "pc",
+  "windows",
+  "android",
+  "ios",
+  "linux",
+  "macos",
+  "steam",
+  "epic",
+  "gog",
+];
+export const MIN_RATING_COUNT_ON_HIGH_SHOVELWARE_PLATFORMS = 25;
+
+/**
+ * The catalog's quality bar, shared by import-platform-region.ts (which skips
+ * games below it) and cleanup-shovelware.ts (which removes them): on a
+ * high-shovelware platform a game needs 25+ IGDB ratings; elsewhere it needs a
+ * cover or at least one rating.
+ */
+export function meetsCatalogQualityBar(
+  game: Pick<IGDBGame, "rating_count" | "cover">,
+  platformSlug: string | null
+): { ok: boolean; reason: string } {
+  const ratingCount = game.rating_count ?? 0;
+  if (platformSlug && HIGH_SHOVELWARE_PLATFORM_SLUGS.includes(platformSlug)) {
+    return ratingCount >= MIN_RATING_COUNT_ON_HIGH_SHOVELWARE_PLATFORMS
+      ? { ok: true, reason: "Meets quality criteria" }
+      : {
+          ok: false,
+          reason: `High-shovelware platform (${platformSlug}) with only ${ratingCount} reviews (< ${MIN_RATING_COUNT_ON_HIGH_SHOVELWARE_PLATFORMS})`,
+        };
+  }
+  return game.cover?.image_id || ratingCount > 0
+    ? { ok: true, reason: "Meets quality criteria" }
+    : { ok: false, reason: "No cover image and no ratings" };
+}
+
 // IGDB Platform IDs mapped to our slugs
 export const IGDB_PLATFORM_MAP: Record<string, number[]> = {
   // Nintendo Consoles
