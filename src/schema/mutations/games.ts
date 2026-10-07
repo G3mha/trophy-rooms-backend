@@ -72,7 +72,8 @@ async function createPlatformGamesForFamily(
   prisma: PrismaClient,
   gameFamilyId: string,
   platformIds: string[],
-  releaseDate: Date | null
+  releaseDate: Date | null,
+  igdbId: number | null = null
 ) {
   const uniquePlatformIds = Array.from(new Set(platformIds.filter(Boolean)));
   if (uniquePlatformIds.length === 0) return;
@@ -85,6 +86,7 @@ async function createPlatformGamesForFamily(
         gameFamilyId,
         platformId,
         releaseDate,
+        igdbId,
       },
     });
 
@@ -1216,6 +1218,24 @@ builder.mutationField("importGameFamilyFromIGDBUrl", (t) =>
         .map((slug) => platforms.find((platform) => platform.slug === slug)?.id)
         .filter((id): id is string => Boolean(id));
 
+      // The IGDB id catches the game under any title; the title check below
+      // still covers families imported before ids were stored
+      const knownFamily = await ctx.prisma.gameFamily.findFirst({
+        where: { OR: [{ igdbId: igdbGame.id }, { games: { some: { igdbId: igdbGame.id } } }] },
+        select: { title: true },
+      });
+      if (knownFamily) {
+        return {
+          success: false,
+          gameFamilyId: null,
+          error: {
+            code: ErrorCode.ALREADY_EXISTS,
+            message: `This IGDB game is already in the catalog as "${knownFamily.title}"`,
+            field: "url",
+          },
+        };
+      }
+
       const existingFamily = await ctx.prisma.gameFamily.findFirst({
         where: { title: { equals: trimmedTitle, mode: "insensitive" } },
         include: { games: true },
@@ -1254,6 +1274,7 @@ builder.mutationField("importGameFamilyFromIGDBUrl", (t) =>
             ? getCoverUrl(igdbGame.cover.image_id, "cover_big")
             : null,
           releaseDate,
+          igdbId: igdbGame.id,
           type: mapIGDBCategoryToGameType(igdbGame.category),
         },
       });
@@ -1262,7 +1283,8 @@ builder.mutationField("importGameFamilyFromIGDBUrl", (t) =>
         ctx.prisma,
         gameFamily.id,
         platformIds,
-        releaseDate
+        releaseDate,
+        igdbGame.id
       );
 
       invalidateGameCaches().catch(() => {});
