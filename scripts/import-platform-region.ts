@@ -53,11 +53,13 @@ const RELATION_FIELDS = "ports, involved_companies.company, involved_companies.d
 
 // Developers only: a publisher says little, since licensed games often had a
 // different developer on each platform under one publisher (Sega published
-// both The Lost World: Jurassic Park games of 1997)
+// both The Lost World: Jurassic Park games of 1997). A game IGDB lists no
+// developer for is often self-published, so its companies stand in (Nostatic
+// Software is only PixelMaker's publisher there).
 function developersOf(game: ImportGame): Set<number> {
-  return new Set(
-    (game.involved_companies ?? []).filter((involved) => involved.developer).map((involved) => involved.company)
-  );
+  const companies = game.involved_companies ?? [];
+  const developers = companies.filter((involved) => involved.developer);
+  return new Set((developers.length > 0 ? developers : companies).map((involved) => involved.company));
 }
 
 // CLAUDE.md: when a game is on both Switch and Switch 2, the Switch 2 edition
@@ -800,8 +802,15 @@ async function main() {
 
   const familyTitleById = new Map(existingGameFamilies.map((family) => [family.id, normalizeTitle(family.title)]));
 
+  // Games whose family is known by IGDB id are placed first, so a second IGDB
+  // entry for one of them (PixelMaker has two on Wii U) is seen as a game
+  // already on the platform
   const plan: PlannedGame[] = [];
-  for (const game of newGames) {
+  const knownFirst = [
+    ...newGames.filter((game) => familyIdByIgdbId.has(game.id)),
+    ...newGames.filter((game) => !familyIdByIgdbId.has(game.id)),
+  ];
+  for (const game of knownFirst) {
     const title = game.name.trim();
     // Every game here was selected for having a shipped release on the platform
     const dates = releaseDates.get(game.id);
