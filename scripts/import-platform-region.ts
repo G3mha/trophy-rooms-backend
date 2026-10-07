@@ -809,6 +809,8 @@ async function main() {
       : []
   );
 
+  const familyTitleById = new Map(existingGameFamilies.map((family) => [family.id, normalizeTitle(family.title)]));
+
   const plan: PlannedGame[] = [];
   for (const game of newGames) {
     const title = game.name.trim();
@@ -850,7 +852,14 @@ async function main() {
       place("join-by-id", knownFamilyId);
       continue;
     }
-    const linkedIgdbId = (game.ports ?? []).find((id) => familyIdByIgdbId.has(id));
+    // A port's family under another title only joins when it's already here,
+    // which makes this game a duplicate (Final Fantasy III is the SNES Final
+    // Fantasy VI). Otherwise it would put the game under the port's name
+    // (Farming Simulator 25 under "Farming Simulator: Signature Edition").
+    const linkedIgdbId = (game.ports ?? []).find((id) => {
+      const familyId = familyIdByIgdbId.get(id);
+      return familyId !== undefined && (familyTitleById.get(familyId) === normalizedTitle || familiesOnPlatform.has(familyId));
+    });
     if (linkedIgdbId !== undefined) {
       place("join-by-link", familyIdByIgdbId.get(linkedIgdbId), `IGDB lists #${linkedIgdbId} as its port`);
       continue;
