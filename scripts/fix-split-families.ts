@@ -14,15 +14,16 @@
  * release is the family's date, else the one whose slug matches the family's,
  * else the earliest. Editions the sheet couldn't tie to one IGDB game stay
  * too. Each other group gets a new family built from IGDB
- * (title, description, cover, first Western release, searchTitle) and its
- * editions move there. Editions keep their own dates, labels and user data.
+ * (title, description, cover, first Western release, searchTitle, igdbId) and
+ * its editions move there, recording the IGDB game they matched. Editions keep
+ * their own dates, labels and user data.
  *
  * Everything is checked again inside the transaction. The script stops if a
  * family or edition changed since the sheet was written, if the family has
  * achievement sets, DLC, bundles, buylist entries or base/derived links
  * (which would need a person to decide where they go), if a moved edition has
  * trophies, if an edition label with a cover would end up shared across
- * families, or if a new family's slug is taken by another family.
+ * families, or if a new family's slug or IGDB game belongs to another family.
  *
  * Once applied, rows are marked "done"; the script checks those families now
  * hold a single group.
@@ -280,6 +281,12 @@ async function buildPlan(
       }
       plannedSlugs.add(slug);
 
+      const owner = await db.gameFamily.findUnique({ where: { igdbId: igdb.id }, select: { id: true, slug: true } });
+      if (owner && owner.id !== family.id) {
+        plan.problems.push(`${label}: ${igdb.slug} #${igdb.id} already has family ${owner.slug}; move the editions there by hand`);
+        rowProblem = true;
+      }
+
       moves.push({
         igdb,
         slug,
@@ -391,6 +398,7 @@ async function main() {
               description: move.igdb.summary?.trim() || null,
               coverUrl: move.igdb.cover?.image_id ? getCoverUrl(move.igdb.cover.image_id, "cover_big") : null,
               releaseDate: move.releaseDate,
+              igdbId: move.igdb.id,
               type: family.sourceType,
               screenshots: [],
             },
@@ -398,7 +406,7 @@ async function main() {
           });
           const moved = await tx.game.updateMany({
             where: { id: { in: move.gameIds }, gameFamilyId: family.sourceId },
-            data: { gameFamilyId: created.id },
+            data: { gameFamilyId: created.id, igdbId: move.igdb.id },
           });
           if (moved.count !== move.gameIds.length) {
             throw new Error(`${family.sheet.familySlug}: moved ${moved.count} editions to ${move.slug}, expected ${move.gameIds.length}. Rolled back.`);
