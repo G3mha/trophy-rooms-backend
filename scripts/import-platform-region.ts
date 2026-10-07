@@ -46,10 +46,19 @@ interface IGDBGameReleaseDate extends IGDBReleaseDate {
 // recognise those, so they don't become second families.
 interface ImportGame extends IGDBGame {
   ports?: number[];
-  involved_companies?: Array<{ company: number }>;
+  involved_companies?: Array<{ company: number; developer?: boolean }>;
 }
 
-const RELATION_FIELDS = "ports, involved_companies.company";
+const RELATION_FIELDS = "ports, involved_companies.company, involved_companies.developer";
+
+// Developers only: a publisher says little, since licensed games often had a
+// different developer on each platform under one publisher (Sega published
+// both The Lost World: Jurassic Park games of 1997)
+function developersOf(game: ImportGame): Set<number> {
+  return new Set(
+    (game.involved_companies ?? []).filter((involved) => involved.developer).map((involved) => involved.company)
+  );
+}
 
 // CLAUDE.md: when a game is on both Switch and Switch 2, the Switch 2 edition
 // gets the official edition name ("Nintendo Switch 2 Edition + ...") and its
@@ -381,23 +390,23 @@ async function fetchAllMainGamesForPlatform(
   return limit ? allGames.slice(0, limit) : allGames;
 }
 
-async function fetchCompanies(gameIds: number[]): Promise<Map<number, Set<number>>> {
-  const companies = new Map<number, Set<number>>();
+async function fetchDevelopers(gameIds: number[]): Promise<Map<number, Set<number>>> {
+  const developers = new Map<number, Set<number>>();
   const chunkSize = 500;
 
   for (let index = 0; index < gameIds.length; index += chunkSize) {
     const chunk = gameIds.slice(index, index + chunkSize);
     const games = await igdbRequest<ImportGame[]>(
       "games",
-      `fields involved_companies.company; where id = (${chunk.join(", ")}); limit ${chunk.length};`
+      `fields involved_companies.company, involved_companies.developer; where id = (${chunk.join(", ")}); limit ${chunk.length};`
     );
     for (const game of games) {
-      companies.set(game.id, new Set((game.involved_companies ?? []).map((involved) => involved.company)));
+      developers.set(game.id, developersOf(game));
     }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
 
-  return companies;
+  return developers;
 }
 
 function looksJapaneseTitle(title: string): boolean {
@@ -443,8 +452,8 @@ interface PlannedGame {
   // join-by-id: the family is this IGDB game, or holds an edition of it
   // join-by-link: IGDB lists a port of it that's in the family
   // join-by-title: a same-titled family with no IGDB id
-  // join-by-company: a same-titled family of another IGDB game, released
-  //   within a year by a company this game shares
+  // join-by-developer: a same-titled family of another IGDB game, released
+  //   within a year by a developer this game shares
   // family-on-platform: its family already has an edition here, so it's skipped
   // title-on-platform: a same-titled game came out here within a year, so
   //   this is a second IGDB entry for it and it's skipped
@@ -454,7 +463,7 @@ interface PlannedGame {
     | "join-by-id"
     | "join-by-link"
     | "join-by-title"
-    | "join-by-company"
+    | "join-by-developer"
     | "family-on-platform"
     | "title-on-platform"
     | "needs-edition-name"
@@ -501,7 +510,7 @@ function reportPlan(
   console.log(`  join a family by IGDB id:            ${count("join-by-id")}`);
   console.log(`  join a family IGDB links it to:      ${count("join-by-link")}`);
   console.log(`  join a family by title:              ${count("join-by-title")}`);
-  console.log(`  join a family by title and company:  ${count("join-by-company")}`);
+  console.log(`  join a family by title and developer: ${count("join-by-developer")}`);
   console.log(`  new family:                          ${count("new-family")}`);
   console.log(`  skipped, family already has a ${platformName} edition: ${count("family-on-platform")}`);
   console.log(`  skipped, a same-titled game came out here within a year: ${count("title-on-platform")}`);
@@ -509,7 +518,7 @@ function reportPlan(
 
   list("Joining a family IGDB links it to", plan.filter((row) => row.kind === "join-by-link"));
   list("Joining a family by title", plan.filter((row) => row.kind === "join-by-title"));
-  list("Joining a family by title and company", plan.filter((row) => row.kind === "join-by-company"));
+  list("Joining a family by title and developer", plan.filter((row) => row.kind === "join-by-developer"));
   list("Skipped, family already has an edition here", plan.filter((row) => row.kind === "family-on-platform"));
   list("Skipped, a same-titled game came out here within a year", plan.filter((row) => row.kind === "title-on-platform"));
   list("Skipped, needs an edition name and cover", plan.filter((row) => row.kind === "needs-edition-name"));
@@ -765,17 +774,17 @@ async function main() {
 
   console.log(`New ${platform.name} games to import: ${newGames.length}`);
 
-  // Companies of the same-titled families a new game might be a second IGDB
+  // Developers of the same-titled families a new game might be a second IGDB
   // entry of
-  const companyCandidates = new Set<number>();
+  const developerCandidates = new Set<number>();
   for (const game of newGames) {
     const dates = releaseDates.get(game.id);
     if (!dates) continue;
     for (const family of identifiedFamiliesByTitle.get(normalizeTitle(game.name)) ?? []) {
-      if (withinAYear(family.releaseDate, new Date(dates.first * 1000))) companyCandidates.add(family.igdbId);
+      if (withinAYear(family.releaseDate, new Date(dates.first * 1000))) developerCandidates.add(family.igdbId);
     }
   }
-  const familyCompanies = await fetchCompanies(Array.from(companyCandidates));
+  const familyDevelopers = await fetchDevelopers(Array.from(developerCandidates));
 
   const basePlatformSlug = ENHANCED_EDITION_BASE_PLATFORM[platform.slug];
   const familiesOnBasePlatform = new Set(
@@ -869,15 +878,15 @@ async function main() {
 
     // Not for a re-release: the arcade Teenage Mutant Ninja Turtles (1989) on
     // Xbox 360 shares Konami and its year with the different NES game
-    const gameCompanies = new Set((game.involved_companies ?? []).map((involved) => involved.company));
-    const companyFamily = (identifiedFamiliesByTitle.get(normalizedTitle) ?? []).find(
+    const gameDevelopers = developersOf(game);
+    const developerFamily = (identifiedFamiliesByTitle.get(normalizedTitle) ?? []).find(
       (family) =>
         withinAYear(row.platformRelease, row.firstRelease) &&
         withinAYear(family.releaseDate, row.firstRelease) &&
-        Array.from(familyCompanies.get(family.igdbId) ?? []).some((company) => gameCompanies.has(company))
+        Array.from(familyDevelopers.get(family.igdbId) ?? []).some((developer) => gameDevelopers.has(developer))
     );
-    if (companyFamily) {
-      place("join-by-company", companyFamily.id, `shares a company with #${companyFamily.igdbId}`);
+    if (developerFamily) {
+      place("join-by-developer", developerFamily.id, `shares a developer with #${developerFamily.igdbId}`);
       continue;
     }
 
