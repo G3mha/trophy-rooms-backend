@@ -475,19 +475,6 @@ async function main() {
   } else {
     igdbGames = await fetchAllMainGamesForPlatform(igdbPlatformIds, limit);
     console.log(`Found ${igdbGames.length} main games with no version parent`);
-
-    releaseDates = await fetchReleaseDatesByRegionsForGames(
-      igdbGames.map((game) => game.id),
-      WESTERN_RELEASE_REGION_IDS,
-      igdbPlatformIds
-    );
-
-    const westernReleaseFilteredGames = igdbGames.filter((game) => releaseDates.has(game.id));
-    const excludedWithoutWesternRelease = igdbGames.length - westernReleaseFilteredGames.length;
-    console.log(
-      `Excluded ${excludedWithoutWesternRelease} titles without a shipped Western release on ${platform.name}`
-    );
-    igdbGames = westernReleaseFilteredGames;
   }
 
   // Same bar cleanup-shovelware.ts removes games by, so imports don't need cleaning up
@@ -577,7 +564,7 @@ async function main() {
   }
 
   const seenIgdbIds = new Set(igdbIdsOnPlatform);
-  const newGames = filteredByLanguage.filter((game) => {
+  let newGames = filteredByLanguage.filter((game) => {
     if (seenIgdbIds.has(game.id) || unidentifiedPlatformTitles.has(normalizeTitle(game.name))) {
       return false;
     }
@@ -585,6 +572,23 @@ async function main() {
     seenIgdbIds.add(game.id);
     return true;
   });
+
+  // Western releases are fetched last, only for games that passed the cheaper
+  // filters: on a platform that's mostly in the catalog that skips most lookups
+  if (!regionSlug) {
+    releaseDates = await fetchReleaseDatesByRegionsForGames(
+      newGames.map((game) => game.id),
+      WESTERN_RELEASE_REGION_IDS,
+      igdbPlatformIds
+    );
+
+    const westernReleaseFilteredGames = newGames.filter((game) => releaseDates.has(game.id));
+    const excludedWithoutWesternRelease = newGames.length - westernReleaseFilteredGames.length;
+    console.log(
+      `Excluded ${excludedWithoutWesternRelease} titles without a shipped Western release on ${platform.name}`
+    );
+    newGames = westernReleaseFilteredGames;
+  }
 
   console.log(`New ${platform.name} games to import: ${newGames.length}`);
 
