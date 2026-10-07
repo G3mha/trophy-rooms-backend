@@ -75,6 +75,16 @@ function withinAYear(date: Date | null, other: Date): boolean {
   return date !== null && Math.abs(date.getTime() - other.getTime()) <= A_YEAR_MS;
 }
 
+// Two same-titled games out on one platform this close together are one
+// release that IGDB lists twice, whatever their first releases: a Switch port
+// often has its own entry, dated years after the PC original (Monomals, Pocket
+// Pool)
+const SAME_RELEASE_MS = 45 * 24 * 60 * 60 * 1000;
+
+function sameRelease(date: Date | null, other: Date): boolean {
+  return date !== null && Math.abs(date.getTime() - other.getTime()) <= SAME_RELEASE_MS;
+}
+
 // Earliest shipped release per IGDB game, on any platform and on the platform
 // being imported. The Game gets its own platform's date. The family keeps the
 // first release, which also decides whether a same-titled family is the same
@@ -876,11 +886,14 @@ async function main() {
       continue;
     }
 
-    // Both dates: Sonic the Hedgehog (2006) on Xbox 360 isn't the 1991 game's
+    // A year apart here is only the same game when the first releases are
+    // close too: Sonic the Hedgehog (2006) on Xbox 360 isn't the 1991 game's
     // 2007 Xbox Live Arcade release
     if (
       (platformDatesByTitle.get(normalizedTitle) ?? []).some(
-        (other) => withinAYear(other.here, row.platformRelease) && withinAYear(other.first, row.firstRelease)
+        (other) =>
+          sameRelease(other.here, row.platformRelease) ||
+          (withinAYear(other.here, row.platformRelease) && withinAYear(other.first, row.firstRelease))
       )
     ) {
       place("title-on-platform");
