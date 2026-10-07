@@ -517,13 +517,15 @@ async function main() {
         },
       },
     }),
+    // Every type: a family's IGDB id is unique whatever its type, so a new
+    // family can't take an id a DLC or expansion family already has
     prisma.gameFamily.findMany({
-      where: { type: GameType.BASE_GAME },
       select: {
         id: true,
         title: true,
         releaseDate: true,
         igdbId: true,
+        type: true,
       },
       orderBy: { createdAt: "asc" },
     }),
@@ -567,7 +569,7 @@ async function main() {
     Array<{ id: string; releaseDate: Date | null }>
   >();
   for (const family of existingGameFamilies) {
-    if (family.igdbId !== null) continue;
+    if (family.igdbId !== null || family.type !== GameType.BASE_GAME) continue;
     const normalizedTitle = normalizeTitle(family.title);
     const families = existingFamilyByTitle.get(normalizedTitle) ?? [];
     families.push({ id: family.id, releaseDate: family.releaseDate });
