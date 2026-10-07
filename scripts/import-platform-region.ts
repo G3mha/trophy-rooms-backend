@@ -50,6 +50,14 @@ interface ImportGame extends IGDBGame {
 }
 
 const RELATION_FIELDS = "ports, involved_companies.company";
+
+// CLAUDE.md: when a game is on both Switch and Switch 2, the Switch 2 edition
+// gets the official edition name ("Nintendo Switch 2 Edition + ...") and its
+// own cover. IGDB gives neither, so those editions are listed for a person to
+// add rather than imported as Standard.
+const ENHANCED_EDITION_BASE_PLATFORM: Record<string, string> = {
+  "switch-2": "switch",
+};
 const A_YEAR_MS = 366 * 24 * 60 * 60 * 1000;
 
 function withinAYear(date: Date | null, other: Date): boolean {
@@ -464,6 +472,8 @@ interface PlannedGame {
   // family-on-platform: its family already has an edition here, so it's skipped
   // title-on-platform: a same-titled game came out here within a year, so
   //   this is a second IGDB entry for it and it's skipped
+  // needs-edition-name: its family is on the base platform of this one
+  //   (Switch for Switch 2), so it's skipped and listed
   kind:
     | "join-by-id"
     | "join-by-link"
@@ -471,12 +481,13 @@ interface PlannedGame {
     | "join-by-company"
     | "family-on-platform"
     | "title-on-platform"
+    | "needs-edition-name"
     | "new-family";
   familyId?: string;
   note?: string;
 }
 
-const SKIPPED_KINDS = new Set<PlannedGame["kind"]>(["family-on-platform", "title-on-platform"]);
+const SKIPPED_KINDS = new Set<PlannedGame["kind"]>(["family-on-platform", "title-on-platform", "needs-edition-name"]);
 
 interface FamilySummary {
   slug: string;
@@ -518,12 +529,14 @@ function reportPlan(
   console.log(`  new family:                          ${count("new-family")}`);
   console.log(`  skipped, family already has a ${platformName} edition: ${count("family-on-platform")}`);
   console.log(`  skipped, a same-titled game came out here within a year: ${count("title-on-platform")}`);
+  console.log(`  skipped, needs an edition name and cover: ${count("needs-edition-name")}`);
 
   list("Joining a family IGDB links it to", plan.filter((row) => row.kind === "join-by-link"));
   list("Joining a family by title", plan.filter((row) => row.kind === "join-by-title"));
   list("Joining a family by title and company", plan.filter((row) => row.kind === "join-by-company"));
   list("Skipped, family already has an edition here", plan.filter((row) => row.kind === "family-on-platform"));
   list("Skipped, a same-titled game came out here within a year", plan.filter((row) => row.kind === "title-on-platform"));
+  list("Skipped, needs an edition name and cover", plan.filter((row) => row.kind === "needs-edition-name"));
   list(
     "New families titled like an existing family",
     plan.filter((row) => row.kind === "new-family" && existingTitles.has(normalizeTitle(row.title)))
@@ -784,6 +797,18 @@ async function main() {
   }
   const familyCompanies = await fetchCompanies(Array.from(companyCandidates));
 
+  const basePlatformSlug = ENHANCED_EDITION_BASE_PLATFORM[platform.slug];
+  const familiesOnBasePlatform = new Set(
+    basePlatformSlug
+      ? (
+          await prisma.game.findMany({
+            where: { platform: { slug: basePlatformSlug } },
+            select: { gameFamilyId: true },
+          })
+        ).flatMap((game) => (game.gameFamilyId ? [game.gameFamilyId] : []))
+      : []
+  );
+
   const plan: PlannedGame[] = [];
   for (const game of newGames) {
     const title = game.name.trim();
@@ -802,9 +827,16 @@ async function main() {
     };
     // A family has one edition per platform
     const place = (kind: PlannedGame["kind"], familyId?: string, note?: string) => {
-      const skipped = kind === "title-on-platform" || (familyId !== undefined && familiesOnPlatform.has(familyId));
-      plan.push({ ...row, kind: skipped && kind !== "title-on-platform" ? "family-on-platform" : kind, familyId, note });
-      if (skipped) return;
+      if (familyId !== undefined && familiesOnPlatform.has(familyId)) {
+        plan.push({ ...row, kind: "family-on-platform", familyId, note });
+        return;
+      }
+      if (familyId !== undefined && familiesOnBasePlatform.has(familyId)) {
+        plan.push({ ...row, kind: "needs-edition-name", familyId, note });
+        return;
+      }
+      plan.push({ ...row, kind, familyId, note });
+      if (kind === "title-on-platform") return;
       if (familyId) familiesOnPlatform.add(familyId);
       platformDatesByTitle.set(normalizedTitle, [...(platformDatesByTitle.get(normalizedTitle) ?? []), row.platformRelease]);
     };
