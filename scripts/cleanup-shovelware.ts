@@ -2,10 +2,24 @@ import { PrismaClient } from "@prisma/client";
 import {
   searchGameByTitle,
   IGDB_PLATFORM_MAP,
+  HIGH_SHOVELWARE_PLATFORM_SLUGS,
+  MIN_RATING_COUNT_ON_HIGH_SHOVELWARE_PLATFORMS,
+  meetsCatalogQualityBar,
   type IGDBGame,
 } from "../src/lib/igdb.js";
 
 let prisma = new PrismaClient();
+
+// Deleting a game deletes its library entries, collection items, trophies,
+// play sessions and buylist entries with it, so games anyone uses are kept
+// whatever their IGDB rating
+const NO_USER_DATA = {
+  userGames: { none: {} },
+  collectionItems: { none: {} },
+  trophies: { none: {} },
+  playSessions: { none: {} },
+  buylistItems: { none: {} },
+};
 
 // Reconnect to database periodically to avoid connection pool exhaustion
 async function reconnectPrisma(): Promise<void> {
@@ -69,11 +83,7 @@ async function withRetry<T>(
   throw lastError;
 }
 
-// Platform slugs that require stricter filtering (25+ reviews)
-const HIGH_SHOVELWARE_PLATFORMS = ["pc", "android", "ios", "linux", "macos", "steam", "epic", "gog"];
 
-// Minimum rating count for high-shovelware platforms
-const MIN_RATING_COUNT_STRICT = 25;
 
 interface CleanupStats {
   total: number;
@@ -95,30 +105,9 @@ async function shouldDeleteGame(
     return { delete: false, reason: "Not found on IGDB - keeping" };
   }
 
-  const isHighShovelwarePlatform = platformSlug && HIGH_SHOVELWARE_PLATFORMS.includes(platformSlug);
-  const ratingCount = igdbGame.rating_count || 0;
-  const hasCover = !!igdbGame.cover?.image_id;
-  const hasRating = ratingCount > 0;
-
-  if (isHighShovelwarePlatform) {
-    // Strict criteria: must have 25+ reviews
-    if (ratingCount < MIN_RATING_COUNT_STRICT) {
-      return {
-        delete: true,
-        reason: `High-shovelware platform (${platformSlug}) with only ${ratingCount} reviews (< ${MIN_RATING_COUNT_STRICT})`,
-      };
-    }
-  } else {
-    // Moderate criteria: must have cover OR at least 1 rating
-    if (!hasCover && !hasRating) {
-      return {
-        delete: true,
-        reason: "No cover image and no ratings",
-      };
-    }
-  }
-
-  return { delete: false, reason: "Meets quality criteria" };
+  // Shared with import-platform-region.ts, so imports skip what this removes
+  const bar = meetsCatalogQualityBar(igdbGame, platformSlug);
+  return { delete: !bar.ok, reason: bar.reason };
 }
 
 async function main() {
@@ -141,7 +130,7 @@ async function main() {
   const platformMap = new Map(platforms.map((p) => [p.id, p.slug]));
 
   console.log(`\nPlatforms loaded: ${platforms.length}`);
-  console.log(`High-shovelware platforms (require ${MIN_RATING_COUNT_STRICT}+ reviews): ${HIGH_SHOVELWARE_PLATFORMS.join(", ")}`);
+  console.log(`High-shovelware platforms (require ${MIN_RATING_COUNT_ON_HIGH_SHOVELWARE_PLATFORMS}+ reviews): ${HIGH_SHOVELWARE_PLATFORM_SLUGS.join(", ")}`);
 
   // Build query for games
   const whereClause: { platformId?: string } = {};
@@ -187,15 +176,18 @@ async function main() {
   console.log("\nStarting cleanup...\n");
 
   while (true) {
-    const games = await withRetry(() =>
-      prisma.game.findMany({
-        where: whereClause,
-        select: { id: true, title: true, platformId: true },
-        skip: offset,
-        take: batchSize,
-        orderBy: { title: "asc" },
-      })
-    );
+    // Titles live on the family since the GameFamily split
+    const games = (
+      await withRetry(() =>
+        prisma.game.findMany({
+          where: whereClause,
+          select: { id: true, platformId: true, gameFamily: { select: { title: true } } },
+          skip: offset,
+          take: batchSize,
+          orderBy: [{ gameFamily: { title: "asc" } }, { id: "asc" }],
+        })
+      )
+    ).map((game) => ({ id: game.id, platformId: game.platformId, title: game.gameFamily?.title ?? "" }));
 
     if (games.length === 0) break;
 
@@ -259,7 +251,10 @@ async function main() {
       console.log(`\n[Deleting batch of ${gamesToDelete.length} games...]`);
       await withRetry(() =>
         prisma.game.deleteMany({
-          where: { id: { in: [...gamesToDelete] } },
+          where: {
+          id: { in: [...gamesToDelete] },
+          ...NO_USER_DATA,
+        },
         })
       );
       gamesToDelete.length = 0; // Clear the array
@@ -293,7 +288,7 @@ async function main() {
     console.log(`\nDeleting final batch of ${gamesToDelete.length} games...`);
     await withRetry(() =>
       prisma.game.deleteMany({
-        where: { id: { in: gamesToDelete } },
+        where: { id: { in: gamesToDelete }, ...NO_USER_DATA },
       })
     );
     console.log("Final batch deleted!");
