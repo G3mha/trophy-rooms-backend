@@ -218,6 +218,14 @@ function ensureUniqueGameFamilySlug(
   return slug;
 }
 
+// The database pooler closes connections left idle while IGDB is read, which
+// can take minutes on a big platform, and Prisma only finds out when the next
+// query fails ("Server has closed the connection"). Disconnecting first makes
+// the next query open fresh ones.
+async function reconnectAfterIgdb() {
+  await prisma.$disconnect();
+}
+
 async function ensureStandardVersion() {
   let standardVersion = await prisma.gameVersion.findFirst({
     where: { slug: "standard" },
@@ -646,6 +654,7 @@ async function main() {
     console.log(`Excluded ${excludedJapaneseCount} titles that look Japanese by name`);
   }
 
+  await reconnectAfterIgdb();
   const [existingGames, existingGameFamilies, identifiedGames] = await Promise.all([
     prisma.game.findMany({
       where: { platformId: platform.id },
@@ -788,6 +797,7 @@ async function main() {
   }
   const familyDevelopers = await fetchDevelopers(Array.from(developerCandidates));
 
+  await reconnectAfterIgdb();
   const basePlatformSlug = ENHANCED_EDITION_BASE_PLATFORM[platform.slug];
   const familiesOnBasePlatform = new Set(
     basePlatformSlug
@@ -920,6 +930,7 @@ async function main() {
     return;
   }
 
+  await reconnectAfterIgdb();
   const standardVersion = await ensureStandardVersion();
   const existingSlugs = new Set(
     (
