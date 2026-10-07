@@ -1,6 +1,7 @@
 import type { User } from "@prisma/client";
 import { builder } from "../builder.js";
 import { visibleSetWhere } from "../../lib/achievement-visibility.js";
+import { countFinishedGames } from "../../lib/trophies.js";
 
 // Completions whose achievement the viewer can see. A user's list leaves out
 // achievements in other users' private sets, even ones they completed.
@@ -160,10 +161,10 @@ builder.queryField("myStats", (t) =>
         return null;
       }
 
+      const userId = ctx.user.id;
       const [trophyCount, achievementCount, gamesPlayed] = await Promise.all([
-        ctx.prisma.trophy.count({
-          where: { userId: ctx.user.id },
-        }),
+        // Finished games, not Trophy rows (see ../../lib/trophies.js)
+        countFinishedGames(ctx.prisma, [userId]).then((counts) => counts.get(userId) ?? 0),
         ctx.prisma.userAchievement.count({
           where: { userId: ctx.user.id },
         }),

@@ -2,6 +2,7 @@ import { builder } from "../builder.js";
 import { UserRole, AchievementTier } from "@prisma/client";
 import { hasRequiredRole } from "../../context.js";
 import { visibleSetWhere } from "../../lib/achievement-visibility.js";
+import { countFinishedGames } from "../../lib/trophies.js";
 
 builder.enumType(UserRole, {
   name: "UserRole",
@@ -77,7 +78,12 @@ builder.prismaObject("User", {
       },
     }),
     achievementCount: t.relationCount("achievements"),
-    trophyCount: t.relationCount("trophies"),
+    // Finished games, not Trophy rows: a game owned on two editions carries a
+    // trophy on each (see ../../lib/trophies.js)
+    trophyCount: t.int({
+      resolve: async (user, _args, ctx) =>
+        (await countFinishedGames(ctx.prisma, [user.id])).get(user.id) ?? 0,
+    }),
     // Count of unique game families where user has at least one achievement
     gamesWithAchievementsCount: t.int({
       resolve: async (user, _args, ctx) => {
