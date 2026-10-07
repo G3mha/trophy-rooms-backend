@@ -503,10 +503,12 @@ async function main() {
     console.log(`Excluded ${excludedJapaneseCount} titles that look Japanese by name`);
   }
 
-  const [existingGames, existingGameFamilies] = await Promise.all([
+  const [existingGames, existingGameFamilies, identifiedGames] = await Promise.all([
     prisma.game.findMany({
       where: { platformId: platform.id },
       select: {
+        igdbId: true,
+        gameFamilyId: true,
         gameFamily: {
           select: {
             title: true,
@@ -520,36 +522,64 @@ async function main() {
         id: true,
         title: true,
         releaseDate: true,
+        igdbId: true,
       },
       orderBy: { createdAt: "asc" },
     }),
+    prisma.game.findMany({
+      where: { igdbId: { not: null } },
+      select: { igdbId: true, gameFamilyId: true },
+    }),
   ]);
 
-  const existingPlatformTitles = new Set(
+  // Games already on the platform: by IGDB id, and by title for editions whose
+  // IGDB game isn't known yet (they may be any game with that name)
+  const igdbIdsOnPlatform = new Set(
+    existingGames.map((game) => game.igdbId).filter((id): id is number => id !== null)
+  );
+  const unidentifiedPlatformTitles = new Set(
     existingGames
-      .map((game) => game.gameFamily?.title ? normalizeTitle(game.gameFamily.title) : null)
-      .filter((title): title is string => Boolean(title))
+      .filter((game) => game.igdbId === null && game.gameFamily)
+      .map((game) => normalizeTitle(game.gameFamily!.title))
+  );
+  const familiesOnPlatform = new Set(
+    existingGames.map((game) => game.gameFamilyId).filter((id): id is string => id !== null)
   );
 
+  // Families by IGDB game: an edition's id finds a remake or port kept in its
+  // original's family, and the family's own id wins over it
+  const familyIdByIgdbId = new Map<number, string>();
+  for (const game of identifiedGames) {
+    if (game.igdbId !== null && game.gameFamilyId && !familyIdByIgdbId.has(game.igdbId)) {
+      familyIdByIgdbId.set(game.igdbId, game.gameFamilyId);
+    }
+  }
+  for (const family of existingGameFamilies) {
+    if (family.igdbId !== null) familyIdByIgdbId.set(family.igdbId, family.id);
+  }
+
+  // Title matches only reach families whose IGDB game isn't known: one that has
+  // an id is a specific game, and a same-named game isn't it (Need for Speed:
+  // Most Wanted 2012 is not the 2005 game)
   const existingFamilyByTitle = new Map<
     string,
     Array<{ id: string; releaseDate: Date | null }>
   >();
   for (const family of existingGameFamilies) {
+    if (family.igdbId !== null) continue;
     const normalizedTitle = normalizeTitle(family.title);
     const families = existingFamilyByTitle.get(normalizedTitle) ?? [];
     families.push({ id: family.id, releaseDate: family.releaseDate });
     existingFamilyByTitle.set(normalizedTitle, families);
   }
 
-  const seenImportTitles = new Set(existingPlatformTitles);
+  const seenIgdbIds = new Set(igdbIdsOnPlatform);
   const newGames = filteredByLanguage.filter((game) => {
-    const normalizedTitle = normalizeTitle(game.name);
-    if (seenImportTitles.has(normalizedTitle)) {
+    if (seenIgdbIds.has(game.id) || unidentifiedPlatformTitles.has(normalizeTitle(game.name))) {
       return false;
     }
 
-    seenImportTitles.add(normalizedTitle);
+    seenIgdbIds.add(game.id);
     return true;
   });
 
@@ -583,9 +613,9 @@ async function main() {
     const gameRowsToAttach: Array<{
       gameFamilyId: string;
       releaseDate: Date | null;
+      igdbId: number;
     }> = [];
     const familyRowsToCreate: Array<{
-      sourceTitle: string;
       // The new family's game takes its own platform's date, not the family's
       gameReleaseDate: Date;
       title: string;
@@ -593,6 +623,7 @@ async function main() {
       description: string | null;
       coverUrl: string | null;
       releaseDate: Date | null;
+      igdbId: number;
       type: GameType;
       screenshots: string[];
     }> = [];
@@ -612,14 +643,21 @@ async function main() {
       const normalizedTitle = normalizeTitle(trimmedTitle);
       const firstRelease = new Date(dates.first * 1000);
       const platformRelease = new Date(dates.onPlatform * 1000);
-      const existingFamily = (existingFamilyByTitle.get(normalizedTitle) ?? []).find((family) =>
-        shouldReuseExistingFamily(family, platform.slug, firstRelease)
-      );
+      const knownFamilyId = familyIdByIgdbId.get(game.id);
+      const existingFamilyId =
+        knownFamilyId ??
+        (existingFamilyByTitle.get(normalizedTitle) ?? []).find(
+          (family) => !familiesOnPlatform.has(family.id) && shouldReuseExistingFamily(family, platform.slug, firstRelease)
+        )?.id;
 
-      if (existingFamily) {
+      if (existingFamilyId) {
+        // A family has one edition per platform
+        if (familiesOnPlatform.has(existingFamilyId)) continue;
+        familiesOnPlatform.add(existingFamilyId);
         gameRowsToAttach.push({
-          gameFamilyId: existingFamily.id,
+          gameFamilyId: existingFamilyId,
           releaseDate: platformRelease,
+          igdbId: game.id,
         });
         continue;
       }
@@ -628,7 +666,6 @@ async function main() {
       const slug = ensureUniqueGameFamilySlug(preferredSlug, existingSlugs);
 
       familyRowsToCreate.push({
-        sourceTitle: normalizedTitle,
         gameReleaseDate: platformRelease,
         title: trimmedTitle,
         slug,
@@ -637,6 +674,7 @@ async function main() {
           ? getCoverUrl(game.cover.image_id, "cover_big")
           : null,
         releaseDate: firstRelease,
+        igdbId: game.id,
         type: GameType.BASE_GAME,
         screenshots: [],
       });
@@ -650,24 +688,22 @@ async function main() {
       const createdGameFamilies = familyRowsToCreate.length > 0
         ? await tx.gameFamily.createManyAndReturn({
             data: familyRowsToCreate.map(
-              ({ sourceTitle: _sourceTitle, gameReleaseDate: _gameReleaseDate, ...row }) => row
+              ({ gameReleaseDate: _gameReleaseDate, ...row }) => row
             ),
             select: {
               id: true,
               slug: true,
               releaseDate: true,
+              igdbId: true,
             },
           })
         : [];
 
-      createdGameFamilies.forEach((gameFamily, createdIndex) => {
-        const sourceTitle = familyRowsToCreate[createdIndex]?.sourceTitle;
-        if (sourceTitle) {
-          const families = existingFamilyByTitle.get(sourceTitle) ?? [];
-          families.push({ id: gameFamily.id, releaseDate: gameFamily.releaseDate });
-          existingFamilyByTitle.set(sourceTitle, families);
-        }
-      });
+      // Later chunks find these by IGDB id, not by title
+      for (const gameFamily of createdGameFamilies) {
+        if (gameFamily.igdbId !== null) familyIdByIgdbId.set(gameFamily.igdbId, gameFamily.id);
+        familiesOnPlatform.add(gameFamily.id);
+      }
 
       const gameReleaseDateBySlug = new Map(
         familyRowsToCreate.map((row) => [row.slug, row.gameReleaseDate])
@@ -679,11 +715,13 @@ async function main() {
             gameFamilyId: gameFamily.id,
             platformId: platform.id,
             releaseDate: gameReleaseDateBySlug.get(gameFamily.slug) ?? null,
+            igdbId: gameFamily.igdbId,
           })),
         ].map((row) => ({
           gameFamilyId: row.gameFamilyId,
           platformId: platform.id,
           releaseDate: row.releaseDate,
+          igdbId: row.igdbId,
         })),
         select: {
           id: true,
