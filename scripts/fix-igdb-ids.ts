@@ -6,7 +6,8 @@
  * different one in the file is reported. An edition with an edition label
  * other than Standard (Oblivion Remastered on Steam, Ghost of Tsushima
  * Director's Cut) is skipped too: it is often its own IGDB game under a
- * different title, while the check matched it by the family's title. A family id is unique, so when the
+ * different title, while the check matched it by the family's title. An entry
+ * that says which label its id was matched for ("matchedLabel") is filled. A family id is unique, so when the
  * file gives one IGDB game to several families, or a family is given an id
  * another family already has, none of them get it: that usually means
  * duplicate families, which a person should merge. Those are reported and
@@ -35,6 +36,8 @@ interface EditionId {
   platform: string;
   igdbId: number;
   igdb: string;
+  // Set when the id was matched for the edition's label rather than its title
+  matchedLabel?: string;
 }
 
 interface FamilyId {
@@ -99,7 +102,7 @@ async function buildPlan(db: Prisma.TransactionClient, ids: IdFile): Promise<Pla
         plan.alreadySet++;
       } else if (game.igdbId !== null) {
         plan.skipped.push(`${label}: already #${game.igdbId}, the check matched #${entry.igdbId} (${entry.igdb})`);
-      } else if (game.versions.some((version) => version.name !== "Standard")) {
+      } else if (!entry.matchedLabel && game.versions.some((version) => version.name !== "Standard")) {
         plan.skipped.push(
           `${label}: has edition label ${game.versions.map((version) => version.name).filter((name) => name !== "Standard").join(", ")}; may be its own IGDB game`
         );
