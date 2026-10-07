@@ -1,0 +1,23 @@
+[
+  {"gameId": "cmovihlls00030m79y2r4wx3t", "family": "breath-of-fire", "platform": "Game Boy Advance", "from": "2001-07-06", "to": "2001-12-01", "igdb": "breath-of-fire--1 #276017, \"Dec 01, 2001\""},
+  {"gameId": "cmokgkx5v00ig0md8hrs1t022", "family": "castlevania-dawn-of-sorrow", "platform": "Nintendo DS", "from": "2005-10-04", "to": "2005-09-29", "igdb": "castlevania-dawn-of-sorrow #1136, \"Sep 29, 2005\""},
+  {"gameId": "cmolkkp2f007p0mrimx7gjvte", "family": "catan", "platform": "PlayStation 3", "from": "2010-06-15", "to": "2010-05-12", "igdb": "catan #21830, \"May 12, 2010\""},
+  {"gameId": "cmokuhuu100vl0m1rodc567ma", "family": "cyberpunk-2077", "platform": "PlayStation 5", "from": "2020-12-10", "to": "2022-02-15", "igdb": "cyberpunk-2077 #1877, \"Feb 15, 2022\""},
+  {"gameId": "cmolqmxnj00dr0mv5hgcq1r3i", "family": "cyberpunk-2077", "platform": "Xbox Series X|S", "from": "2020-12-10", "to": "2022-02-15", "igdb": "cyberpunk-2077 #1877, \"Feb 15, 2022\""},
+  {"gameId": "cmolk87ko004a0m665k5cgtnq", "family": "donkey-kong-64", "platform": "Wii U", "from": "2015-04-16", "to": "2015-04-02", "igdb": "donkey-kong-64 #1096, \"Apr 02, 2015\""},
+  {"gameId": "cmolj0npt00900m6sw01wz7cr", "family": "donkey-kong-country", "platform": "Super Nintendo", "from": "1994-11-21", "to": "1994-11-18", "igdb": "donkey-kong-country #1090, \"Nov 18, 1994\""},
+  {"gameId": "cmovihjrj00010m79a2n7eha0", "family": "donkey-kong-country", "platform": "Game Boy Advance", "from": "2003-06-09", "to": "2003-06-06", "igdb": "donkey-kong-country--1 #150028, \"Jun 06, 2003\""},
+  {"gameId": "cmolkolpg006a0mz8agm1iwgo", "family": "donkey-kong-jungle-beat", "platform": "GameCube", "from": "2005-03-14", "to": "2005-02-04", "igdb": "donkey-kong-jungle-beat #1097, \"Feb 04, 2005\""},
+  {"gameId": "cms6iv8wp000b0md32p2q5t98", "family": "final-fantasy", "platform": "PlayStation", "from": "2003-04-08", "to": "2003-03-14", "igdb": "final-fantasy--7 #380632, \"Mar 14, 2003\""},
+  {"gameId": "cms6ivc9c000d0md3hx5djs5x", "family": "final-fantasy-ii", "platform": "PlayStation", "from": "2003-04-08", "to": "2003-03-14", "igdb": "final-fantasy-ii--7 #380633, \"Mar 14, 2003\""},
+  {"gameId": "cmok6xflh00jy0mr1pfdaachu", "family": "kirby-and-the-amazing-mirror", "platform": "Game Boy Advance", "from": "2004-10-18", "to": "2004-07-02", "igdb": "kirby-and-the-amazing-mirror #3721, \"Jul 02, 2004\""},
+  {"gameId": "cmrwvqtfs00040mte8x3301r2", "family": "metroid", "platform": "Wii", "from": "2007-08-13", "to": "2007-07-20", "igdb": "metroid #1101, \"Jul 20, 2007\""},
+  {"gameId": "cmolk88uv00bu0m66lme3ejot", "family": "metroid-other-m", "platform": "Wii U", "from": "2016-12-08", "to": "2016-03-31", "igdb": "metroid-other-m #1113, \"Mar 31, 2016\""},
+  {"gameId": "cmpw9xq7g00020m9yn9tpxmdc", "family": "metroid-zero-mission", "platform": "Wii U", "from": "2016-01-14", "to": "2015-03-12", "igdb": "metroid-zero-mission #1107, \"Mar 12, 2015\""},
+  {"gameId": "cmolqt2hy005b0mb7b6zw1b4x", "family": "pro-wrestling-1", "platform": "Master System", "from": "1991-12-31", "to": "1986-12-01", "igdb": "pro-wrestling--1 #18143, \"Dec 1986\""},
+  {"gameId": "cmoljmq9s01sd0m1uncxer290", "family": "super-mario-rpg-legend-of-the-seven-stars", "platform": "Wii", "from": "2008-09-01", "to": "2008-08-22", "igdb": "super-mario-rpg-legend-of-the-seven-stars #5418, \"Aug 22, 2008\""},
+  {"gameId": "cmolk8a2y00io0m669zpfpzse", "family": "super-mario-rpg-legend-of-the-seven-stars", "platform": "Wii U", "from": "2016-06-30", "to": "2015-12-24", "igdb": "super-mario-rpg-legend-of-the-seven-stars #5418, \"Dec 24, 2015\""},
+  {"gameId": "cmolkkurm018c0mri7hnu1lpg", "family": "the-elder-scrolls-iv-oblivion", "platform": "PlayStation 3", "from": "2006-03-20", "to": "2007-03-20", "igdb": "the-elder-scrolls-iv-oblivion #59, \"Mar 20, 2007\""},
+  {"gameId": "cmolk8a2y00l80m664tee2bpx", "family": "the-legend-of-zelda-skyward-sword", "platform": "Wii", "from": "2011-11-20", "to": "2011-11-18", "igdb": "the-legend-of-zelda-skyward-sword #534, \"Nov 18, 2011\""},
+  {"gameId": "cmrww97kt00040mwgayr3yt6e", "family": "the-legend-of-zelda-twilight-princess", "platform": "GameCube", "from": "2006-12-11", "to": "2006-12-08", "igdb": "the-legend-of-zelda-twilight-princess #1036, \"Dec 08, 2006\""}
+]
