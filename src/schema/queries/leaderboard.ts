@@ -1,5 +1,6 @@
 import { builder } from "../builder.js";
 import { USER_EMAIL_DEPRECATION } from "../deprecations.js";
+import { countFinishedGames, topUsersByFinishedGames } from "../../lib/trophies.js";
 
 // Leaderboard entry type
 const LeaderboardEntry = builder.objectRef<{
@@ -63,12 +64,12 @@ builder.queryField("leaderboardByTrophies", (t) =>
     resolve: async (_root, args, ctx) => {
       const limit = Math.min(args.limit || 10, 100);
 
-      const results = await ctx.prisma.trophy.groupBy({
-        by: ["userId"],
-        _count: { id: true },
-        orderBy: { _count: { id: "desc" } },
-        take: limit,
-      });
+      // Finished games, not Trophy rows: a game owned on two editions carries
+      // a trophy on each (see ../../lib/trophies.js)
+      const results = (await topUsersByFinishedGames(ctx.prisma, limit)).map((row) => ({
+        userId: row.userId,
+        _count: { id: row.count },
+      }));
 
       const userIds = results.map((r) => r.userId);
       const users = await ctx.prisma.user.findMany({
@@ -127,15 +128,8 @@ builder.queryField("leaderboardByAchievements", (t) =>
 
       const userMap = new Map(users.map((u) => [u.id, u]));
 
-      // Get trophy counts for secondary value
-      const trophyCounts = await ctx.prisma.trophy.groupBy({
-        by: ["userId"],
-        where: { userId: { in: userIds } },
-        _count: { id: true },
-      });
-      const trophyMap = new Map(
-        trophyCounts.map((t) => [t.userId, t._count.id])
-      );
+      // Finished games for the secondary value
+      const trophyMap = await countFinishedGames(ctx.prisma, userIds);
 
       return results.map((r, index) => {
         const user = userMap.get(r.userId);
@@ -350,15 +344,8 @@ builder.queryField("leaderboardByGamesPlayed", (t) =>
 
       const userMap = new Map(users.map((u) => [u.id, u]));
 
-      // Get trophy counts for secondary value
-      const trophyCounts = await ctx.prisma.trophy.groupBy({
-        by: ["userId"],
-        where: { userId: { in: userIds } },
-        _count: { id: true },
-      });
-      const trophyMap = new Map(
-        trophyCounts.map((t) => [t.userId, t._count.id])
-      );
+      // Finished games for the secondary value
+      const trophyMap = await countFinishedGames(ctx.prisma, userIds);
 
       return sortedUsers.map((u, index) => {
         const user = userMap.get(u.userId);
