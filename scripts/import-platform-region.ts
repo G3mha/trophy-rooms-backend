@@ -181,8 +181,11 @@ function generateSlug(title: string): string {
     .substring(0, 100);
 }
 
+// Accents and punctuation don't make a different title ("Zhēnběn Xīyóujì" is
+// "Zhen Ben Xi You Ji"). A title with no Latin letters or digits keeps its own
+// characters, so Japanese titles don't all compare equal.
 function normalizeTitle(title: string): string {
-  return title.trim().toLowerCase();
+  return normalizeForSearch(title) || title.trim().toLowerCase();
 }
 
 function shouldReuseExistingFamily(
