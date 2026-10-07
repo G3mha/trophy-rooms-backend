@@ -4,6 +4,7 @@ import {
   getCoverUrl,
   IGDB_PLATFORM_MAP,
   isShippedRelease,
+  meetsCatalogQualityBar,
   WESTERN_RELEASE_REGION_IDS,
   type IGDBGame,
   type IGDBReleaseDate,
@@ -313,7 +314,7 @@ async function fetchMainGamesByIds(gameIds: number[]): Promise<IGDBGame[]> {
   for (let i = 0; i < gameIds.length; i += chunkSize) {
     const chunk = gameIds.slice(i, i + chunkSize);
     const query = `
-      fields id, name, slug, summary, cover.image_id, first_release_date, game_type;
+      fields id, name, slug, summary, cover.image_id, first_release_date, game_type, rating_count;
       where id = (${chunk.join(", ")}) & game_type = 0 & version_parent = null;
       limit ${chunk.length};
     `;
@@ -340,7 +341,7 @@ async function fetchAllMainGamesForPlatform(
 
   while (hasMore) {
     const query = `
-      fields id, name, slug, summary, cover.image_id, first_release_date, category, game_type, keywords.name, websites.url;
+      fields id, name, slug, summary, cover.image_id, first_release_date, category, game_type, rating_count, keywords.name, websites.url;
       where platforms = (${igdbPlatformIds.join(", ")}) & game_type = 0 & version_parent = null;
       sort name asc;
       offset ${offset};
@@ -487,6 +488,11 @@ async function main() {
     );
     igdbGames = westernReleaseFilteredGames;
   }
+
+  // Same bar cleanup-shovelware.ts removes games by, so imports don't need cleaning up
+  const meetingQualityBar = igdbGames.filter((game) => meetsCatalogQualityBar(game, platform.slug).ok);
+  console.log(`Excluded ${igdbGames.length - meetingQualityBar.length} titles below the catalog quality bar`);
+  igdbGames = meetingQualityBar;
 
   const filteredByLanguage = excludeJapaneseTitles
     ? igdbGames.filter((game) => !looksJapaneseTitle(game.name))
