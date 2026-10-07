@@ -1,4 +1,5 @@
 import { Prisma, PrismaClient, GameType } from "@prisma/client";
+import { normalizeForSearch } from "../src/lib/normalize-search.js";
 import {
   igdbRequest,
   getCoverUrl,
@@ -620,6 +621,7 @@ async function main() {
       gameReleaseDate: Date;
       title: string;
       slug: string;
+      searchTitle: string;
       description: string | null;
       coverUrl: string | null;
       releaseDate: Date | null;
@@ -669,6 +671,7 @@ async function main() {
         gameReleaseDate: platformRelease,
         title: trimmedTitle,
         slug,
+        searchTitle: normalizeForSearch(trimmedTitle),
         description: game.summary?.trim() || null,
         coverUrl: game.cover?.image_id
           ? getCoverUrl(game.cover.image_id, "cover_big")
