@@ -1,7 +1,8 @@
 import {
   AchievementSetType,
   AchievementSetVisibility,
-  type Prisma,
+  Prisma,
+  type PrismaClient,
 } from "@prisma/client";
 
 /**
@@ -52,4 +53,56 @@ function compareByRelease(a: TrophyGameCandidate, b: TrophyGameCandidate): numbe
   const byCreated = a.createdAt.getTime() - b.createdAt.getTime();
   if (byCreated !== 0) return byCreated;
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+}
+
+// A user earns one trophy per game family, but it is stored on each of their
+// library editions (pickTrophyGames), so counts of finished games go through
+// families: distinct families per user, distinct users per family. Counting
+// Trophy rows would count a game twice for someone who owns two editions.
+
+/** Finished games (distinct families with a trophy) per user. */
+export async function countFinishedGames(
+  prisma: PrismaClient,
+  userIds: string[]
+): Promise<Map<string, number>> {
+  if (userIds.length === 0) return new Map();
+  const rows = await prisma.$queryRaw<Array<{ userId: string; count: number }>>`
+    SELECT t."userId", COUNT(DISTINCT g."gameFamilyId")::int AS count
+    FROM "Trophy" t
+    JOIN "Game" g ON g.id = t."gameId"
+    WHERE t."userId" IN (${Prisma.join(userIds)})
+    GROUP BY t."userId"
+  `;
+  return new Map(rows.map((row) => [row.userId, row.count]));
+}
+
+/** Users with the most finished games, most first. */
+export async function topUsersByFinishedGames(
+  prisma: PrismaClient,
+  limit: number
+): Promise<Array<{ userId: string; count: number }>> {
+  return prisma.$queryRaw<Array<{ userId: string; count: number }>>`
+    SELECT t."userId", COUNT(DISTINCT g."gameFamilyId")::int AS count
+    FROM "Trophy" t
+    JOIN "Game" g ON g.id = t."gameId"
+    GROUP BY t."userId"
+    ORDER BY count DESC, t."userId" ASC
+    LIMIT ${limit}
+  `;
+}
+
+/** Players who finished each family (distinct users with a trophy on any of its editions). */
+export async function countTrophyHolders(
+  prisma: PrismaClient,
+  familyIds: string[]
+): Promise<Map<string, number>> {
+  if (familyIds.length === 0) return new Map();
+  const rows = await prisma.$queryRaw<Array<{ familyId: string; count: number }>>`
+    SELECT g."gameFamilyId" AS "familyId", COUNT(DISTINCT t."userId")::int AS count
+    FROM "Trophy" t
+    JOIN "Game" g ON g.id = t."gameId"
+    WHERE g."gameFamilyId" IN (${Prisma.join(familyIds)})
+    GROUP BY g."gameFamilyId"
+  `;
+  return new Map(rows.map((row) => [row.familyId, row.count]));
 }
