@@ -1,0 +1,77 @@
+[
+  {
+    "family": "scp-5k",
+    "platform": "PlayStation 5",
+    "igdb": "#132594: PC only on IGDB (early access 2022-02-22, full release TBD); no console version"
+  },
+  {
+    "family": "baldur-s-gate-dark-alliance",
+    "platform": "Xbox Series X|S",
+    "igdb": "#83: Microsoft Store 9NZ7NRN0D1FB is an Xbox One game with no Optimized for Xbox Series X|S flag; backward compatibility"
+  },
+  {
+    "family": "blaster-master-zero-iii",
+    "platform": "Xbox Series X|S",
+    "igdb": "#145058: Microsoft Store 9N866WL46C4F is an Xbox One game with no Optimized for Xbox Series X|S flag; backward compatibility"
+  },
+  {
+    "family": "boss-101",
+    "platform": "Xbox Series X|S",
+    "igdb": "#34959: Microsoft Store 9NPZFZX1ZF66 is an Xbox One game with no Optimized for Xbox Series X|S flag; backward compatibility"
+  },
+  {
+    "family": "car-mechanic-simulator-2018",
+    "platform": "Xbox Series X|S",
+    "igdb": "#40470: Microsoft Store 9MX4DXKMSCZW is an Xbox One game with no Optimized for Xbox Series X|S flag; backward compatibility"
+  },
+  {
+    "family": "jumanji-the-video-game",
+    "platform": "Xbox Series X|S",
+    "igdb": "#119226: Microsoft Store BVG8N7M5NZHD is an Xbox One game with no Optimized for Xbox Series X|S flag; backward compatibility"
+  },
+  {
+    "family": "lamentum",
+    "platform": "Xbox Series X|S",
+    "igdb": "#115588: Microsoft Store 9P48NK83KSMF is an Xbox One game with no Optimized for Xbox Series X|S flag; backward compatibility"
+  },
+  {
+    "family": "lord-of-the-click-ii",
+    "platform": "Xbox Series X|S",
+    "igdb": "#172857: Microsoft Store 9NHTWGXGXFBC is an Xbox One game with no Optimized for Xbox Series X|S flag; backward compatibility"
+  },
+  {
+    "family": "masked-shooters",
+    "platform": "Xbox Series X|S",
+    "igdb": "#36519: IGDB lists Xbox One only (2017-10-16); backward compatibility"
+  },
+  {
+    "family": "nier",
+    "platform": "Xbox Series X|S",
+    "igdb": "#7120: Microsoft Store 9NQ62V5X2RG8 is an Xbox One game with no Optimized for Xbox Series X|S flag; backward compatibility"
+  },
+  {
+    "family": "otogi-myth-of-demons",
+    "platform": "Xbox Series X|S",
+    "igdb": "#5975: Microsoft Store 9MZ93MFG08SR is an Xbox One game with no Optimized for Xbox Series X|S flag; backward compatibility"
+  },
+  {
+    "family": "scp-5k",
+    "platform": "Xbox Series X|S",
+    "igdb": "#132594: PC only on IGDB (early access 2022-02-22, full release TBD); no console version"
+  },
+  {
+    "family": "signalis",
+    "platform": "Xbox Series X|S",
+    "igdb": "#103244: Microsoft Store 9PLF2RS7JRZL is an Xbox One game with no Optimized for Xbox Series X|S flag; backward compatibility"
+  },
+  {
+    "family": "solo-leveling-arise",
+    "platform": "Xbox Series X|S",
+    "igdb": "#188574: Android, iOS and PC only; the Xbox game is Solo Leveling: Arise Overdrive (#349302)"
+  },
+  {
+    "family": "the-addams-family-mansion-mayhem",
+    "platform": "Xbox Series X|S",
+    "igdb": "#150006: Microsoft Store 9NK9LWX511GX is an Xbox One game with no Optimized for Xbox Series X|S flag; backward compatibility"
+  }
+]
