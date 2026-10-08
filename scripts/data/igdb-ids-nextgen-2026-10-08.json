@@ -1,0 +1,268 @@
+{
+  "families": [
+    {
+      "familyId": "cmrww3gg7000m0mj1xtq0cssy",
+      "family": "resident-evil-2-2019",
+      "igdbId": 19686,
+      "igdb": "resident-evil-2--1"
+    },
+    {
+      "familyId": "cmrww43wt00130mj1qmafi9ze",
+      "family": "resident-evil-3-2020",
+      "igdbId": 115115,
+      "igdb": "resident-evil-3"
+    },
+    {
+      "familyId": "cmrww4mpn001g0mj1neuptdbp",
+      "family": "resident-evil-4-2023",
+      "igdbId": 132181,
+      "igdb": "resident-evil-4--1"
+    },
+    {
+      "familyId": "cmrxmc27s00000m6944483m57",
+      "family": "silent-hill-2-2024",
+      "igdbId": 222341,
+      "igdb": "silent-hill-2--1"
+    },
+    {
+      "familyId": "cmrxo2pdf000m0mw5b2kew62j",
+      "family": "alone-in-the-dark-2024",
+      "igdbId": 213237,
+      "igdb": "alone-in-the-dark--1"
+    }
+  ],
+  "editions": [
+    {
+      "gameId": "cmokui8vm03y80m1r3qngnt5h",
+      "family": "sushi-ben",
+      "platform": "PlayStation 5",
+      "igdbId": 258801,
+      "igdb": "sushi-ben"
+    },
+    {
+      "gameId": "cmokuia3c045t0m1r29iyvtpi",
+      "family": "the-last-of-us-part-ii",
+      "platform": "PlayStation 5",
+      "igdbId": 277143,
+      "igdb": "the-last-of-us-part-ii-remastered",
+      "matchedLabel": "Remastered"
+    },
+    {
+      "gameId": "cmokuiciq04nj0m1r8dhv8rhj",
+      "family": "wings-of-wor",
+      "platform": "PlayStation 5",
+      "igdbId": 105255,
+      "igdb": "wings-of-wor"
+    },
+    {
+      "gameId": "cmrwtk0lr000q0mozr27nndvn",
+      "family": "the-elder-scrolls-iv-oblivion",
+      "platform": "PlayStation 5",
+      "igdbId": 267306,
+      "igdb": "the-elder-scrolls-iv-oblivion-remastered",
+      "matchedLabel": "Remastered"
+    },
+    {
+      "gameId": "cmrwtmngx001r0mozifuk541f",
+      "family": "death-stranding",
+      "platform": "PlayStation 5",
+      "igdbId": 152063,
+      "igdb": "death-stranding-directors-cut",
+      "matchedLabel": "Director's Cut"
+    },
+    {
+      "gameId": "cmrww23sh00090mhsdpen4xhi",
+      "family": "live-a-live",
+      "platform": "PlayStation 5",
+      "igdbId": 191407,
+      "igdb": "live-a-live--1",
+      "matchedLabel": "HD-2D Remake"
+    },
+    {
+      "gameId": "cmrww3q9a000u0mj11axibw1q",
+      "family": "resident-evil-2-2019",
+      "platform": "PlayStation 5",
+      "igdbId": 19686,
+      "igdb": "resident-evil-2--1"
+    },
+    {
+      "gameId": "cmrww3i2y000o0mj1ydnyyl60",
+      "family": "resident-evil-2-2019",
+      "platform": "PlayStation 4",
+      "igdbId": 19686,
+      "igdb": "resident-evil-2--1"
+    },
+    {
+      "gameId": "cmrww3kwr000q0mj1bfgnjt73",
+      "family": "resident-evil-2-2019",
+      "platform": "Xbox One",
+      "igdbId": 19686,
+      "igdb": "resident-evil-2--1"
+    },
+    {
+      "gameId": "cmrww3niq000s0mj1m9nxlren",
+      "family": "resident-evil-2-2019",
+      "platform": "Steam",
+      "igdbId": 19686,
+      "igdb": "resident-evil-2--1"
+    },
+    {
+      "gameId": "cmrww3yqy00100mj1k4mxb7em",
+      "family": "resident-evil-2-2019",
+      "platform": "iOS",
+      "igdbId": 19686,
+      "igdb": "resident-evil-2--1"
+    },
+    {
+      "gameId": "cmrww41hb00120mj19k07cblc",
+      "family": "resident-evil-2-2019",
+      "platform": "macOS",
+      "igdbId": 19686,
+      "igdb": "resident-evil-2--1"
+    },
+    {
+      "gameId": "cmrww4e7u001b0mj1xgbbuu1o",
+      "family": "resident-evil-3-2020",
+      "platform": "PlayStation 5",
+      "igdbId": 115115,
+      "igdb": "resident-evil-3"
+    },
+    {
+      "gameId": "cmrww45iz00150mj144ulrav4",
+      "family": "resident-evil-3-2020",
+      "platform": "PlayStation 4",
+      "igdbId": 115115,
+      "igdb": "resident-evil-3"
+    },
+    {
+      "gameId": "cmrww48h400170mj1yuk1y60j",
+      "family": "resident-evil-3-2020",
+      "platform": "Xbox One",
+      "igdbId": 115115,
+      "igdb": "resident-evil-3"
+    },
+    {
+      "gameId": "cmrww4bdy00190mj1stt84rcy",
+      "family": "resident-evil-3-2020",
+      "platform": "Steam",
+      "igdbId": 115115,
+      "igdb": "resident-evil-3"
+    },
+    {
+      "gameId": "cmrww4r9w001k0mj1pwztbz49",
+      "family": "resident-evil-4-2023",
+      "platform": "PlayStation 5",
+      "igdbId": 132181,
+      "igdb": "resident-evil-4--1",
+      "matchedLabel": "Standard"
+    },
+    {
+      "gameId": "cmrww4oce001i0mj1ctu6t2rw",
+      "family": "resident-evil-4-2023",
+      "platform": "PlayStation 4",
+      "igdbId": 132181,
+      "igdb": "resident-evil-4--1",
+      "matchedLabel": "Standard"
+    },
+    {
+      "gameId": "cmrww4wxi001o0mj19h69zxzj",
+      "family": "resident-evil-4-2023",
+      "platform": "Steam",
+      "igdbId": 132181,
+      "igdb": "resident-evil-4--1"
+    },
+    {
+      "gameId": "cmrww4zxn001q0mj1up24eghl",
+      "family": "resident-evil-4-2023",
+      "platform": "iOS",
+      "igdbId": 132181,
+      "igdb": "resident-evil-4--1"
+    },
+    {
+      "gameId": "cmrww52zw001s0mj1vumqf2or",
+      "family": "resident-evil-4-2023",
+      "platform": "macOS",
+      "igdbId": 132181,
+      "igdb": "resident-evil-4--1"
+    },
+    {
+      "gameId": "cmrxmc48o00020m691ewaorna",
+      "family": "silent-hill-2-2024",
+      "platform": "PlayStation 5",
+      "igdbId": 222341,
+      "igdb": "silent-hill-2--1"
+    },
+    {
+      "gameId": "cmrxmc6er00040m69rtryl5mb",
+      "family": "silent-hill-2-2024",
+      "platform": "Steam",
+      "igdbId": 222341,
+      "igdb": "silent-hill-2--1"
+    },
+    {
+      "gameId": "cmrxo2res000o0mw521rphs41",
+      "family": "alone-in-the-dark-2024",
+      "platform": "PlayStation 5",
+      "igdbId": 213237,
+      "igdb": "alone-in-the-dark--1"
+    },
+    {
+      "gameId": "cmrxo2wrk000s0mw5usuoawi3",
+      "family": "alone-in-the-dark-2024",
+      "platform": "Steam",
+      "igdbId": 213237,
+      "igdb": "alone-in-the-dark--1"
+    },
+    {
+      "gameId": "cmolqmwj300bn0mv5zsft08wx",
+      "family": "catacomb-master",
+      "platform": "Xbox Series X|S",
+      "igdbId": 246783,
+      "igdb": "catacomb-master"
+    },
+    {
+      "gameId": "cmolqn85o01w10mv5htf1fw0w",
+      "family": "wings-of-wor",
+      "platform": "Xbox Series X|S",
+      "igdbId": 105255,
+      "igdb": "wings-of-wor"
+    },
+    {
+      "gameId": "cmrwtk3c2000s0mozxoxbc06a",
+      "family": "the-elder-scrolls-iv-oblivion",
+      "platform": "Xbox Series X|S",
+      "igdbId": 267306,
+      "igdb": "the-elder-scrolls-iv-oblivion-remastered",
+      "matchedLabel": "Remastered"
+    },
+    {
+      "gameId": "cmrww3sw0000w0mj1kcdufkib",
+      "family": "resident-evil-2-2019",
+      "platform": "Xbox Series X|S",
+      "igdbId": 19686,
+      "igdb": "resident-evil-2--1"
+    },
+    {
+      "gameId": "cmrww4h5e001d0mj13l4728ag",
+      "family": "resident-evil-3-2020",
+      "platform": "Xbox Series X|S",
+      "igdbId": 115115,
+      "igdb": "resident-evil-3"
+    },
+    {
+      "gameId": "cmrww4tzw001m0mj1r36608xa",
+      "family": "resident-evil-4-2023",
+      "platform": "Xbox Series X|S",
+      "igdbId": 132181,
+      "igdb": "resident-evil-4--1",
+      "matchedLabel": "Standard"
+    },
+    {
+      "gameId": "cmrxo2u1g000q0mw5eg3m51cy",
+      "family": "alone-in-the-dark-2024",
+      "platform": "Xbox Series X|S",
+      "igdbId": 213237,
+      "igdb": "alone-in-the-dark--1"
+    }
+  ]
+}
