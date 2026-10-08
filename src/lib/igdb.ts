@@ -62,6 +62,14 @@ const NON_RELEASE_STATUSES = new Set([
   "Next-Gen Optimization Patch Release",
 ]);
 
+const DIGITAL_COMPATIBILITY_RELEASE = "Digital Compatibility Release";
+
+// Xbox One and Xbox Series X|S, where a Digital Compatibility Release is an
+// Xbox 360 or original Xbox game running through backward compatibility (the
+// store sells it as an "Xbox360BackwardCompatibil" package), which CLAUDE.md
+// doesn't count as a release: NieR and Otogi on Xbox One, 2021-11-15.
+const BACKWARD_COMPATIBILITY_PLATFORM_IDS = new Set([49, 169]);
+
 /**
  * Whether an IGDB release date marks the game going on sale on its platform.
  * Most release dates carry no status, and those count.
@@ -69,10 +77,12 @@ const NON_RELEASE_STATUSES = new Set([
 export function isShippedRelease<T extends IGDBReleaseDate>(
   release: T
 ): release is T & { platform: number; date: number } {
+  const status = release.status?.name ?? "";
   return (
     release.platform !== undefined &&
     release.date !== undefined &&
-    !NON_RELEASE_STATUSES.has(release.status?.name ?? "")
+    !NON_RELEASE_STATUSES.has(status) &&
+    !(status === DIGITAL_COMPATIBILITY_RELEASE && BACKWARD_COMPATIBILITY_PLATFORM_IDS.has(release.platform))
   );
 }
 

@@ -89,8 +89,9 @@ function sameRelease(date: Date | null, other: Date): boolean {
 // being imported. The Game gets its own platform's date. The family keeps the
 // first release, which also decides whether a same-titled family is the same
 // game, so a later port still joins its original's family. Cancelled, alpha,
-// beta and next-gen patch releases don't count (isShippedRelease), and a game
-// with no shipped release on the platform is left out of the import.
+// beta and next-gen patch releases don't count (isShippedRelease), nor do Xbox
+// backward-compatibility listings, and a game with no shipped release on the
+// platform is left out of the import.
 interface GameReleaseDates {
   first: number;
   onPlatform?: number;
