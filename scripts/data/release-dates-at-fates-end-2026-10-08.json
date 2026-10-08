@@ -1,0 +1,26 @@
+[
+  {
+    "gameId": "cmuyfuea1021ttzlt8d8jcga1",
+    "family": "at-fates-end",
+    "platform": "PlayStation 5",
+    "from": "2026-12-31",
+    "to": "2027-12-31",
+    "igdb": "at-fates-end #348205, \"2027\""
+  },
+  {
+    "gameId": "cmuyfxr6o003rtz6hbei2qzfu",
+    "family": "at-fates-end",
+    "platform": "Xbox Series X|S",
+    "from": "2026-12-31",
+    "to": "2027-12-31",
+    "igdb": "at-fates-end #348205, \"2027\""
+  },
+  {
+    "familyId": "cmuyfue7j01w9tzltbuvatrtp",
+    "family": "at-fates-end",
+    "from": "2026-12-31",
+    "to": "2027-12-31",
+    "igdb": "at-fates-end #348205, \"2027\"",
+    "match": "unmatched"
+  }
+]
