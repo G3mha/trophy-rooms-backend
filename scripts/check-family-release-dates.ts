@@ -69,7 +69,7 @@
  */
 
 import { writeFileSync } from "node:fs";
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 import {
   IGDB_PLATFORM_MAP,
   igdbRequest,
@@ -89,6 +89,7 @@ const CANDIDATE_FIELDS =
   "fields id, name, slug, game_status.status, platforms.id, release_dates.platform, release_dates.date, release_dates.human, release_dates.release_region, release_dates.status.name;";
 const TITLES_PER_REQUEST = 50;
 const PAGE_SIZE = 500;
+const FAMILY_PAGE_SIZE = 2000;
 
 interface IGDBCandidate {
   id: number;
@@ -249,31 +250,44 @@ async function main() {
     console.log(`Database host: ${new URL(databaseUrl).host}\n`);
   }
 
-  const families = (
-    await prisma.gameFamily.findMany({
-      where:
-        requestedSlugs.length > 0
-          ? { slug: { in: requestedSlugs } }
-          : all
-            ? { games: { some: {} } }
-            : { games: { some: { releaseDate: null } } },
+  const where: Prisma.GameFamilyWhereInput =
+    requestedSlugs.length > 0
+      ? { slug: { in: requestedSlugs } }
+      : all
+        ? { games: { some: {} } }
+        : { games: { some: { releaseDate: null } } };
+  const select = {
+    id: true,
+    title: true,
+    slug: true,
+    releaseDate: true,
+    games: {
       select: {
         id: true,
-        title: true,
-        slug: true,
         releaseDate: true,
-        games: {
-          select: {
-            id: true,
-            releaseDate: true,
-            platform: { select: { name: true, slug: true } },
-          },
-          orderBy: { createdAt: "asc" },
-        },
+        platform: { select: { name: true, slug: true } },
       },
-      orderBy: { title: "asc" },
-    })
-  ).filter((family) => requestedSlugs.length > 0 || all || family.games.length >= 2);
+      orderBy: { createdAt: "asc" },
+    },
+  } satisfies Prisma.GameFamilySelect;
+  // Read in pages: the whole catalog in one query (about 37,500 families)
+  // makes Prisma's query engine panic ("no entry found for key")
+  const loaded: Array<Prisma.GameFamilyGetPayload<{ select: typeof select }>> = [];
+  for (let cursor: string | undefined; ; ) {
+    const page = await prisma.gameFamily.findMany({
+      where,
+      select,
+      orderBy: { id: "asc" },
+      take: FAMILY_PAGE_SIZE,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+    });
+    loaded.push(...page);
+    if (page.length < FAMILY_PAGE_SIZE) break;
+    cursor = page[page.length - 1]!.id;
+  }
+  const families = loaded
+    .sort((a, b) => a.title.localeCompare(b.title))
+    .filter((family) => requestedSlugs.length > 0 || all || family.games.length >= 2);
 
   const titles = Array.from(new Set(families.map((family) => family.title)));
   const candidatesByTitle = all ? await findCandidatesByExactNames(titles) : new Map<string, IGDBCandidate[]>();
