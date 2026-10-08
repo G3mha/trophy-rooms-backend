@@ -190,10 +190,13 @@ function generateSlug(title: string): string {
 
 // Accents and punctuation don't make a different title ("Zhēnběn Xīyóujì" is
 // "Zhen Ben Xi You Ji"), but "&" is a word: "Alphadia I & II" isn't "Alphadia
-// III". A title with no Latin letters or digits keeps its own characters, so
-// Japanese titles don't all compare equal.
+// III". A year in brackets at the end is the catalog telling same-named games
+// apart ("Castlevania (1999)"), not part of IGDB's name. A title with no Latin
+// letters or digits keeps its own characters, so Japanese titles don't all
+// compare equal.
 function normalizeTitle(title: string): string {
-  return normalizeForSearch(title.replace(/&/g, " and ")) || title.trim().toLowerCase();
+  const name = title.replace(/\s*\((?:19|20)\d{2}\)\s*$/, "");
+  return normalizeForSearch(name.replace(/&/g, " and ")) || name.trim().toLowerCase();
 }
 
 // The game's first release, not its date on this platform, so a re-release

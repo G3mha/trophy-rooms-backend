@@ -31,7 +31,8 @@ const SAME_RELEASE_MS = 45 * 24 * 60 * 60 * 1000;
 
 // As import-platform-region.ts compares titles
 function normalizeTitle(title: string): string {
-  return normalizeForSearch(title.replace(/&/g, " and ")) || title.trim().toLowerCase();
+  const name = title.replace(/\s*\((?:19|20)\d{2}\)\s*$/, "");
+  return normalizeForSearch(name.replace(/&/g, " and ")) || name.trim().toLowerCase();
 }
 
 interface Merge {
