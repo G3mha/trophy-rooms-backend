@@ -1,0 +1,23 @@
+[
+  { "keep": "castlevania-1999", "merge": "castlevania-2", "igdbId": 1130 },
+  { "keep": "alone-in-the-dark-2008", "merge": "alone-in-the-dark-2-1", "igdbId": 1958 },
+  { "keep": "battletoads-2020", "merge": "battletoads-2", "igdbId": 103289 },
+  { "keep": "burnout-2023", "merge": "burnout-3", "igdbId": 275040 },
+  { "keep": "ninja-gaiden-2004", "merge": "ninja-gaiden", "igdbId": 5972 },
+  { "keep": "the-revenge-of-shinobi-2002", "merge": "the-revenge-of-shinobi-1", "igdbId": 10222 },
+  { "keep": "teenage-mutant-ninja-turtles-2013", "merge": "teenage-mutant-ninja-turtles-2", "igdbId": 19967 },
+  { "keep": "quartet-2025", "merge": "quartet-1", "igdbId": 165575 },
+  { "keep": "world-soccer-2019", "merge": "world-soccer-2", "igdbId": 119441 },
+  { "keep": "wipeout-3-2012", "merge": "wipeout-3-1", "igdbId": 28355 },
+  { "keep": "home-alone-2006", "merge": "home-alone-1", "igdbId": 78598 },
+  { "keep": "overlord-2007", "merge": "overlord", "igdbId": 44 },
+  { "keep": "golf-2020", "merge": "golf-7", "igdbId": 147820 },
+  { "keep": "othello-1986", "merge": "othello", "igdbId": 3660 },
+  { "keep": "popeye-2021", "merge": "popeye-3", "igdbId": 178809 },
+  { "keep": "ridge-racer-1993", "merge": "ridge-racer-1", "igdbId": 18696 },
+  { "keep": "ridge-racer-2005", "merge": "ridge-racer-2-1", "igdbId": 18787 },
+  { "keep": "dauntless-1993", "merge": "dauntless-1", "igdbId": 245139 },
+  { "keep": "onslaught-1989", "merge": "onslaught", "igdbId": 15329 },
+  { "keep": "kao-the-kangaroo-2000", "merge": "kao-the-kangaroo", "igdbId": 36745 },
+  { "keep": "underground-2015", "merge": "underground-1", "igdbId": 77009 }
+]
