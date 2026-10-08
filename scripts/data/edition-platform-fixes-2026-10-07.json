@@ -1,0 +1,56 @@
+[
+  {
+    "family": "astebros",
+    "from": "PlayStation 5",
+    "to": "PlayStation 4",
+    "fromDate": "2023-05-30",
+    "releaseDate": "2024-03-14",
+    "igdb": "astebros #250797",
+    "evidence": "PlayStation Store https://store.playstation.com/en-us/concept/10009343 sells CUSA45479 (PS4 only), released 2024-03-14"
+  },
+  {
+    "family": "kukoos-lost-pets",
+    "from": "PlayStation 5",
+    "to": "PlayStation 4",
+    "fromDate": "2021-12-15",
+    "releaseDate": "2022-12-06",
+    "igdb": "kukoos-lost-pets #165463",
+    "evidence": "PlayStation Store https://store.playstation.com/en-us/concept/10006108 sells CUSA36592 (PS4 only), released 2022-12-06"
+  },
+  {
+    "family": "ruff-ghanor",
+    "from": "PlayStation 5",
+    "to": "PlayStation 4",
+    "fromDate": "2024-02-22",
+    "releaseDate": "2024-02-25",
+    "igdb": "ruff-ghanor #271605",
+    "evidence": "PlayStation Store https://store.playstation.com/en-us/concept/10005992 sells CUSA36207 (PS4 only), released 2024-02-25"
+  },
+  {
+    "family": "teravit",
+    "from": "PlayStation 5",
+    "to": "PlayStation 4",
+    "fromDate": "2023-04-20",
+    "releaseDate": "2024-06-06",
+    "igdb": "teravit #167863",
+    "evidence": "PlayStation Store https://store.playstation.com/en-us/concept/10003938 sells CUSA37429 (PS4 only), released 2024-06-06"
+  },
+  {
+    "family": "jump-challenge",
+    "from": "Xbox Series X|S",
+    "to": "Xbox One",
+    "fromDate": "2022-03-19",
+    "releaseDate": "2022-09-14",
+    "igdb": "jump-challenge #185284",
+    "evidence": "Microsoft Store 9PHWTTLDLC75 has no Optimized for Xbox Series X|S flag, released 2022-09-14"
+  },
+  {
+    "family": "zaxoid",
+    "from": "Xbox Series X|S",
+    "to": "Xbox One",
+    "fromDate": "2026-04-14",
+    "releaseDate": "2026-07-03",
+    "igdb": "zaxoid #392247",
+    "evidence": "Microsoft Store 9N16MXZ75D9P has no Optimized for Xbox Series X|S flag, released 2026-07-03"
+  }
+]
