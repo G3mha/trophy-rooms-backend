@@ -1,0 +1,37 @@
+{
+  "families": [],
+  "editions": [
+    {
+      "gameId": "cmnvaj6zz001cl801t6nh6rqa",
+      "family": "resident-evil-village",
+      "platform": "Nintendo Switch",
+      "igdbId": 217560,
+      "igdb": "resident-evil-village-cloud-version",
+      "matchedLabel": "Cloud Version"
+    },
+    {
+      "gameId": "cmrww4k6s001f0mj1ny2b4smv",
+      "family": "resident-evil-3-2020",
+      "platform": "Nintendo Switch",
+      "igdbId": 217562,
+      "igdb": "resident-evil-3-cloud-version",
+      "matchedLabel": "Cloud Version"
+    },
+    {
+      "gameId": "cmnvuwijr0001xg01kqrh2ej4",
+      "family": "resident-evil-7-biohazard",
+      "platform": "Nintendo Switch",
+      "igdbId": 102075,
+      "igdb": "resident-evil-7-biohazard-cloud",
+      "matchedLabel": "Cloud Version"
+    },
+    {
+      "gameId": "cmrww3vtg000y0mj1o9cwz3qd",
+      "family": "resident-evil-2-2019",
+      "platform": "Nintendo Switch",
+      "igdbId": 217561,
+      "igdb": "resident-evil-2-cloud-version",
+      "matchedLabel": "Cloud Version"
+    }
+  ]
+}
