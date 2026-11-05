@@ -95,7 +95,7 @@ const ACHIEVEMENTS: AchievementSeed[] = [
   // Side challenges
   { title: "Jump-Rope Genius", description: "Reach 100 jumps in the New Donk City jump-rope challenge.", tier: SILVER },
   { title: "Volleyball Veteran", description: "Keep a 100-hit volleyball rally going in Bubblaine.", tier: SILVER },
-  { title: "Koopa Freerunner", description: "Beat the Koopas at every freerunning race.", tier: SILVER },
+  { title: "Koopa Freerunner", description: "Win the Regular Cup and the Master Cup in all thirteen Koopa Freerunning races.", tier: SILVER },
   { title: "Rock Breaker", description: "Smash the Moon Rock in every kingdom.", tier: SILVER },
   { title: "Peach Hunter", description: "Find Princess Peach in every kingdom after the main story.", tier: SILVER },
   { title: "Riding High", description: "Ride Yoshi in the Mushroom Kingdom.", tier: BRONZE },
