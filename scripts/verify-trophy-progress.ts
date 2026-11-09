@@ -333,6 +333,77 @@ async function verify() {
   await mark(alice, firstOfficial.id);
   check("alice gets her trophy back on B", await trophyGameIds(alice), [gameMid.id]);
 
+  console.log("countsTowardTrophy: a restating set neither gates nor counts");
+
+  // A second real list for the same game, the shape Resident Evil Requiem has:
+  // a console trophy list plus an in-game challenge list that restates it.
+  // Flagged off, it must be invisible to trophy awarding and to progress.
+  const restating = await prisma.achievementSet.create({
+    data: {
+      title: "Restates official",
+      type: AchievementSetType.OFFICIAL,
+      visibility: AchievementSetVisibility.PUBLIC,
+      gameFamilyId: family.id,
+      countsTowardTrophy: false,
+      achievements: {
+        create: [
+          { title: "Restates official 1", points: 10 },
+          { title: "Restates official 2", points: 20 },
+        ],
+      },
+    },
+    include: { achievements: { orderBy: { title: "asc" } } },
+  });
+  const [restatingFirst] = restating.achievements as [(typeof restating.achievements)[number]];
+
+  check("alice keeps her trophy when a flagged-off set appears", await trophyGameIds(alice), [
+    gameMid.id,
+  ]);
+  check(
+    "alice stays at 100% with the flagged-off set present",
+    await myProgress(alice, family.id),
+    expectedComplete
+  );
+
+  // Ticking inside a flagged-off set must not move the bar either way
+  await mark(alice, restatingFirst.id);
+  check(
+    "ticking a flagged-off achievement leaves progress at 3 of 3",
+    await myProgress(alice, family.id),
+    expectedComplete
+  );
+  check("alice still holds her trophy", await trophyGameIds(alice), [gameMid.id]);
+
+  // The flag is what does the work: counting the same set raises the bar
+  await prisma.achievementSet.update({
+    where: { id: restating.id },
+    data: { countsTowardTrophy: true },
+  });
+  check(
+    "counting the same set raises alice's total to 5",
+    (await myProgress(alice, family.id))?.totalCount,
+    5
+  );
+  check(
+    "and drops her below 100%",
+    (await myProgress(alice, family.id))?.percentComplete,
+    4 / 5
+  );
+
+  await prisma.achievementSet.update({
+    where: { id: restating.id },
+    data: { countsTowardTrophy: false },
+  });
+  check(
+    "flagging it off again restores 100%",
+    await myProgress(alice, family.id),
+    expectedComplete
+  );
+
+  // Leave the family as the later checks expect to find it
+  await unmark(alice, restatingFirst.id);
+  await prisma.achievementSet.delete({ where: { id: restating.id } });
+
   console.log("fix-duplicate-trophies.ts");
 
   // Rows the old mutation left behind: one trophy per game in the family
