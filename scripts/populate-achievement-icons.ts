@@ -62,15 +62,6 @@ function normalizeTitle(value: string): string {
     .trim();
 }
 
-function decodeXmlEntities(value: string): string {
-  return value
-    .replace(/&amp;/g, "&")
-    .replace(/&quot;/g, "\"")
-    .replace(/&#39;/g, "'")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">");
-}
-
 async function fetchRetroAchievementsIcons(
   retroGameId: number
 ): Promise<{ iconsByTitle: Map<string, string>; gameIconUrl: string | null }> {
@@ -117,35 +108,54 @@ async function fetchRetroAchievementsIcons(
   };
 }
 
+// Steam Community retired the `?xml=1` achievement feed when the site became
+// client-rendered. The page now reads its data from this Web API method, which
+// needs no key, so the script does the same.
+const STEAM_ACHIEVEMENTS_ENDPOINT =
+  "https://api.steampowered.com/IPlayerService/GetGameAchievements/v1/";
+const STEAM_ICON_BASE = "https://cdn.fastly.steamstatic.com/steamcommunity/public/images/apps";
+
+type SteamAchievement = {
+  localized_name?: string;
+  icon?: string;
+};
+
+function buildSteamIconUrl(steamAppId: number, icon: string): string {
+  return icon.startsWith("http") ? icon : `${STEAM_ICON_BASE}/${steamAppId}/${icon}`;
+}
+
 async function fetchSteamIcons(steamAppId: number): Promise<Map<string, string>> {
-  const response = await fetch(
-    `https://steamcommunity.com/stats/${steamAppId}/achievements?xml=1`
-  );
+  const url = new URL(STEAM_ACHIEVEMENTS_ENDPOINT);
+  url.searchParams.set("appid", String(steamAppId));
+  url.searchParams.set("language", "english");
+
+  const response = await fetch(url);
 
   if (!response.ok) {
-    throw new Error(
-      `Steam Community request failed (${response.status}) for app ${steamAppId}`
-    );
+    throw new Error(`Steam Web API request failed (${response.status}) for app ${steamAppId}`);
   }
 
-  const html = await response.text();
+  const payload = (await response.json()) as {
+    response?: { achievements?: SteamAchievement[] };
+  };
+
+  const achievements = payload.response?.achievements ?? [];
+
+  if (achievements.length === 0) {
+    throw new Error(`Steam Web API returned no achievements for app ${steamAppId}`);
+  }
+
   const iconsByTitle = new Map<string, string>();
-  const achievementBlocks =
-    html.match(/<div class="achieveRow[\s\S]*?<div style="clear: both;"><\/div>\s*<\/div>/g) ??
-    [];
 
-  for (const block of achievementBlocks) {
-    const nameMatch = block.match(/<h3>(.*?)<\/h3>/s);
-    const iconMatch = block.match(/<img src="([^"]+)"/s);
+  for (const achievement of achievements) {
+    const title = achievement.localized_name?.trim();
+    const icon = achievement.icon?.trim();
 
-    const title = decodeXmlEntities(nameMatch?.[1]?.trim() ?? "");
-    const iconUrl = decodeXmlEntities(iconMatch?.[1]?.trim() ?? "");
-
-    if (!title || !iconUrl) {
+    if (!title || !icon) {
       continue;
     }
 
-    iconsByTitle.set(normalizeTitle(title), iconUrl);
+    iconsByTitle.set(normalizeTitle(title), buildSteamIconUrl(steamAppId, icon));
   }
 
   return iconsByTitle;
