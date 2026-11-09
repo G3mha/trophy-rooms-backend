@@ -7,11 +7,33 @@ import {
 
 /**
  * Achievement sets that count towards a game's trophy: official and
- * completionist sets, plus custom sets their creator has made public.
+ * completionist sets, plus custom sets their creator has made public, less
+ * any set whose `countsTowardTrophy` has been cleared.
+ *
  * Private custom sets are personal checklists, so they neither gate a trophy
  * nor count in progress towards one.
+ *
+ * `countsTowardTrophy` is here because a game can ship two real lists that
+ * restate each other. Resident Evil Requiem has both a PSN trophy list and an
+ * in-game Challenges list, and 49 of the 50 challenges are the same
+ * accomplishments as the trophies under the same names. A trophy needs every
+ * achievement in every eligible set, so carrying both lists unflagged made
+ * the trophy ask for 100 ticks covering 51 distinct accomplishments. Clearing
+ * the flag on the restating list leaves it browsable and tickable without
+ * doubling the bar.
+ *
+ * The rule stays "finish every eligible set" rather than "finish any one of
+ * them". Any user can create a custom set and publish it, so crediting a
+ * trophy for a single completed set would let a one-achievement public set
+ * hand out trophies for free. Requiring all of them means an extra set can
+ * only ever raise the bar, never lower it, which is why the escape hatch is
+ * an explicit flag rather than a rule the data can trip on its own.
+ *
+ * Both the earned and the total side of progress read this same filter
+ * (queries/game-progress.ts), so they cannot drift apart.
  */
 export const trophyEligibleSetWhere = {
+  countsTowardTrophy: true,
   OR: [
     { type: { in: [AchievementSetType.OFFICIAL, AchievementSetType.COMPLETIONIST] } },
     { type: AchievementSetType.CUSTOM, visibility: AchievementSetVisibility.PUBLIC },
