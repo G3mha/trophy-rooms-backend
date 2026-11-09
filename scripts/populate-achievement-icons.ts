@@ -50,6 +50,13 @@ const SOURCES: SourceConfig[] = [
       "Trophy Addict": "Achievement Whore",
     },
   },
+  {
+    type: "steam",
+    setTitle: "PSN Achievement Set",
+    gameTitle: "Resident Evil Requiem",
+    steamAppId: 3764200,
+    // Steam ships the 49 trophies without a platinum, so "Requiem" stays iconless.
+  },
 ];
 
 function normalizeTitle(value: string): string {
