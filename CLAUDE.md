@@ -128,3 +128,18 @@ Do NOT add NSO as a platform or create entries for NSO releases. NSO does not of
 Do NOT create Game entries for platforms that merely play a game via backward compatibility (e.g., a Switch game playable on Switch 2, a PS4 game playable on PS5). A Game entry requires an actual platform release that can be owned. Only create the newer platform's entry when a distinct edition exists for it (see the Switch 2 Enhanced Editions rules).
 
 Playing on a backward-compatible platform is still representable in the Library: `UserGame.platformId` records where the user PLAYS (it is independent of the referenced Game's native platform), so a Switch cart owned in the Collection can have a Library entry marked as played on Switch 2. The iOS status picker offers all platforms for exactly this reason.
+
+### Achievement Sets and Trophy Gating
+
+A family's trophy requires **every** achievement in **every** trophy-eligible set: official and completionist sets, plus custom sets their creator published (`trophyEligibleSetWhere` in `src/lib/trophies.ts`). There is no optional achievement inside an eligible set, so deciding what goes in a set is a product decision, not a trivia exercise.
+
+The rule is "finish every eligible set", never "finish any one of them". Any user can create a custom set and publish it, so crediting a trophy for one completed set would let a one-achievement public set hand out trophies for free. Requiring all of them means an extra set can only raise the bar.
+
+That makes overlapping lists a problem. A game can ship two real lists that restate each other, and transcribing both doubles the ticks without adding accomplishments:
+
+- **Before adding a second set to a family, diff the titles against the existing set.** A publisher's in-game challenge or record list usually mirrors its own trophy list rather than supplementing it. Resident Evil Requiem's 50 in-game Challenges turned out to be the 49 non-Platinum PSN trophies under identical titles, plus one extra.
+- When a set restates another, clear `AchievementSet.countsTowardTrophy` on the restating one. It stays visible and tickable but stops gating, and any achievement unique to it becomes optional.
+- Leave the platform-authoritative list gating (the PSN list, whose Platinum already means "obtain all trophies"). Never clear the flag on every set in a family, or the game becomes unfinishable.
+- The flag is data curation, set by `fix-*` scripts like set creation itself. It is not exposed through GraphQL.
+
+`countsTowardTrophy` defaults to true, and both the earned and total sides of progress read the same filter (`src/schema/queries/game-progress.ts`), so they cannot drift apart. `scripts/verify-trophy-progress.ts` covers the behaviour end to end against a disposable local database.
