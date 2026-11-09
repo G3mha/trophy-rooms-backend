@@ -264,6 +264,12 @@ model AchievementSet {
   type       AchievementSetType       @default(OFFICIAL)
   visibility AchievementSetVisibility @default(PRIVATE)
 
+  // Whether finishing this set is required for the game family's trophy. A
+  // game can ship two real lists that restate each other (a console trophy
+  // list and an in-game challenge list), and requiring both would make the
+  // trophy need two ticks per accomplishment. See lib/trophies.ts.
+  countsTowardTrophy Boolean @default(true)
+
   // Link to GameFamily (achievements are shared across platforms)
   gameFamily   GameFamily? @relation(fields: [gameFamilyId], references: [id], onDelete: Cascade)
   gameFamilyId String? // Nullable during migration, will be required after
