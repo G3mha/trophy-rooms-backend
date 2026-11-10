@@ -40,6 +40,15 @@ export const trophyEligibleSetWhere = {
   ],
 } satisfies Prisma.AchievementSetWhereInput;
 
+/**
+ * How to list a game's sets: the ones that count towards its trophy first, so
+ * a set that merely restates another never leads the page.
+ */
+export const trophySetsFirstOrderBy = [
+  { countsTowardTrophy: "desc" },
+  { title: "asc" },
+] satisfies Prisma.AchievementSetOrderByWithRelationInput[];
+
 type TrophyGameCandidate = {
   id: string;
   releaseDate: Date | null;

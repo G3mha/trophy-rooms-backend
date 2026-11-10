@@ -1,7 +1,7 @@
 import { builder, MutationErrorRef } from "../builder.js";
 import { ErrorCode } from "../../lib/errors.js";
 import { visibleSetWhere } from "../../lib/achievement-visibility.js";
-import { trophyEligibleSetWhere } from "../../lib/trophies.js";
+import { trophyEligibleSetWhere, trophySetsFirstOrderBy } from "../../lib/trophies.js";
 
 // GameType enum for categorizing games (base games, fangames, ROM hacks, mods, DLCs, expansions)
 export const GameTypeEnum = builder.enumType("GameType", {
@@ -161,7 +161,7 @@ builder.prismaObject("Game", {
             gameFamilyId: game.gameFamilyId,
             AND: [visibleSetWhere(ctx.user)],
           },
-          orderBy: { title: "asc" },
+          orderBy: trophySetsFirstOrderBy,
         });
       },
     }),
