@@ -17,6 +17,9 @@ builder.prismaObject("AchievementSet", {
     title: t.exposeString("title"),
     type: t.expose("type", { type: AchievementSetType }),
     visibility: t.expose("visibility", { type: AchievementSetVisibility }),
+    // Read-only. Clients work out trophy progress from a game's sets, so they
+    // need the same answer the server awards by. Curated by fix-* scripts.
+    countsTowardTrophy: t.exposeBoolean("countsTowardTrophy"),
 
     // Link to GameFamily (achievements are shared across platforms)
     gameFamily: t.relation("gameFamily", { nullable: true }),
