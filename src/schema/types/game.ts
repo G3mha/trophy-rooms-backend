@@ -1,6 +1,7 @@
 import { builder, MutationErrorRef } from "../builder.js";
 import { ErrorCode } from "../../lib/errors.js";
 import { visibleSetWhere } from "../../lib/achievement-visibility.js";
+import { trophyEligibleSetWhere } from "../../lib/trophies.js";
 
 // GameType enum for categorizing games (base games, fangames, ROM hacks, mods, DLCs, expansions)
 export const GameTypeEnum = builder.enumType("GameType", {
@@ -245,6 +246,9 @@ builder.prismaObject("Game", {
         });
       },
     }),
+    // Gating sets only, so this matches the trophy bar (see lib/trophies.ts).
+    // achievementSetCount above stays visibility-based: a restating set is
+    // still real, browsable content even when it does not count.
     achievementCount: t.int({
       resolve: async (game, _args, ctx) => {
         if (!game.gameFamilyId) return 0;
@@ -252,7 +256,7 @@ builder.prismaObject("Game", {
           where: {
             achievementSet: {
               gameFamilyId: game.gameFamilyId,
-              AND: [visibleSetWhere(ctx.user)],
+              ...trophyEligibleSetWhere,
             },
           },
         });

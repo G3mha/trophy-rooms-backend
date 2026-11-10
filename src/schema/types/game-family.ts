@@ -1,7 +1,7 @@
 import { builder, MutationErrorRef } from "../builder.js";
 import { ErrorCode } from "../../lib/errors.js";
 import { visibleSetWhere } from "../../lib/achievement-visibility.js";
-import { countTrophyHolders } from "../../lib/trophies.js";
+import { countTrophyHolders, trophyEligibleSetWhere } from "../../lib/trophies.js";
 import { GameTypeEnum } from "./game.js";
 
 // GameFamily Prisma Object
@@ -59,14 +59,17 @@ builder.prismaObject("GameFamily", {
       where: (_args, ctx) => visibleSetWhere(ctx.user),
     }),
 
-    // Computed field: total achievement count across all sets
+    // Total achievements that count towards the family's trophy. Not every
+    // visible set: a set flagged countsTowardTrophy false restates another
+    // list, so counting it would show a total twice the size of the bar a
+    // player is actually filling. See lib/trophies.ts.
     totalAchievementCount: t.int({
       resolve: async (family, _args, ctx) => {
         const result = await ctx.prisma.achievement.count({
           where: {
             achievementSet: {
               gameFamilyId: family.id,
-              AND: [visibleSetWhere(ctx.user)],
+              ...trophyEligibleSetWhere,
             },
           },
         });

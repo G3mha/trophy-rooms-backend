@@ -4,7 +4,7 @@ import { GamesFilterInput, GameOrderBy, GameTypeEnum } from "../types/game.js";
 import { GameFamiliesFilterInput, GameFamilyOrderBy } from "../types/game-family.js";
 import { searchGames, searchGameFamilies } from "../../lib/fulltext-search.js";
 import { visibleSetWhere } from "../../lib/achievement-visibility.js";
-import { countTrophyHolders } from "../../lib/trophies.js";
+import { countTrophyHolders, trophyEligibleSetWhere } from "../../lib/trophies.js";
 
 // Games connection with cursor-based pagination
 builder.queryField("games", (t) =>
@@ -491,7 +491,7 @@ builder.queryField("gamesPage", (t) =>
                   select: { achievementSets: { where: visibleSetWhere(ctx.user) } },
                 },
                 achievementSets: {
-                  where: visibleSetWhere(ctx.user),
+                  where: trophyEligibleSetWhere,
                   select: {
                     _count: {
                       select: { achievements: true },
@@ -593,7 +593,7 @@ builder.queryField("gamesByTitle", (t) =>
             },
           },
           achievementSets: {
-            where: visibleSetWhere(ctx.user),
+            where: trophyEligibleSetWhere,
             select: {
               _count: {
                 select: { achievements: true },
@@ -858,7 +858,7 @@ builder.queryField("gameFamiliesPage", (t) =>
               },
             },
             achievementSets: {
-              where: visibleSetWhere(ctx.user),
+              where: trophyEligibleSetWhere,
               select: {
                 _count: {
                   select: { achievements: true },
