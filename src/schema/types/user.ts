@@ -3,6 +3,7 @@ import { UserRole, AchievementTier } from "@prisma/client";
 import { hasRequiredRole } from "../../context.js";
 import { visibleSetWhere } from "../../lib/achievement-visibility.js";
 import { countFinishedGames } from "../../lib/trophies.js";
+import { POINTS_DEPRECATION } from "../deprecations.js";
 
 builder.enumType(UserRole, {
   name: "UserRole",
@@ -21,13 +22,13 @@ const UserStats = builder.objectRef<{
 
 UserStats.implement({
   fields: (t) => ({
-    totalPoints: t.exposeInt("totalPoints"),
+    totalPoints: t.exposeInt("totalPoints", { deprecationReason: POINTS_DEPRECATION }),
     platinumCount: t.exposeInt("platinumCount"),
     goldCount: t.exposeInt("goldCount"),
     silverCount: t.exposeInt("silverCount"),
     bronzeCount: t.exposeInt("bronzeCount"),
     completionRate: t.exposeFloat("completionRate"),
-    averagePointsPerGame: t.exposeFloat("averagePointsPerGame"),
+    averagePointsPerGame: t.exposeFloat("averagePointsPerGame", { deprecationReason: POINTS_DEPRECATION }),
   }),
 });
 

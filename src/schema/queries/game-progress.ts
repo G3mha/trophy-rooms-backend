@@ -1,5 +1,6 @@
 import { builder } from "../builder.js";
 import { trophyEligibleSetWhere } from "../../lib/trophies.js";
+import { POINTS_DEPRECATION } from "../deprecations.js";
 
 function computePercentComplete(earnedCount: number, totalCount: number): number {
   if (totalCount <= 0) return 0;
@@ -28,8 +29,8 @@ UserGameProgress.implement({
     gameCoverUrl: t.exposeString("gameCoverUrl", { nullable: true }),
     earnedCount: t.exposeInt("earnedCount"),
     totalCount: t.exposeInt("totalCount"),
-    earnedPoints: t.exposeInt("earnedPoints"),
-    totalPoints: t.exposeInt("totalPoints"),
+    earnedPoints: t.exposeInt("earnedPoints", { deprecationReason: POINTS_DEPRECATION }),
+    totalPoints: t.exposeInt("totalPoints", { deprecationReason: POINTS_DEPRECATION }),
     percentComplete: t.exposeFloat("percentComplete"),
     hasTrophy: t.exposeBoolean("hasTrophy"),
     trophyEarnedAt: t.expose("trophyEarnedAt", { type: "DateTime", nullable: true }),

@@ -1,5 +1,6 @@
 import { builder, MutationErrorRef } from "../builder.js";
 import { ErrorCode } from "../../lib/errors.js";
+import { POINTS_DEPRECATION } from "../deprecations.js";
 
 // AchievementTier enum for GraphQL
 export const AchievementTierEnum = builder.enumType("AchievementTier", {
@@ -12,7 +13,7 @@ builder.prismaObject("Achievement", {
     title: t.exposeString("title"),
     description: t.exposeString("description", { nullable: true }),
     iconUrl: t.exposeString("iconUrl", { nullable: true }),
-    points: t.exposeInt("points"),
+    points: t.exposeInt("points", { deprecationReason: POINTS_DEPRECATION }),
     tier: t.expose("tier", { type: AchievementTierEnum }),
     achievementSet: t.relation("achievementSet"),
     achievementSetId: t.exposeString("achievementSetId"),
@@ -45,7 +46,7 @@ export const CreateAchievementInput = builder.inputType(
       title: t.string({ required: true }),
       description: t.string(),
       iconUrl: t.string(),
-      points: t.int({ required: false, defaultValue: 0 }),
+      points: t.int({ required: false, defaultValue: 0, deprecationReason: POINTS_DEPRECATION }),
       tier: t.field({ type: AchievementTierEnum, required: false }),
       achievementSetId: t.id({ required: true }),
     }),
@@ -59,7 +60,7 @@ export const UpdateAchievementInput = builder.inputType(
       title: t.string(),
       description: t.string(),
       iconUrl: t.string(),
-      points: t.int(),
+      points: t.int({ deprecationReason: POINTS_DEPRECATION }),
       tier: t.field({ type: AchievementTierEnum, required: false }),
     }),
   }
@@ -70,7 +71,7 @@ export const BulkAchievementInput = builder.inputType("BulkAchievementInput", {
     title: t.string({ required: true }),
     description: t.string(),
     iconUrl: t.string(),
-    points: t.int(),
+    points: t.int({ deprecationReason: POINTS_DEPRECATION }),
     tier: t.field({ type: AchievementTierEnum, required: false }),
   }),
 });

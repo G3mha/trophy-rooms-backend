@@ -1,5 +1,5 @@
 import { builder } from "../builder.js";
-import { USER_EMAIL_DEPRECATION } from "../deprecations.js";
+import { POINTS_DEPRECATION, USER_EMAIL_DEPRECATION } from "../deprecations.js";
 import { visibleSetWhere } from "../../lib/achievement-visibility.js";
 
 // Activity feed entry type
@@ -29,7 +29,7 @@ ActivityFeedEntry.implement({
     achievementId: t.exposeString("achievementId"),
     achievementTitle: t.exposeString("achievementTitle"),
     achievementTier: t.exposeString("achievementTier"),
-    achievementPoints: t.exposeInt("achievementPoints"),
+    achievementPoints: t.exposeInt("achievementPoints", { deprecationReason: POINTS_DEPRECATION }),
     gameFamilyId: t.exposeString("gameFamilyId"),
     gameTitle: t.exposeString("gameTitle"),
     earnedAt: t.expose("earnedAt", { type: "DateTime" }),
@@ -96,7 +96,7 @@ CombinedActivityEntry.implement({
     achievementId: t.exposeString("achievementId", { nullable: true }),
     achievementTitle: t.exposeString("achievementTitle", { nullable: true }),
     achievementTier: t.exposeString("achievementTier", { nullable: true }),
-    achievementPoints: t.exposeInt("achievementPoints", { nullable: true }),
+    achievementPoints: t.exposeInt("achievementPoints", { nullable: true, deprecationReason: POINTS_DEPRECATION }),
     gameId: t.exposeString("gameId", { nullable: true }),
     gameFamilyId: t.exposeString("gameFamilyId"),
     gameTitle: t.exposeString("gameTitle"),

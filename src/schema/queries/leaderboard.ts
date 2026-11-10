@@ -1,5 +1,5 @@
 import { builder } from "../builder.js";
-import { USER_EMAIL_DEPRECATION } from "../deprecations.js";
+import { POINTS_DEPRECATION, USER_EMAIL_DEPRECATION } from "../deprecations.js";
 import { countFinishedGames, topUsersByFinishedGames } from "../../lib/trophies.js";
 
 // Leaderboard entry type
@@ -149,6 +149,7 @@ builder.queryField("leaderboardByAchievements", (t) =>
 builder.queryField("leaderboardByPoints", (t) =>
   t.field({
     type: [LeaderboardEntry],
+    deprecationReason: POINTS_DEPRECATION,
     args: {
       limit: t.arg.int({ required: false, defaultValue: 10 }),
     },
