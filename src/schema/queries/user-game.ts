@@ -1,5 +1,6 @@
 import { builder } from "../builder.js";
 import { GameStatusEnum } from "../types/user-game.js";
+import { trophyEligibleSetWhere } from "../../lib/trophies.js";
 
 // Bundle a library game belongs to (for stacking compilations in the UI)
 const UserGameBundleRef = builder.objectRef<{
@@ -172,11 +173,15 @@ builder.queryField("myGamesByStatus", (t) =>
         .map((item) => item.game.gameFamilyId)
         .filter((id): id is string => id !== null);
 
+      // Gating sets only. This had no set filter at all, so a library row's
+      // count included other users' private custom sets as well as any set
+      // that merely restates another. See lib/trophies.ts.
       const achievementCounts = await ctx.prisma.achievement.groupBy({
         by: ["achievementSetId"],
         where: {
           achievementSet: {
             gameFamilyId: { in: gameFamilyIds },
+            ...trophyEligibleSetWhere,
           },
         },
         _count: { id: true },
