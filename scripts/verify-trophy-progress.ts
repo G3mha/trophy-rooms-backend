@@ -139,6 +139,17 @@ async function publicProgress(user: User, familyId: string) {
   return data.userGameProgress.find((entry) => entry.gameFamilyId === familyId);
 }
 
+// What a visitor sees on the game page: the achievement total should match
+// the trophy bar, while the set list still shows every visible set.
+async function familyTotals(familyId: string) {
+  const data = await run<{
+    gameFamily: { totalAchievementCount: number; achievementSetCount: number } | null;
+  }>(null, `query ($id: ID!) { gameFamily(id: $id) { totalAchievementCount achievementSetCount } }`, {
+    id: familyId,
+  });
+  return data.gameFamily;
+}
+
 function runCleanup(...args: string[]) {
   const script = fileURLToPath(new URL("./fix-duplicate-trophies.ts", import.meta.url));
   const result = spawnSync("npx", ["tsx", script, ...args], {
@@ -374,6 +385,18 @@ async function verify() {
   );
   check("alice still holds her trophy", await trophyGameIds(alice), [gameMid.id]);
 
+  // The public game page must not advertise a bigger total than the bar
+  check(
+    "the public achievement total counts gating sets only",
+    (await familyTotals(family.id))?.totalAchievementCount,
+    3
+  );
+  check(
+    "while the flagged-off set still shows in the set list",
+    (await familyTotals(family.id))?.achievementSetCount,
+    3
+  );
+
   // The flag is what does the work: counting the same set raises the bar
   await prisma.achievementSet.update({
     where: { id: restating.id },
@@ -388,6 +411,11 @@ async function verify() {
     "and drops her below 100%",
     (await myProgress(alice, family.id))?.percentComplete,
     4 / 5
+  );
+  check(
+    "counting it raises the public total to 5 as well",
+    (await familyTotals(family.id))?.totalAchievementCount,
+    5
   );
 
   await prisma.achievementSet.update({
