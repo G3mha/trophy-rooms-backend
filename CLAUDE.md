@@ -140,6 +140,6 @@ That makes overlapping lists a problem. A game can ship two real lists that rest
 - **Before adding a second set to a family, diff the titles against the existing set.** A publisher's in-game challenge or record list usually mirrors its own trophy list rather than supplementing it. Resident Evil Requiem's 50 in-game Challenges turned out to be the 49 non-Platinum PSN trophies under identical titles, plus one extra.
 - When a set restates another, clear `AchievementSet.countsTowardTrophy` on the restating one. It stays visible and tickable but stops gating, and any achievement unique to it becomes optional.
 - Leave the platform-authoritative list gating (the PSN list, whose Platinum already means "obtain all trophies"). Never clear the flag on every set in a family, or the game becomes unfinishable.
-- The flag is data curation, set by `fix-*` scripts like set creation itself. It is not exposed through GraphQL.
+- The flag is data curation, set by `fix-*` scripts like set creation itself. GraphQL exposes it read-only, because the clients compute trophy progress from a game's sets. Nothing can set it through the API.
 
 `countsTowardTrophy` defaults to true, and both the earned and total sides of progress read the same filter (`src/schema/queries/game-progress.ts`), so they cannot drift apart. `scripts/verify-trophy-progress.ts` covers the behaviour end to end against a disposable local database.
