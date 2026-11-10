@@ -93,6 +93,14 @@ export const yoga = createYoga({
   },
   graphqlEndpoint: "/graphql",
   healthCheckEndpoint: "/health",
+  // Yoga answers any unmatched path with its own welcome page, status 200,
+  // whenever the request is a GET whose Accept header includes text/html.
+  // That is every browser and every vulnerability scanner wearing a browser
+  // User-Agent, so a wordlist sweep of /admin, /billing, /cadastro and the
+  // rest came back 200 while curl got 404 - and the page names the Yoga
+  // version and the GraphQL route. There is no HTML app here, only /graphql
+  // and /health, so an unknown path is a 404 whatever the client accepts.
+  landingPage: false,
   logging: {
     debug: (...args) => logger.debug(args, "GraphQL debug"),
     info: (...args) => logger.info(args, "GraphQL info"),
