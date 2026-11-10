@@ -385,6 +385,21 @@ async function verify() {
   );
   check("alice still holds her trophy", await trophyGameIds(alice), [gameMid.id]);
 
+  // Clients compute progress from a game's sets, so they have to see the flag
+  const exposed = await run<{
+    gameFamily: { achievementSets: { title: string; countsTowardTrophy: boolean }[] } | null;
+  }>(
+    null,
+    `query ($id: ID!) { gameFamily(id: $id) { achievementSets { title countsTowardTrophy } } }`,
+    { id: family.id }
+  );
+  check(
+    "GraphQL reports the flag on the set",
+    exposed.gameFamily?.achievementSets.find((set) => set.title === "Restates official")
+      ?.countsTowardTrophy,
+    false
+  );
+
   // The public game page must not advertise a bigger total than the bar
   check(
     "the public achievement total counts gating sets only",
