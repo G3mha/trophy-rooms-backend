@@ -351,15 +351,15 @@ async function verify() {
   // Flagged off, it must be invisible to trophy awarding and to progress.
   const restating = await prisma.achievementSet.create({
     data: {
-      title: "Restates official",
+      title: "A restating list",
       type: AchievementSetType.OFFICIAL,
       visibility: AchievementSetVisibility.PUBLIC,
       gameFamilyId: family.id,
       countsTowardTrophy: false,
       achievements: {
         create: [
-          { title: "Restates official 1", points: 10 },
-          { title: "Restates official 2", points: 20 },
+          { title: "A restating list 1", points: 10 },
+          { title: "A restating list 2", points: 20 },
         ],
       },
     },
@@ -395,9 +395,27 @@ async function verify() {
   );
   check(
     "GraphQL reports the flag on the set",
-    exposed.gameFamily?.achievementSets.find((set) => set.title === "Restates official")
+    exposed.gameFamily?.achievementSets.find((set) => set.title === "A restating list")
       ?.countsTowardTrophy,
     false
+  );
+
+  // Its title sorts first, so only the flag can put it last
+  const expectedSetOrder = ["Dave public", "Official", "A restating list"];
+  check(
+    "the family lists the set that does not gate last",
+    exposed.gameFamily?.achievementSets.map((set) => set.title),
+    expectedSetOrder
+  );
+  const onGame = await run<{ game: { achievementSets: { title: string }[] } | null }>(
+    null,
+    `query ($id: ID!) { game(id: $id) { achievementSets { title } } }`,
+    { id: gameOld.id }
+  );
+  check(
+    "the game page lists it last too",
+    onGame.game?.achievementSets.map((set) => set.title),
+    expectedSetOrder
   );
 
   // The public game page must not advertise a bigger total than the bar
