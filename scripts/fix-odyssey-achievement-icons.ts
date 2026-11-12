@@ -7,8 +7,9 @@
  * Cloudflare R2 bucket behind assets.trophyrooms.org. File names carry a
  * content hash, so a re-cropped icon gets a new URL instead of a stale cache.
  *
- * 30 of the 46 achievements have an icon. The rest have no matching official
- * art yet and keep the tier medal.
+ * 30 icons show the scene their achievement is about. The other 16 have no
+ * matching official art, so each gets its own tile of the key art (art12 on
+ * IGDB), picked so no two repeat and none shows another achievement's subject.
  *
  * Dry run by default. Pass --apply to write. Every URL is checked before
  * anything is written, so a missing upload can't leave a broken icon.
@@ -58,6 +59,23 @@ const ICONS: Record<string, string> = {
   "Volleyball Veteran": "volleyball-veteran-e40ea5a7.webp",
   "Jump-Rope Genius": "jump-rope-genius-89f16b3c.webp",
   "Koopa Freerunner": "koopa-freerunner-e5a83e7d.webp",
+  // Key art tiles for achievements with no matching official art
+  "Lake Lamode Swept": "lake-lamode-swept-ba74e415.webp",
+  "Forgotten Isle Swept": "forgotten-isle-swept-0aac382c.webp",
+  "Nimbus Arena Swept": "nimbus-arena-swept-d3c19248.webp",
+  "Peach's Castle Swept": "peachs-castle-swept-2345f1d2.webp",
+  "Rabbit Ridge Swept": "rabbit-ridge-swept-134061f9.webp",
+  "Purple Patch": "purple-patch-9e945f62.webp",
+  "Purple Pockets": "purple-pockets-3d0e30e4.webp",
+  "Purple Reign": "purple-reign-77b0b314.webp",
+  "All One Thousand": "all-one-thousand-68a526d6.webp",
+  "Riding High": "riding-high-61f3b508.webp",
+  "Rock Breaker": "rock-breaker-fb1810da.webp",
+  "Dark Invitation": "dark-invitation-4c9a5cf2.webp",
+  "Half a Sky": "half-a-sky-8aafbeb6.webp",
+  "Royal Invitation": "royal-invitation-346df001.webp",
+  "Arrival at Rabbit Ridge": "arrival-at-rabbit-ridge-7d745199.webp",
+  "Long Journey's End": "long-journeys-end-be02df3f.webp",
 };
 
 async function main() {
