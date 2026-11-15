@@ -10,6 +10,7 @@
  */
 
 import { PrismaClient, GameStatus, BuylistPriority } from "@prisma/client";
+import { awardTrophyIfComplete, notPlatinum, trophyEligibleSetWhere } from "../src/lib/trophies.js";
 
 const prisma = new PrismaClient();
 
@@ -132,12 +133,23 @@ async function main() {
     }
   }
 
-  // Trophies on the completed games
+  // Platinums on the completed games. A Platinum is earned by finishing the
+  // game's trophy list, so tick the list and let the app's own award create
+  // it. A game without a list gets none.
   const completed = picks.slice(2, 5);
+  let platinums = 0;
   for (const game of completed) {
-    await prisma.trophy.create({
-      data: { userId: user.id, gameId: game.id },
+    const trophies = await prisma.achievement.findMany({
+      where: { ...notPlatinum, achievementSet: { gameFamilyId: game.gameFamilyId, ...trophyEligibleSetWhere } },
+      select: { id: true },
     });
+    if (trophies.length === 0) continue;
+    await prisma.userAchievement.createMany({
+      data: trophies.map((trophy) => ({ userId: user.id, achievementId: trophy.id })),
+      skipDuplicates: true,
+    });
+    await awardTrophyIfComplete(prisma, user.id, game.gameFamilyId);
+    platinums++;
   }
 
   // Play journal: an active streak over the last four days
@@ -171,7 +183,7 @@ async function main() {
   }
 
   console.log(`Seeded demo account ${user.id}:`);
-  console.log(`  library ${statuses.length}, collection 8, trophies 3, sessions 4, buylist 3`);
+  console.log(`  library ${statuses.length}, collection 8, Platinums ${platinums}, sessions 4, buylist 3`);
   console.log(picks.map((g) => `  - ${g.gameFamily.title} [${g.platform.name}]`).join("\n"));
 }
 
