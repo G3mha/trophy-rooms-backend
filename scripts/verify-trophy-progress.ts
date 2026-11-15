@@ -465,6 +465,64 @@ async function verify() {
   await unmark(alice, restatingFirst.id);
   await prisma.achievementSet.delete({ where: { id: restating.id } });
 
+  console.log("markAllAchievementsComplete: one call finishes the trophy list");
+
+  type MarkAll = {
+    markAllAchievementsComplete: {
+      success: boolean;
+      markedCount: number;
+      error: { code: string } | null;
+    };
+  };
+  const markAll = (user: User | null, gameFamilyId: string) =>
+    run<MarkAll>(
+      user,
+      `mutation ($id: ID!) { markAllAchievementsComplete(gameFamilyId: $id) { success markedCount error { code } } }`,
+      { id: gameFamilyId }
+    ).then((data) => data.markAllAchievementsComplete);
+
+  const hank = await makeUser("hank");
+  await mark(hank, firstOfficial.id);
+  const tickedBefore = await prisma.userAchievement.findUniqueOrThrow({
+    where: { userId_achievementId: { userId: hank.id, achievementId: firstOfficial.id } },
+  });
+
+  check("signed out, it is refused", (await markAll(null, family.id)).error?.code, "UNAUTHORIZED");
+  check("a family with no achievements is not found", (await markAll(hank, otherFamily.id)).error?.code, "NOT_FOUND");
+  check("nothing was marked by the refused calls", await prisma.userAchievement.count({ where: { userId: hank.id } }), 1);
+
+  check("it marks only what was missing", await markAll(hank, family.id), {
+    success: true,
+    markedCount: eligible.length - 1,
+    error: null,
+  });
+  check(
+    "every trophy-eligible achievement is complete, and nothing in a private set",
+    (await prisma.userAchievement.findMany({ where: { userId: hank.id }, select: { achievementId: true } }))
+      .map((row) => row.achievementId)
+      .sort(),
+    eligible.map((achievement) => achievement.id).sort()
+  );
+  check(
+    "an achievement ticked earlier keeps its date",
+    (
+      await prisma.userAchievement.findUniqueOrThrow({
+        where: { userId_achievementId: { userId: hank.id, achievementId: firstOfficial.id } },
+      })
+    ).createdAt.getTime(),
+    tickedBefore.createdAt.getTime()
+  );
+  check("the trophy lands on the earliest release, as hank has no library", await trophyGameIds(hank), [gameOld.id]);
+  check("a second call marks nothing and still succeeds", await markAll(hank, family.id), {
+    success: true,
+    markedCount: 0,
+    error: null,
+  });
+  check("and leaves one trophy", await trophyGameIds(hank), [gameOld.id]);
+
+  // Leave the family as the later checks expect to find it
+  await prisma.user.delete({ where: { id: hank.id } });
+
   console.log("fix-duplicate-trophies.ts");
 
   // Rows the old mutation left behind: one trophy per game in the family
