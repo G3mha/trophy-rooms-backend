@@ -38,7 +38,7 @@ const SOURCES: SourceConfig[] = [
     gameTitle: "Mario Kart: Double Dash!!",
     retroGameId: 7693,
     syntheticIcons: {
-      "Retro Mastery": "__RETRO_GAME_ICON__",
+      "Perfect Partners": "__RETRO_GAME_ICON__",
     },
   },
   {
