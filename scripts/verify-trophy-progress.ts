@@ -513,6 +513,34 @@ async function verify() {
     tickedBefore.createdAt.getTime()
   );
   check("the trophy lands on the earliest release, as hank has no library", await trophyGameIds(hank), [gameOld.id]);
+  type Feed = {
+    activityFeed: { type: string; userId: string; achievementId: string | null }[];
+    recentAchievementActivity: { userId: string; achievementId: string }[];
+  };
+  const feed = await run<Feed>(
+    null,
+    `{ activityFeed(limit: 100) { type userId achievementId }
+       recentAchievementActivity(limit: 50) { userId achievementId } }`
+  );
+  check(
+    "the feed shows hank's own tick and the trophy, not the rows mark-all wrote",
+    feed.activityFeed
+      .filter((entry) => entry.userId === hank.id)
+      .map((entry) => (entry.type === "trophy" ? "trophy" : entry.achievementId))
+      .sort(),
+    ["trophy", firstOfficial.id].sort()
+  );
+  check(
+    "the achievement feed shows only hank's own tick",
+    feed.recentAchievementActivity.filter((entry) => entry.userId === hank.id).map((entry) => entry.achievementId),
+    [firstOfficial.id]
+  );
+  check(
+    "other players' single ticks still reach the feed",
+    feed.activityFeed.some((entry) => entry.type === "achievement" && entry.userId !== hank.id),
+    true
+  );
+
   check("a second call marks nothing and still succeeds", await markAll(hank, family.id), {
     success: true,
     markedCount: 0,
