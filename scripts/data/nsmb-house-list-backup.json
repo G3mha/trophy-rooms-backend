@@ -1,0 +1,188 @@
+{
+  "set": {
+    "title": "Base Achievement Set",
+    "type": "OFFICIAL",
+    "visibility": "PUBLIC"
+  },
+  "achievements": [
+    {
+      "title": "Desert Done",
+      "description": "Clear World 2.",
+      "tier": "BRONZE",
+      "ticks": []
+    },
+    {
+      "title": "Tides Turned",
+      "description": "Clear World 3.",
+      "tier": "BRONZE",
+      "ticks": []
+    },
+    {
+      "title": "Forest Found",
+      "description": "Unlock World 4.",
+      "tier": "BRONZE",
+      "ticks": []
+    },
+    {
+      "title": "Giant Trouble",
+      "description": "Clear World 4.",
+      "tier": "BRONZE",
+      "ticks": []
+    },
+    {
+      "title": "Sky Survivor",
+      "description": "Clear World 5.",
+      "tier": "BRONZE",
+      "ticks": []
+    },
+    {
+      "title": "Frozen Finish",
+      "description": "Clear World 6.",
+      "tier": "BRONZE",
+      "ticks": []
+    },
+    {
+      "title": "Clouds Open",
+      "description": "Unlock World 7.",
+      "tier": "SILVER",
+      "ticks": []
+    },
+    {
+      "title": "Thunder Broken",
+      "description": "Clear World 7.",
+      "tier": "SILVER",
+      "ticks": []
+    },
+    {
+      "title": "Bowser Beaten",
+      "description": "Clear World 8 and finish the game.",
+      "tier": "GOLD",
+      "ticks": []
+    },
+    {
+      "title": "First Secret",
+      "description": "Find your first secret exit.",
+      "tier": "BRONZE",
+      "ticks": []
+    },
+    {
+      "title": "Pathfinder",
+      "description": "Find 5 secret exits.",
+      "tier": "BRONZE",
+      "ticks": []
+    },
+    {
+      "title": "Cartographer",
+      "description": "Find every secret exit in the game.",
+      "tier": "GOLD",
+      "ticks": []
+    },
+    {
+      "title": "Blasted Off",
+      "description": "Unlock your first cannon route.",
+      "tier": "BRONZE",
+      "ticks": []
+    },
+    {
+      "title": "Shortcut Expert",
+      "description": "Unlock every cannon route.",
+      "tier": "SILVER",
+      "ticks": []
+    },
+    {
+      "title": "World 1 Coin Sweep",
+      "description": "Collect every Star Coin in World 1.",
+      "tier": "BRONZE",
+      "ticks": []
+    },
+    {
+      "title": "World 2 Coin Sweep",
+      "description": "Collect every Star Coin in World 2.",
+      "tier": "BRONZE",
+      "ticks": []
+    },
+    {
+      "title": "World 3 Coin Sweep",
+      "description": "Collect every Star Coin in World 3.",
+      "tier": "BRONZE",
+      "ticks": []
+    },
+    {
+      "title": "World 4 Coin Sweep",
+      "description": "Collect every Star Coin in World 4.",
+      "tier": "BRONZE",
+      "ticks": []
+    },
+    {
+      "title": "World 5 Coin Sweep",
+      "description": "Collect every Star Coin in World 5.",
+      "tier": "SILVER",
+      "ticks": []
+    },
+    {
+      "title": "World 6 Coin Sweep",
+      "description": "Collect every Star Coin in World 6.",
+      "tier": "SILVER",
+      "ticks": []
+    },
+    {
+      "title": "World 7 Coin Sweep",
+      "description": "Collect every Star Coin in World 7.",
+      "tier": "SILVER",
+      "ticks": []
+    },
+    {
+      "title": "World 8 Coin Sweep",
+      "description": "Collect every Star Coin in World 8.",
+      "tier": "SILVER",
+      "ticks": []
+    },
+    {
+      "title": "Treasure Hunter",
+      "description": "Collect 120 Star Coins total.",
+      "tier": "BRONZE",
+      "ticks": []
+    },
+    {
+      "title": "Coin King",
+      "description": "Collect every Star Coin in the game.",
+      "tier": "GOLD",
+      "ticks": []
+    },
+    {
+      "title": "One-Star Save",
+      "description": "Earn a 1-star save file.",
+      "tier": "BRONZE",
+      "ticks": []
+    },
+    {
+      "title": "Two-Star Save",
+      "description": "Earn a 2-star save file.",
+      "tier": "SILVER",
+      "ticks": []
+    },
+    {
+      "title": "Three-Star Save",
+      "description": "Earn a 3-star save file.",
+      "tier": "SILVER",
+      "ticks": []
+    },
+    {
+      "title": "No Loose Ends",
+      "description": "Reach full map completion with all exits discovered.",
+      "tier": "SILVER",
+      "ticks": []
+    },
+    {
+      "title": "A New Journey Begins",
+      "description": "Clear World 1.",
+      "tier": "BRONZE",
+      "ticks": [
+        {
+          "userId": "cmnt4fixf0001kx01fv8983te",
+          "createdAt": "2026-04-29T01:49:43.272Z"
+        }
+      ]
+    }
+  ]
+}
