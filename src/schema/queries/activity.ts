@@ -2,6 +2,7 @@ import { builder } from "../builder.js";
 import { POINTS_DEPRECATION, USER_EMAIL_DEPRECATION } from "../deprecations.js";
 import { visibleSetWhere } from "../../lib/achievement-visibility.js";
 import type { Prisma, PrismaClient } from "@prisma/client";
+import { notPlatinum } from "../../lib/trophies.js";
 
 /**
  * Leaves "Mark all complete" out of the achievement feed.
@@ -11,6 +12,9 @@ import type { Prisma, PrismaClient } from "@prisma/client";
  * whole feed with one player. The trophy it awards is that moment's entry, so
  * the completions themselves are dropped. A player's own ticks never share a
  * timestamp, which is what tells the two apart without a schema change.
+ *
+ * The Platinum is left out of the feed for the same reason (notPlatinum): it
+ * is completed together with the trophy, which already has its own entry.
  *
  * Only the 100 most recent groups are excluded, which covers any feed page:
  * an older group could only surface behind 100 newer ones.
@@ -143,7 +147,7 @@ builder.queryField("recentAchievementActivity", (t) =>
       const recentAchievements = await ctx.prisma.userAchievement.findMany({
         // Hide completions of achievements in sets this viewer can't see
         where: {
-          achievement: { achievementSet: visibleSetWhere(ctx.user) },
+          achievement: { ...notPlatinum, achievementSet: visibleSetWhere(ctx.user) },
           ...(await withoutBulkMarked(ctx.prisma)),
         },
         take: limit,
@@ -246,7 +250,7 @@ builder.queryField("activityFeed", (t) =>
       // Fetch both achievements and trophies
       const [achievements, trophies] = await Promise.all([
         ctx.prisma.userAchievement.findMany({
-          where: { achievement: { achievementSet: visibleSetWhere(ctx.user) }, ...notBulkMarked },
+          where: { achievement: { ...notPlatinum, achievementSet: visibleSetWhere(ctx.user) }, ...notBulkMarked },
           take: limit,
           orderBy: { createdAt: "desc" },
           include: {
