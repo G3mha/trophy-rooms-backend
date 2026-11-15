@@ -55,7 +55,7 @@ const SOURCES: SourceConfig[] = [
     setTitle: "PSN Trophy List",
     gameTitle: "Resident Evil Requiem",
     steamAppId: 3764200,
-    // Steam ships the 49 trophies without a platinum, so "Requiem" stays iconless.
+    // Steam ships the 49 trophies without a platinum, so fix-platinum-icons.ts sets "Requiem".
   },
 ];
 
