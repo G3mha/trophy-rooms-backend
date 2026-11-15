@@ -25,7 +25,7 @@ builder.mutationField("createAchievement", (t) =>
           achievementId: null,
           error: {
             code: ErrorCode.UNAUTHORIZED,
-            message: "You must be logged in to create an achievement",
+            message: "You must be logged in to create a trophy",
             field: null,
           },
         };
@@ -60,7 +60,7 @@ builder.mutationField("createAchievement", (t) =>
           achievementId: null,
           error: {
             code: ErrorCode.NOT_FOUND,
-            message: `Achievement set with id "${achievementSetId}" not found`,
+            message: `Trophy list with id "${achievementSetId}" not found`,
             field: "achievementSetId",
           },
         };
@@ -77,7 +77,7 @@ builder.mutationField("createAchievement", (t) =>
             achievementId: null,
             error: {
               code: ErrorCode.FORBIDDEN,
-              message: "You do not have permission to add achievements to this set",
+              message: "You do not have permission to add trophies to this list",
               field: null,
             },
           };
@@ -88,7 +88,7 @@ builder.mutationField("createAchievement", (t) =>
           achievementId: null,
           error: {
             code: ErrorCode.FORBIDDEN,
-            message: "You do not have permission to add achievements to this set",
+            message: "You do not have permission to add trophies to this list",
             field: null,
           },
         };
@@ -110,7 +110,7 @@ builder.mutationField("createAchievement", (t) =>
           achievementId: null,
           error: {
             code: ErrorCode.ALREADY_EXISTS,
-            message: `An achievement with title "${trimmedTitle}" already exists for this set`,
+            message: `A trophy with title "${trimmedTitle}" already exists for this list`,
             field: "title",
           },
         };
@@ -154,7 +154,7 @@ builder.mutationField("updateAchievement", (t) =>
           achievementId: null,
           error: {
             code: ErrorCode.UNAUTHORIZED,
-            message: "You must be logged in to update an achievement",
+            message: "You must be logged in to update a trophy",
             field: null,
           },
         };
@@ -172,7 +172,7 @@ builder.mutationField("updateAchievement", (t) =>
           achievementId: null,
           error: {
             code: ErrorCode.NOT_FOUND,
-            message: `Achievement with id "${id}" not found`,
+            message: `Trophy with id "${id}" not found`,
             field: null,
           },
         };
@@ -189,7 +189,7 @@ builder.mutationField("updateAchievement", (t) =>
             achievementId: null,
             error: {
               code: ErrorCode.FORBIDDEN,
-              message: "You do not have permission to update this achievement",
+              message: "You do not have permission to update this trophy",
               field: null,
             },
           };
@@ -200,7 +200,7 @@ builder.mutationField("updateAchievement", (t) =>
           achievementId: null,
           error: {
             code: ErrorCode.FORBIDDEN,
-            message: "You do not have permission to update this achievement",
+            message: "You do not have permission to update this trophy",
             field: null,
           },
         };
@@ -236,7 +236,7 @@ builder.mutationField("updateAchievement", (t) =>
               achievementId: null,
               error: {
                 code: ErrorCode.ALREADY_EXISTS,
-                message: `An achievement with title "${trimmedTitle}" already exists for this set`,
+                message: `A trophy with title "${trimmedTitle}" already exists for this list`,
                 field: "title",
               },
             };
@@ -280,7 +280,7 @@ builder.mutationField("deleteAchievement", (t) =>
           achievementId: null,
           error: {
             code: ErrorCode.UNAUTHORIZED,
-            message: "You must be logged in to delete an achievement",
+            message: "You must be logged in to delete a trophy",
             field: null,
           },
         };
@@ -298,7 +298,7 @@ builder.mutationField("deleteAchievement", (t) =>
           achievementId: null,
           error: {
             code: ErrorCode.NOT_FOUND,
-            message: `Achievement with id "${id}" not found`,
+            message: `Trophy with id "${id}" not found`,
             field: null,
           },
         };
@@ -315,7 +315,7 @@ builder.mutationField("deleteAchievement", (t) =>
             achievementId: null,
             error: {
               code: ErrorCode.FORBIDDEN,
-              message: "You do not have permission to delete this achievement",
+              message: "You do not have permission to delete this trophy",
               field: null,
             },
           };
@@ -326,7 +326,7 @@ builder.mutationField("deleteAchievement", (t) =>
           achievementId: null,
           error: {
             code: ErrorCode.FORBIDDEN,
-            message: "You do not have permission to delete this achievement",
+            message: "You do not have permission to delete this trophy",
             field: null,
           },
         };
@@ -361,7 +361,7 @@ builder.mutationField("bulkCreateAchievements", (t) =>
           skippedCount: 0,
           error: {
             code: ErrorCode.UNAUTHORIZED,
-            message: "You must be logged in to import achievements",
+            message: "You must be logged in to import trophies",
             field: null,
           },
         };
@@ -374,7 +374,7 @@ builder.mutationField("bulkCreateAchievements", (t) =>
           skippedCount: 0,
           error: {
             code: ErrorCode.VALIDATION_ERROR,
-            message: "No achievements provided",
+            message: "No trophies provided",
             field: "achievements",
           },
         };
@@ -393,7 +393,7 @@ builder.mutationField("bulkCreateAchievements", (t) =>
           skippedCount: 0,
           error: {
             code: ErrorCode.NOT_FOUND,
-            message: `Achievement set with id "${achievementSetId}" not found`,
+            message: `Trophy list with id "${achievementSetId}" not found`,
             field: "achievementSetId",
           },
         };
@@ -411,7 +411,7 @@ builder.mutationField("bulkCreateAchievements", (t) =>
             skippedCount: 0,
             error: {
               code: ErrorCode.FORBIDDEN,
-              message: "You do not have permission to import into this set",
+              message: "You do not have permission to import into this list",
               field: null,
             },
           };
@@ -423,7 +423,7 @@ builder.mutationField("bulkCreateAchievements", (t) =>
           skippedCount: 0,
           error: {
             code: ErrorCode.FORBIDDEN,
-            message: "You do not have permission to import into this set",
+            message: "You do not have permission to import into this list",
             field: null,
           },
         };
@@ -446,7 +446,7 @@ builder.mutationField("bulkCreateAchievements", (t) =>
           skippedCount: 0,
           error: {
             code: ErrorCode.VALIDATION_ERROR,
-            message: "All achievements are empty",
+            message: "All trophies are empty",
             field: "achievements",
           },
         };
@@ -486,7 +486,7 @@ builder.mutationField("bulkDeleteAchievements", (t) =>
           deletedCount: 0,
           error: {
             code: ErrorCode.UNAUTHORIZED,
-            message: "You must be logged in to delete achievements",
+            message: "You must be logged in to delete trophies",
             field: null,
           },
         };
@@ -498,7 +498,7 @@ builder.mutationField("bulkDeleteAchievements", (t) =>
           deletedCount: 0,
           error: {
             code: ErrorCode.FORBIDDEN,
-            message: "You do not have permission to delete achievements",
+            message: "You do not have permission to delete trophies",
             field: null,
           },
         };
@@ -510,7 +510,7 @@ builder.mutationField("bulkDeleteAchievements", (t) =>
           deletedCount: 0,
           error: {
             code: ErrorCode.VALIDATION_ERROR,
-            message: "At least one achievement ID is required",
+            message: "At least one trophy ID is required",
             field: "ids",
           },
         };
