@@ -151,9 +151,16 @@ builder.mutationField("markAllAchievementsComplete", (t) =>
         };
       }
 
-      // Ones the user already ticked keep their original completion date
+      // Ones the user already ticked keep their original completion date. The
+      // new rows share one createdAt on purpose: that shared instant is how the
+      // activity feed recognises a mark-all (queries/activity.ts).
+      const markedAt = new Date();
       const { count } = await ctx.prisma.userAchievement.createMany({
-        data: achievements.map((achievement) => ({ userId: user.id, achievementId: achievement.id })),
+        data: achievements.map((achievement) => ({
+          userId: user.id,
+          achievementId: achievement.id,
+          createdAt: markedAt,
+        })),
         skipDuplicates: true,
       });
 
