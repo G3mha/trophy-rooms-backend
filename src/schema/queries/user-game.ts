@@ -1,6 +1,6 @@
 import { builder } from "../builder.js";
 import { GameStatusEnum } from "../types/user-game.js";
-import { trophyEligibleSetWhere } from "../../lib/trophies.js";
+import { notPlatinum, trophyEligibleSetWhere } from "../../lib/trophies.js";
 
 // Bundle a library game belongs to (for stacking compilations in the UI)
 const UserGameBundleRef = builder.objectRef<{
@@ -179,6 +179,7 @@ builder.queryField("myGamesByStatus", (t) =>
       const achievementCounts = await ctx.prisma.achievement.groupBy({
         by: ["achievementSetId"],
         where: {
+          ...notPlatinum,
           achievementSet: {
             gameFamilyId: { in: gameFamilyIds },
             ...trophyEligibleSetWhere,

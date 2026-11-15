@@ -1,7 +1,7 @@
 import { builder, MutationErrorRef } from "../builder.js";
 import { ErrorCode } from "../../lib/errors.js";
 import { visibleSetWhere } from "../../lib/achievement-visibility.js";
-import { countTrophyHolders, trophyEligibleSetWhere, trophySetsFirstOrderBy } from "../../lib/trophies.js";
+import { countTrophyHolders, notPlatinum, trophyEligibleSetWhere, trophySetsFirstOrderBy } from "../../lib/trophies.js";
 import { GameTypeEnum } from "./game.js";
 
 // GameFamily Prisma Object
@@ -67,6 +67,7 @@ builder.prismaObject("GameFamily", {
       resolve: async (family, _args, ctx) => {
         const result = await ctx.prisma.achievement.count({
           where: {
+            ...notPlatinum,
             achievementSet: {
               gameFamilyId: family.id,
               ...trophyEligibleSetWhere,

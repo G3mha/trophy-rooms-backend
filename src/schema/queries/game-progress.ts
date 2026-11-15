@@ -1,5 +1,5 @@
 import { builder } from "../builder.js";
-import { trophyEligibleSetWhere } from "../../lib/trophies.js";
+import { notPlatinum, trophyEligibleSetWhere } from "../../lib/trophies.js";
 import { POINTS_DEPRECATION } from "../deprecations.js";
 
 function computePercentComplete(earnedCount: number, totalCount: number): number {
@@ -53,7 +53,7 @@ builder.queryField("myGameProgress", (t) =>
       const userAchievements = await ctx.prisma.userAchievement.findMany({
         where: {
           userId: ctx.user.id,
-          achievement: { achievementSet: trophyEligibleSetWhere },
+          achievement: { ...notPlatinum, achievementSet: trophyEligibleSetWhere },
         },
         include: {
           achievement: {
@@ -134,6 +134,7 @@ builder.queryField("myGameProgress", (t) =>
       const gameFamilyTotals = await ctx.prisma.achievement.groupBy({
         by: ["achievementSetId"],
         where: {
+          ...notPlatinum,
           achievementSet: {
             gameFamilyId: { in: gameFamilyIds },
             ...trophyEligibleSetWhere,
@@ -227,7 +228,7 @@ builder.queryField("userGameProgress", (t) =>
       const userAchievements = await ctx.prisma.userAchievement.findMany({
         where: {
           userId: args.userId,
-          achievement: { achievementSet: trophyEligibleSetWhere },
+          achievement: { ...notPlatinum, achievementSet: trophyEligibleSetWhere },
         },
         include: {
           achievement: {
@@ -308,6 +309,7 @@ builder.queryField("userGameProgress", (t) =>
       const gameFamilyTotals = await ctx.prisma.achievement.groupBy({
         by: ["achievementSetId"],
         where: {
+          ...notPlatinum,
           achievementSet: {
             gameFamilyId: { in: gameFamilyIds },
             ...trophyEligibleSetWhere,

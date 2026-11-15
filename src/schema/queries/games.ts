@@ -4,7 +4,7 @@ import { GamesFilterInput, GameOrderBy, GameTypeEnum } from "../types/game.js";
 import { GameFamiliesFilterInput, GameFamilyOrderBy } from "../types/game-family.js";
 import { searchGames, searchGameFamilies } from "../../lib/fulltext-search.js";
 import { visibleSetWhere } from "../../lib/achievement-visibility.js";
-import { countTrophyHolders, trophyEligibleSetWhere } from "../../lib/trophies.js";
+import { countTrophyHolders, notPlatinum, trophyEligibleSetWhere } from "../../lib/trophies.js";
 
 // Games connection with cursor-based pagination
 builder.queryField("games", (t) =>
@@ -494,7 +494,7 @@ builder.queryField("gamesPage", (t) =>
                   where: trophyEligibleSetWhere,
                   select: {
                     _count: {
-                      select: { achievements: true },
+                      select: { achievements: { where: notPlatinum } },
                     },
                   },
                 },
@@ -596,7 +596,7 @@ builder.queryField("gamesByTitle", (t) =>
             where: trophyEligibleSetWhere,
             select: {
               _count: {
-                select: { achievements: true },
+                select: { achievements: { where: notPlatinum } },
               },
             },
           },
@@ -861,7 +861,7 @@ builder.queryField("gameFamiliesPage", (t) =>
               where: trophyEligibleSetWhere,
               select: {
                 _count: {
-                  select: { achievements: true },
+                  select: { achievements: { where: notPlatinum } },
                 },
               },
             },
