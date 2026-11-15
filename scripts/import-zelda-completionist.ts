@@ -19,7 +19,7 @@ if (!RETRO_API_KEY) {
   throw new Error("RETROACHIEVEMENTS_API_KEY or RA_WEB_API_KEY environment variable is required");
 }
 
-const SET_TITLE = "Completionist set";
+const SET_TITLE = "Completionist list";
 
 const OOT_ORIGINAL_FAMILY_ID = "cmokvbc3i00a90mxepoc9yo8j";
 const MM_ORIGINAL_FAMILY_ID = "cmokvbc3i00a80mxe6irf4zi6";

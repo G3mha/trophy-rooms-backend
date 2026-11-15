@@ -34,7 +34,7 @@ type SourceConfig =
 const SOURCES: SourceConfig[] = [
   {
     type: "retroachievements",
-    setTitle: "RetroAchievements set",
+    setTitle: "RetroAchievements list",
     gameTitle: "Mario Kart: Double Dash!!",
     retroGameId: 7693,
     syntheticIcons: {

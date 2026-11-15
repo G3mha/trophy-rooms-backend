@@ -14,7 +14,7 @@ try {
 const prisma = new PrismaClient();
 
 const FAMILY_TITLE = "Super Mario Odyssey";
-const SET_TITLE = "Completionist set";
+const SET_TITLE = "Completionist list";
 
 // Same scale as the hand-authored New Super Mario Bros. set.
 const POINTS_BY_TIER: Record<AchievementTier, number> = {

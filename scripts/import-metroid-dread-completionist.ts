@@ -15,7 +15,7 @@ const prisma = new PrismaClient();
 
 // Switch only, so there is no official list to copy.
 const FAMILY_TITLE = "Metroid Dread";
-const SET_TITLE = "Completionist set";
+const SET_TITLE = "Completionist list";
 
 type AchievementSeed = {
   title: string;

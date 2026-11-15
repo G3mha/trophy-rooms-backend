@@ -17,7 +17,7 @@ const prisma = new PrismaClient();
 // Edition's Zelda Notes medals live in the phone app and only count stats, so
 // they aren't transcribed here.
 const FAMILY_TITLE = "The Legend of Zelda: Tears of the Kingdom";
-const SET_TITLE = "Completionist set";
+const SET_TITLE = "Completionist list";
 
 type AchievementSeed = {
   title: string;

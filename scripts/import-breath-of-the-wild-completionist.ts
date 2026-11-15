@@ -39,7 +39,7 @@ const { BRONZE, SILVER, GOLD, PLATINUM } = AchievementTier;
 // missable. Kilton's three Medals of Honor are the game's own tally of the big
 // field bosses.
 const BASE_SET: SetSeed = {
-  title: "Completionist set",
+  title: "Completionist list",
   countsTowardTrophy: true,
   achievements: [
     // Story
@@ -101,7 +101,7 @@ const DLC_SET: SetSeed = {
 };
 
 const SETS = [BASE_SET, DLC_SET];
-const EXPECTED = { "Completionist set": 23, "Expansion Pass": 7 } as Record<string, number>;
+const EXPECTED = { "Completionist list": 23, "Expansion Pass": 7 } as Record<string, number>;
 
 async function main() {
   const apply = process.argv.includes("--apply");

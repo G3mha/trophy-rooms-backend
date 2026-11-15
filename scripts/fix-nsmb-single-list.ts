@@ -28,7 +28,7 @@ const prisma = new PrismaClient();
 
 const FAMILY_SLUG = "new-super-mario-bros";
 const HOUSE_SET = "Base Achievement Set";
-const KEPT_SET = "RetroAchievements set";
+const KEPT_SET = "RetroAchievements list";
 
 async function main() {
   const apply = process.argv.includes("--apply");

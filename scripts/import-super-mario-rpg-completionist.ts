@@ -16,7 +16,7 @@ const prisma = new PrismaClient();
 // The 2023 Switch remake. The SNES original is its own family,
 // "Super Mario RPG: Legend of the Seven Stars".
 const FAMILY_TITLE = "Super Mario RPG";
-const SET_TITLE = "Completionist set";
+const SET_TITLE = "Completionist list";
 
 type AchievementSeed = {
   title: string;

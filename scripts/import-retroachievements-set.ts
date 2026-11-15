@@ -34,7 +34,7 @@ function parseArgs() {
   const options = {
     gameFamilyId: "",
     retroGameId: 0,
-    setTitle: "RetroAchievements set",
+    setTitle: "RetroAchievements list",
   };
 
   for (let index = 0; index < args.length; index += 1) {
