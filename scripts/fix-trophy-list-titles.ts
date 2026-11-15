@@ -3,7 +3,8 @@
  *
  * The apps call every list item a trophy and every list a trophy list, but
  * list titles are data, so names like "PSN Achievement Set" kept the old
- * word. "RetroAchievements" is a brand name and stays.
+ * word. "RetroAchievements" is a brand name and stays. Titles ending in
+ * "set" ("Completionist set") end in "list" for the same reason.
  *
  * A rename is skipped when the family already has a list with the new title,
  * type and creator, since that would break the unique key.
@@ -32,7 +33,9 @@ export function renameTitle(title: string): string {
     .replace(/\bAchievements\b/g, "Trophies")
     .replace(/\bachievements\b/g, "trophies")
     .replace(/\bAchievement\b/g, "Trophy")
-    .replace(/\bachievement\b/g, "trophy");
+    .replace(/\bachievement\b/g, "trophy")
+    // "RetroAchievements set", "Completionist set": the apps say list
+    .replace(/ set$/, " list");
 }
 
 assert.equal(renameTitle("PSN Achievement Set"), "PSN Trophy List");
@@ -40,6 +43,9 @@ assert.equal(renameTitle("Main Achievements"), "Main Trophies");
 assert.equal(renameTitle("RetroAchievements"), "RetroAchievements");
 assert.equal(renameTitle("RetroAchievements Achievement Set"), "RetroAchievements Trophy List");
 assert.equal(renameTitle("In-Game Challenges"), "In-Game Challenges");
+assert.equal(renameTitle("RetroAchievements set"), "RetroAchievements list");
+assert.equal(renameTitle("Completionist set"), "Completionist list");
+assert.equal(renameTitle("Sunset"), "Sunset");
 
 async function main() {
   const apply = process.argv.includes("--apply");
