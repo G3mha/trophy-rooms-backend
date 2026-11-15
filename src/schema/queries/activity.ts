@@ -1,6 +1,30 @@
 import { builder } from "../builder.js";
 import { POINTS_DEPRECATION, USER_EMAIL_DEPRECATION } from "../deprecations.js";
 import { visibleSetWhere } from "../../lib/achievement-visibility.js";
+import type { Prisma, PrismaClient } from "@prisma/client";
+
+/**
+ * Leaves "Mark all complete" out of the achievement feed.
+ *
+ * markAllAchievementsComplete writes one completion per achievement, all with
+ * the same createdAt, so a single tap on a 135-achievement game would fill the
+ * whole feed with one player. The trophy it awards is that moment's entry, so
+ * the completions themselves are dropped. A player's own ticks never share a
+ * timestamp, which is what tells the two apart without a schema change.
+ *
+ * Only the 100 most recent groups are excluded, which covers any feed page:
+ * an older group could only surface behind 100 newer ones.
+ */
+async function withoutBulkMarked(prisma: PrismaClient): Promise<Prisma.UserAchievementWhereInput> {
+  const groups = await prisma.userAchievement.groupBy({
+    by: ["userId", "createdAt"],
+    having: { achievementId: { _count: { gt: 1 } } },
+    orderBy: { createdAt: "desc" },
+    take: 100,
+  });
+  if (groups.length === 0) return {};
+  return { NOT: groups.map((group) => ({ userId: group.userId, createdAt: group.createdAt })) };
+}
 
 // Activity feed entry type
 const ActivityFeedEntry = builder.objectRef<{
@@ -118,7 +142,10 @@ builder.queryField("recentAchievementActivity", (t) =>
 
       const recentAchievements = await ctx.prisma.userAchievement.findMany({
         // Hide completions of achievements in sets this viewer can't see
-        where: { achievement: { achievementSet: visibleSetWhere(ctx.user) } },
+        where: {
+          achievement: { achievementSet: visibleSetWhere(ctx.user) },
+          ...(await withoutBulkMarked(ctx.prisma)),
+        },
         take: limit,
         orderBy: { createdAt: "desc" },
         include: {
@@ -214,10 +241,12 @@ builder.queryField("activityFeed", (t) =>
     resolve: async (_root, args, ctx) => {
       const limit = Math.min(args.limit || 30, 100);
 
+      const notBulkMarked = await withoutBulkMarked(ctx.prisma);
+
       // Fetch both achievements and trophies
       const [achievements, trophies] = await Promise.all([
         ctx.prisma.userAchievement.findMany({
-          where: { achievement: { achievementSet: visibleSetWhere(ctx.user) } },
+          where: { achievement: { achievementSet: visibleSetWhere(ctx.user) }, ...notBulkMarked },
           take: limit,
           orderBy: { createdAt: "desc" },
           include: {
