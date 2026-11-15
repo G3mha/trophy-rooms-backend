@@ -60,20 +60,3 @@ builder.queryField("achievementSets", (t) =>
     },
   })
 );
-
-builder.queryField("myAchievementSets", (t) =>
-  t.prismaField({
-    type: ["AchievementSet"],
-    resolve: (query, _root, _args, ctx) => {
-      if (!ctx.user) {
-        return [];
-      }
-
-      return ctx.prisma.achievementSet.findMany({
-        ...query,
-        where: { createdByUserId: ctx.user.id },
-        orderBy: { createdAt: "desc" },
-      });
-    },
-  })
-);
