@@ -29,7 +29,7 @@ const prisma = new PrismaClient();
 
 const FAMILY_TITLE = "Resident Evil Requiem";
 const NON_GATING_SET_TITLE = "In-Game Challenges";
-const GATING_SET_TITLE = "PSN Achievement Set";
+const GATING_SET_TITLE = "PSN Trophy List";
 
 async function main() {
   const family = await prisma.gameFamily.findFirstOrThrow({

@@ -28,7 +28,7 @@ try {
 const prisma = new PrismaClient();
 
 const FAMILY_SLUG = "resident-evil-requiem";
-const MAIN_SET = "PSN Achievement Set";
+const MAIN_SET = "PSN Trophy List";
 const MERGED_SET = "In-Game Challenges";
 
 const normalize = (title: string) => title.toLowerCase().replace(/[^a-z0-9]/g, "");

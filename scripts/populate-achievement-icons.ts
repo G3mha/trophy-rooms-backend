@@ -43,7 +43,7 @@ const SOURCES: SourceConfig[] = [
   },
   {
     type: "steam",
-    setTitle: "PSN Achievement Set",
+    setTitle: "PSN Trophy List",
     gameTitle: "Hotline Miami",
     steamAppId: 219150,
     aliases: {
@@ -52,7 +52,7 @@ const SOURCES: SourceConfig[] = [
   },
   {
     type: "steam",
-    setTitle: "PSN Achievement Set",
+    setTitle: "PSN Trophy List",
     gameTitle: "Resident Evil Requiem",
     steamAppId: 3764200,
     // Steam ships the 49 trophies without a platinum, so "Requiem" stays iconless.

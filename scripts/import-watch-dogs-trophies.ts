@@ -48,7 +48,7 @@ const { BRONZE, SILVER, GOLD, PLATINUM } = AchievementTier;
 
 // PSN list order, less the five online trophies.
 const BASE_SET: SetSeed = {
-  title: "PSN Achievement Set",
+  title: "PSN Trophy List",
   countsTowardTrophy: true,
   achievements: [
     {
@@ -147,7 +147,7 @@ const BAD_BLOOD_SET: SetSeed = {
 };
 
 const SETS = [BASE_SET, ONLINE_SET, BAD_BLOOD_SET];
-const EXPECTED = { "PSN Achievement Set": 35, "Online trophies": 5, "Bad Blood": 10 } as Record<string, number>;
+const EXPECTED = { "PSN Trophy List": 35, "Online trophies": 5, "Bad Blood": 10 } as Record<string, number>;
 // The whole PS4 list: 1 Platinum, 2 Gold, 19 Silver, 28 Bronze.
 const EXPECTED_TIERS: Record<AchievementTier, number> = { PLATINUM: 1, GOLD: 2, SILVER: 19, BRONZE: 28 };
 

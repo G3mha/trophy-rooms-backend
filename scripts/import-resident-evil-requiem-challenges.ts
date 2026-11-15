@@ -44,7 +44,7 @@ const prisma = new PrismaClient();
 
 const FAMILY_TITLE = "Resident Evil Requiem";
 const SET_TITLE = "In-Game Challenges";
-const TROPHY_SET_TITLE = "PSN Achievement Set";
+const TROPHY_SET_TITLE = "PSN Trophy List";
 
 const POINTS_BY_TIER: Record<AchievementTier, number> = {
   [AchievementTier.BRONZE]: 15,
