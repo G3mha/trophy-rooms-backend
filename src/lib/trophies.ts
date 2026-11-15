@@ -75,6 +75,45 @@ export function pickTrophyGames<T extends TrophyGameCandidate>(
   return earliest ? [earliest] : [];
 }
 
+/**
+ * Award a user the family's trophy once every trophy-eligible achievement in
+ * it is complete. Achievements belong to the GameFamily but trophies belong to
+ * a Game, so pickTrophyGames decides which editions carry it. Safe to call
+ * again: existing trophies are skipped.
+ */
+export async function awardTrophyIfComplete(
+  prisma: PrismaClient,
+  userId: string,
+  gameFamilyId: string
+): Promise<void> {
+  const eligible = { achievementSet: { gameFamilyId, ...trophyEligibleSetWhere } };
+  const totalAchievements = await prisma.achievement.count({ where: eligible });
+  if (totalAchievements === 0) return;
+
+  const completedCount = await prisma.userAchievement.count({
+    where: { userId, achievement: eligible },
+  });
+  if (completedCount < totalAchievements) return;
+
+  const gamesInFamily = await prisma.game.findMany({
+    where: { gameFamilyId },
+    select: {
+      id: true,
+      releaseDate: true,
+      createdAt: true,
+      userGames: { where: { userId }, select: { id: true } },
+    },
+  });
+  const libraryGameIds = new Set(
+    gamesInFamily.filter((game) => game.userGames.length > 0).map((game) => game.id)
+  );
+
+  await prisma.trophy.createMany({
+    data: pickTrophyGames(gamesInFamily, libraryGameIds).map((game) => ({ userId, gameId: game.id })),
+    skipDuplicates: true,
+  });
+}
+
 // Earliest release first, undated games last; createdAt and id keep the pick
 // stable between the mutation and the cleanup script
 function compareByRelease(a: TrophyGameCandidate, b: TrophyGameCandidate): number {
