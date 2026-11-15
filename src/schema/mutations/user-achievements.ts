@@ -1,3 +1,4 @@
+import { AchievementTier } from "@prisma/client";
 import { builder } from "../builder.js";
 import { ErrorCode } from "../../lib/errors.js";
 import { requireAuth } from "../../context.js";
@@ -6,7 +7,7 @@ import {
   MarkAllAchievementsResult,
   DeleteResult,
 } from "../types/user-achievement.js";
-import { awardTrophyIfComplete, trophyEligibleSetWhere } from "../../lib/trophies.js";
+import { awardTrophyIfComplete, notPlatinum, trophyEligibleSetWhere } from "../../lib/trophies.js";
 import { visibleSetWhere } from "../../lib/achievement-visibility.js";
 
 // Mark achievement as complete
@@ -238,6 +239,7 @@ builder.mutationField("unmarkAchievementComplete", (t) =>
         const gameFamilyId = achievementWithSet.achievementSet.gameFamilyId;
         const totalAchievements = await ctx.prisma.achievement.count({
           where: {
+            ...notPlatinum,
             achievementSet: {
               gameFamilyId,
               ...trophyEligibleSetWhere,
@@ -250,6 +252,7 @@ builder.mutationField("unmarkAchievementComplete", (t) =>
             where: {
               userId: user.id,
               achievement: {
+                ...notPlatinum,
                 achievementSet: {
                   gameFamilyId,
                   ...trophyEligibleSetWhere,
@@ -269,6 +272,17 @@ builder.mutationField("unmarkAchievementComplete", (t) =>
               where: {
                 userId: user.id,
                 gameId: { in: gamesInFamily.map((g) => g.id) },
+              },
+            });
+
+            // The Platinum is the trophy, so it goes with it
+            await ctx.prisma.userAchievement.deleteMany({
+              where: {
+                userId: user.id,
+                achievement: {
+                  tier: AchievementTier.PLATINUM,
+                  achievementSet: { gameFamilyId, ...trophyEligibleSetWhere },
+                },
               },
             });
           }
