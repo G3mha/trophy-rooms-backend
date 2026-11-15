@@ -1,6 +1,7 @@
 import {
   AchievementSetType,
   AchievementSetVisibility,
+  AchievementTier,
   Prisma,
   type PrismaClient,
 } from "@prisma/client";
@@ -39,6 +40,22 @@ export const trophyEligibleSetWhere = {
     { type: AchievementSetType.CUSTOM, visibility: AchievementSetVisibility.PUBLIC },
   ],
 } satisfies Prisma.AchievementSetWhereInput;
+
+/**
+ * The achievements a player ticks towards a trophy leave out the Platinum.
+ *
+ * A list's Platinum-tier achievement is the trophy itself, under the game's
+ * own name ("Jump Up, Super Star!"). It stands for finishing everything else,
+ * so it is derived: awardTrophyIfComplete completes it for the player, and
+ * neither progress nor the trophy rule counts it. Counting it would make the
+ * trophy require a tick that means "you have the trophy".
+ *
+ * Spread this into every Achievement filter that feeds progress or awarding,
+ * next to trophyEligibleSetWhere on the set.
+ */
+export const notPlatinum = {
+  tier: { not: AchievementTier.PLATINUM },
+} satisfies Prisma.AchievementWhereInput;
 
 /**
  * How to list a game's sets: the ones that count towards its trophy first, so
@@ -86,7 +103,8 @@ export async function awardTrophyIfComplete(
   userId: string,
   gameFamilyId: string
 ): Promise<void> {
-  const eligible = { achievementSet: { gameFamilyId, ...trophyEligibleSetWhere } };
+  const eligibleSet = { gameFamilyId, ...trophyEligibleSetWhere };
+  const eligible = { ...notPlatinum, achievementSet: eligibleSet };
   const totalAchievements = await prisma.achievement.count({ where: eligible });
   if (totalAchievements === 0) return;
 
@@ -112,6 +130,18 @@ export async function awardTrophyIfComplete(
     data: pickTrophyGames(gamesInFamily, libraryGameIds).map((game) => ({ userId, gameId: game.id })),
     skipDuplicates: true,
   });
+
+  // The Platinum is the trophy, so it is completed along with it
+  const platinum = await prisma.achievement.findMany({
+    where: { tier: AchievementTier.PLATINUM, achievementSet: eligibleSet },
+    select: { id: true },
+  });
+  if (platinum.length > 0) {
+    await prisma.userAchievement.createMany({
+      data: platinum.map((achievement) => ({ userId, achievementId: achievement.id })),
+      skipDuplicates: true,
+    });
+  }
 }
 
 // Earliest release first, undated games last; createdAt and id keep the pick
