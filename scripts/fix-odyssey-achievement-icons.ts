@@ -7,7 +7,7 @@
  * Cloudflare R2 bucket behind assets.trophyrooms.org. File names carry a
  * content hash, so a re-cropped icon gets a new URL instead of a stale cache.
  *
- * 30 icons show the scene their achievement is about. The other 16 have no
+ * 35 icons show what their achievement is about. The other 11 have no
  * matching official art, so each gets its own tile of the key art (art12 on
  * IGDB), picked so no two repeat and none shows another achievement's subject.
  *
@@ -50,8 +50,6 @@ const ICONS: Record<string, string> = {
   "Counter Maxed": "counter-maxed-356351f1.webp",
   "New Threads": "new-threads-a42736c3.webp",
   "Fashion Icon": "fashion-icon-2d2d6595.webp",
-  "Souvenir Shopper": "souvenir-shopper-1d1f47c7.webp",
-  "Fully Furnished": "fully-furnished-3e251079.webp",
   "Peach Hunter": "peach-hunter-7eb9a841.webp",
   "Shiveria Swept": "shiveria-swept-85782480.webp",
   "Crumbleden Swept": "crumbleden-swept-f050ff55.webp",
@@ -59,22 +57,24 @@ const ICONS: Record<string, string> = {
   "Volleyball Veteran": "volleyball-veteran-e40ea5a7.webp",
   "Jump-Rope Genius": "jump-rope-genius-89f16b3c.webp",
   "Koopa Freerunner": "koopa-freerunner-e5a83e7d.webp",
+  "Rabbit Ridge Swept": "rabbit-ridge-swept-25a4124e.webp",
+  "Arrival at Rabbit Ridge": "arrival-at-rabbit-ridge-91bcfcb2.webp",
+  "Souvenir Shopper": "souvenir-shopper-4984e4d0.webp",
+  "Fully Furnished": "fully-furnished-6cb4104f.webp",
+  "Dark Invitation": "dark-invitation-09f8209c.webp",
+  "Half a Sky": "half-a-sky-9f653ea1.webp",
+  "Peach's Castle Swept": "peachs-castle-swept-f0beef0f.webp",
   // Key art tiles for achievements with no matching official art
   "Lake Lamode Swept": "lake-lamode-swept-ba74e415.webp",
   "Forgotten Isle Swept": "forgotten-isle-swept-0aac382c.webp",
   "Nimbus Arena Swept": "nimbus-arena-swept-d3c19248.webp",
-  "Peach's Castle Swept": "peachs-castle-swept-2345f1d2.webp",
-  "Rabbit Ridge Swept": "rabbit-ridge-swept-134061f9.webp",
   "Purple Patch": "purple-patch-9e945f62.webp",
   "Purple Pockets": "purple-pockets-3d0e30e4.webp",
   "Purple Reign": "purple-reign-77b0b314.webp",
   "All One Thousand": "all-one-thousand-68a526d6.webp",
   "Riding High": "riding-high-61f3b508.webp",
   "Rock Breaker": "rock-breaker-fb1810da.webp",
-  "Dark Invitation": "dark-invitation-4c9a5cf2.webp",
-  "Half a Sky": "half-a-sky-8aafbeb6.webp",
   "Royal Invitation": "royal-invitation-346df001.webp",
-  "Arrival at Rabbit Ridge": "arrival-at-rabbit-ridge-7d745199.webp",
   "Long Journey's End": "long-journeys-end-be02df3f.webp",
 };
 
