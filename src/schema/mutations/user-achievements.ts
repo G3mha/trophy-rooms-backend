@@ -28,7 +28,7 @@ builder.mutationField("markAchievementComplete", (t) =>
           userAchievementId: null,
           error: {
             code: ErrorCode.UNAUTHORIZED,
-            message: "You must be logged in to mark achievements",
+            message: "You must be logged in to mark trophies",
             field: null,
           },
         };
@@ -48,7 +48,7 @@ builder.mutationField("markAchievementComplete", (t) =>
           userAchievementId: null,
           error: {
             code: ErrorCode.NOT_FOUND,
-            message: `Achievement with id "${achievementId}" not found`,
+            message: `Trophy with id "${achievementId}" not found`,
             field: "achievementId",
           },
         };
@@ -70,7 +70,7 @@ builder.mutationField("markAchievementComplete", (t) =>
           userAchievementId: null,
           error: {
             code: ErrorCode.ALREADY_EXISTS,
-            message: "You have already completed this achievement",
+            message: "You have already completed this trophy",
             field: null,
           },
         };
@@ -128,7 +128,7 @@ builder.mutationField("markAllAchievementsComplete", (t) =>
           markedCount: 0,
           error: {
             code: ErrorCode.UNAUTHORIZED,
-            message: "You must be logged in to mark achievements",
+            message: "You must be logged in to mark trophies",
             field: null,
           },
         };
@@ -146,7 +146,7 @@ builder.mutationField("markAllAchievementsComplete", (t) =>
           markedCount: 0,
           error: {
             code: ErrorCode.NOT_FOUND,
-            message: "This game has no achievements to complete",
+            message: "This game has no trophies to complete",
             field: "gameFamilyId",
           },
         };
@@ -189,7 +189,7 @@ builder.mutationField("unmarkAchievementComplete", (t) =>
           success: false,
           error: {
             code: ErrorCode.UNAUTHORIZED,
-            message: "You must be logged in to manage achievements",
+            message: "You must be logged in to manage trophies",
             field: null,
           },
         };
@@ -212,7 +212,7 @@ builder.mutationField("unmarkAchievementComplete", (t) =>
           success: false,
           error: {
             code: ErrorCode.NOT_FOUND,
-            message: "You have not completed this achievement",
+            message: "You have not completed this trophy",
             field: null,
           },
         };
