@@ -551,6 +551,53 @@ async function verify() {
   // Leave the family as the later checks expect to find it
   await prisma.user.delete({ where: { id: hank.id } });
 
+  console.log("The Platinum is the trophy: derived, never counted");
+
+  const platinum = await prisma.achievement.create({
+    data: { title: "Verify Platinum", tier: "PLATINUM", achievementSetId: official.id },
+  });
+  const ivy = await makeUser("ivy");
+  const hasPlatinum = async (user: User) =>
+    (await prisma.userAchievement.count({ where: { userId: user.id, achievementId: platinum.id } })) === 1;
+
+  check(
+    "it does not raise the public total",
+    (await familyTotals(family.id))?.totalAchievementCount,
+    eligible.length
+  );
+  for (const achievement of eligible.slice(0, -1)) await mark(ivy, achievement.id);
+  check("one short of the list, there is no trophy", await trophyGameIds(ivy), []);
+  check("and no Platinum", await hasPlatinum(ivy), false);
+
+  const [lastEligible] = eligible.slice(-1) as [(typeof eligible)[number]];
+  await mark(ivy, lastEligible.id);
+  check("the last tick awards the trophy without ticking the Platinum", await trophyGameIds(ivy), [gameOld.id]);
+  check("and completes the Platinum for her", await hasPlatinum(ivy), true);
+  const ivyProgress = await myProgress(ivy, family.id);
+  check("her progress counts the list, not the Platinum", [ivyProgress?.earnedCount, ivyProgress?.totalCount], [
+    eligible.length,
+    eligible.length,
+  ]);
+  check("at 100%", ivyProgress?.percentComplete, 1);
+  check(
+    "the Platinum is not a feed entry",
+    (
+      await run<{ activityFeed: { achievementId: string | null }[] }>(
+        null,
+        `{ activityFeed(limit: 100) { achievementId } }`
+      )
+    ).activityFeed.some((entry) => entry.achievementId === platinum.id),
+    false
+  );
+
+  await unmark(ivy, lastEligible.id);
+  check("unticking one removes the trophy", await trophyGameIds(ivy), []);
+  check("and the Platinum with it", await hasPlatinum(ivy), false);
+
+  // Leave the family as the later checks expect to find it
+  await prisma.user.delete({ where: { id: ivy.id } });
+  await prisma.achievement.delete({ where: { id: platinum.id } });
+
   console.log("fix-duplicate-trophies.ts");
 
   // Rows the old mutation left behind: one trophy per game in the family
