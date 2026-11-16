@@ -53,6 +53,19 @@ builder.mutationField("markAchievementComplete", (t) =>
         };
       }
 
+      // The Platinum is awarded by finishing the list, never ticked by hand
+      if (achievement.tier === AchievementTier.PLATINUM) {
+        return {
+          success: false,
+          userAchievementId: null,
+          error: {
+            code: ErrorCode.VALIDATION_ERROR,
+            message: "Finish every trophy in the list to earn the Platinum",
+            field: "achievementId",
+          },
+        };
+      }
+
       // Check if already completed
       const existing = await ctx.prisma.userAchievement.findUnique({
         where: {
