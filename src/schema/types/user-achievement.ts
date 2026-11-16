@@ -41,26 +41,6 @@ UserAchievementMutationResult.implement({
   }),
 });
 
-// Result of marking a whole game's list complete
-export const MarkAllAchievementsResult = builder.objectRef<{
-  success: boolean;
-  markedCount: number;
-  error: { code: ErrorCode; message: string; field: string | null } | null;
-}>("MarkAllAchievementsResult");
-
-MarkAllAchievementsResult.implement({
-  fields: (t) => ({
-    success: t.exposeBoolean("success"),
-    // Achievements newly completed by this call, not ones already ticked
-    markedCount: t.exposeInt("markedCount"),
-    error: t.field({
-      type: MutationErrorRef,
-      nullable: true,
-      resolve: (result) => result.error,
-    }),
-  }),
-});
-
 // Generic delete result
 export const DeleteResult = builder.objectRef<{
   success: boolean;

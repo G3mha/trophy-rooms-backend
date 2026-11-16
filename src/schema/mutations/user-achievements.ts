@@ -4,7 +4,6 @@ import { ErrorCode } from "../../lib/errors.js";
 import { requireAuth } from "../../context.js";
 import {
   UserAchievementMutationResult,
-  MarkAllAchievementsResult,
   DeleteResult,
 } from "../types/user-achievement.js";
 import { awardTrophyIfComplete, notPlatinum, trophyEligibleSetWhere } from "../../lib/trophies.js";
@@ -104,70 +103,6 @@ builder.mutationField("markAchievementComplete", (t) =>
         userAchievementId: userAchievement.id,
         error: null,
       };
-    },
-  })
-);
-
-// Mark every trophy-eligible achievement in a game family complete in one go,
-// for a player who already finished the game elsewhere. Completions are
-// self-reported one at a time anyway, so this claims nothing a patient user
-// couldn't. Sets that don't gate the trophy are left alone.
-builder.mutationField("markAllAchievementsComplete", (t) =>
-  t.field({
-    type: MarkAllAchievementsResult,
-    args: {
-      gameFamilyId: t.arg.id({ required: true }),
-    },
-    resolve: async (_root, args, ctx) => {
-      let user;
-      try {
-        user = requireAuth(ctx);
-      } catch {
-        return {
-          success: false,
-          markedCount: 0,
-          error: {
-            code: ErrorCode.UNAUTHORIZED,
-            message: "You must be logged in to mark trophies",
-            field: null,
-          },
-        };
-      }
-
-      const gameFamilyId = String(args.gameFamilyId);
-      const achievements = await ctx.prisma.achievement.findMany({
-        where: { achievementSet: { gameFamilyId, ...trophyEligibleSetWhere } },
-        select: { id: true },
-      });
-
-      if (achievements.length === 0) {
-        return {
-          success: false,
-          markedCount: 0,
-          error: {
-            code: ErrorCode.NOT_FOUND,
-            message: "This game has no trophies to complete",
-            field: "gameFamilyId",
-          },
-        };
-      }
-
-      // Ones the user already ticked keep their original completion date. The
-      // new rows share one createdAt on purpose: that shared instant is how the
-      // activity feed recognises a mark-all (queries/activity.ts).
-      const markedAt = new Date();
-      const { count } = await ctx.prisma.userAchievement.createMany({
-        data: achievements.map((achievement) => ({
-          userId: user.id,
-          achievementId: achievement.id,
-          createdAt: markedAt,
-        })),
-        skipDuplicates: true,
-      });
-
-      await awardTrophyIfComplete(ctx.prisma, user.id, gameFamilyId);
-
-      return { success: true, markedCount: count, error: null };
     },
   })
 );
