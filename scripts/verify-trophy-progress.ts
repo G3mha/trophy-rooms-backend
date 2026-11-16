@@ -465,70 +465,31 @@ async function verify() {
   await unmark(alice, restatingFirst.id);
   await prisma.achievementSet.delete({ where: { id: restating.id } });
 
-  console.log("markAllAchievementsComplete: one call finishes the trophy list");
+  console.log("Bulk-written completions stay out of the activity feed");
 
-  type MarkAll = {
-    markAllAchievementsComplete: {
-      success: boolean;
-      markedCount: number;
-      error: { code: string } | null;
-    };
-  };
-  const markAll = (user: User | null, gameFamilyId: string) =>
-    run<MarkAll>(
-      user,
-      `mutation ($id: ID!) { markAllAchievementsComplete(gameFamilyId: $id) { success markedCount error { code } } }`,
-      { id: gameFamilyId }
-    ).then((data) => data.markAllAchievementsComplete);
-
+  // Imports write many completions at one instant; a player's own ticks never share one
   const hank = await makeUser("hank");
   await mark(hank, firstOfficial.id);
-  const tickedBefore = await prisma.userAchievement.findUniqueOrThrow({
-    where: { userId_achievementId: { userId: hank.id, achievementId: firstOfficial.id } },
+  const bulkAt = new Date();
+  await prisma.userAchievement.createMany({
+    data: eligible
+      .filter((achievement) => achievement.id !== firstOfficial.id)
+      .map((achievement) => ({ userId: hank.id, achievementId: achievement.id, createdAt: bulkAt })),
   });
-
-  check("signed out, it is refused", (await markAll(null, family.id)).error?.code, "UNAUTHORIZED");
-  check("a family with no achievements is not found", (await markAll(hank, otherFamily.id)).error?.code, "NOT_FOUND");
-  check("nothing was marked by the refused calls", await prisma.userAchievement.count({ where: { userId: hank.id } }), 1);
-
-  check("it marks only what was missing", await markAll(hank, family.id), {
-    success: true,
-    markedCount: eligible.length - 1,
-    error: null,
-  });
-  check(
-    "every trophy-eligible achievement is complete, and nothing in a private set",
-    (await prisma.userAchievement.findMany({ where: { userId: hank.id }, select: { achievementId: true } }))
-      .map((row) => row.achievementId)
-      .sort(),
-    eligible.map((achievement) => achievement.id).sort()
-  );
-  check(
-    "an achievement ticked earlier keeps its date",
-    (
-      await prisma.userAchievement.findUniqueOrThrow({
-        where: { userId_achievementId: { userId: hank.id, achievementId: firstOfficial.id } },
-      })
-    ).createdAt.getTime(),
-    tickedBefore.createdAt.getTime()
-  );
-  check("the trophy lands on the earliest release, as hank has no library", await trophyGameIds(hank), [gameOld.id]);
-  type Feed = {
+  const feed = await run<{
     activityFeed: { type: string; userId: string; achievementId: string | null }[];
     recentAchievementActivity: { userId: string; achievementId: string }[];
-  };
-  const feed = await run<Feed>(
+  }>(
     null,
     `{ activityFeed(limit: 100) { type userId achievementId }
        recentAchievementActivity(limit: 50) { userId achievementId } }`
   );
   check(
-    "the feed shows hank's own tick and the trophy, not the rows mark-all wrote",
+    "the feed shows hank's own tick, not the bulk rows",
     feed.activityFeed
-      .filter((entry) => entry.userId === hank.id)
-      .map((entry) => (entry.type === "trophy" ? "trophy" : entry.achievementId))
-      .sort(),
-    ["trophy", firstOfficial.id].sort()
+      .filter((entry) => entry.userId === hank.id && entry.type === "achievement")
+      .map((entry) => entry.achievementId),
+    [firstOfficial.id]
   );
   check(
     "the achievement feed shows only hank's own tick",
@@ -540,15 +501,6 @@ async function verify() {
     feed.activityFeed.some((entry) => entry.type === "achievement" && entry.userId !== hank.id),
     true
   );
-
-  check("a second call marks nothing and still succeeds", await markAll(hank, family.id), {
-    success: true,
-    markedCount: 0,
-    error: null,
-  });
-  check("and leaves one trophy", await trophyGameIds(hank), [gameOld.id]);
-
-  // Leave the family as the later checks expect to find it
   await prisma.user.delete({ where: { id: hank.id } });
 
   console.log("The Platinum is the trophy: derived, never counted");
