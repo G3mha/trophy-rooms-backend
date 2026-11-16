@@ -517,6 +517,17 @@ async function verify() {
     (await familyTotals(family.id))?.totalAchievementCount,
     eligible.length
   );
+  check(
+    "it cannot be ticked by hand",
+    (
+      await run<{ markAchievementComplete: { success: boolean } }>(
+        ivy,
+        `mutation ($id: ID!) { markAchievementComplete(achievementId: $id) { success } }`,
+        { id: platinum.id }
+      )
+    ).markAchievementComplete.success,
+    false
+  );
   for (const achievement of eligible.slice(0, -1)) await mark(ivy, achievement.id);
   check("one short of the list, there is no trophy", await trophyGameIds(ivy), []);
   check("and no Platinum", await hasPlatinum(ivy), false);
