@@ -536,6 +536,16 @@ async function verify() {
   await mark(ivy, lastEligible.id);
   check("the last tick awards the trophy without ticking the Platinum", await trophyGameIds(ivy), [gameOld.id]);
   check("and completes the Platinum for her", await hasPlatinum(ivy), true);
+  const unticked = await run<{ unmarkAchievementComplete: { success: boolean } }>(
+    ivy,
+    `mutation ($id: ID!) { unmarkAchievementComplete(achievementId: $id) { success } }`,
+    { id: platinum.id }
+  );
+  check(
+    "it cannot be unticked by hand, so she keeps it",
+    [unticked.unmarkAchievementComplete.success, await hasPlatinum(ivy)],
+    [false, true]
+  );
   const ivyProgress = await myProgress(ivy, family.id);
   check("her progress counts the list, not the Platinum", [ivyProgress?.earnedCount, ivyProgress?.totalCount], [
     eligible.length,
