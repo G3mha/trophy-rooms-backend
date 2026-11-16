@@ -219,6 +219,7 @@ builder.queryField("adminGames", (t) =>
       const skip = (page - 1) * pageSize;
 
       const where: Prisma.GameWhereInput = {};
+      let pageIds: string[] | undefined;
 
       // Use full-text search for better performance and relevance
       if (args.search) {
@@ -233,14 +234,16 @@ builder.queryField("adminGames", (t) =>
           };
         }
         where.id = { in: matchingIds };
+        // matchingIds is ranked by relevance, and "id IN" loses that order
+        pageIds = matchingIds.slice(skip, skip + pageSize);
       }
 
       const [games, totalCount] = await Promise.all([
         ctx.prisma.game.findMany({
-          where,
-          skip,
-          take: pageSize,
-          orderBy: args.search ? undefined : { gameFamily: { title: "asc" } },
+          where: pageIds ? { id: { in: pageIds } } : where,
+          skip: pageIds ? undefined : skip,
+          take: pageIds ? undefined : pageSize,
+          orderBy: pageIds ? undefined : { gameFamily: { title: "asc" } },
           include: {
             platform: true,
             gameFamily: {
@@ -257,6 +260,11 @@ builder.queryField("adminGames", (t) =>
         }),
         ctx.prisma.game.count({ where }),
       ]);
+
+      if (pageIds) {
+        const rank = new Map(pageIds.map((id, index) => [id, index]));
+        games.sort((a, b) => rank.get(a.id)! - rank.get(b.id)!);
+      }
 
       const totalPages = Math.ceil(totalCount / pageSize);
 
