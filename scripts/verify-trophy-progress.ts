@@ -1,9 +1,10 @@
 /**
  * Check trophy awarding, completion rate, game progress and the duplicate
- * trophy cleanup end to end, through the real GraphQL schema.
+ * trophy and stuck Platinum cleanups end to end, through the real GraphQL
+ * schema.
  *
- * It writes fixtures and runs fix-duplicate-trophies.ts --apply, so it only
- * runs against an empty database on localhost. Set up a disposable one:
+ * It writes fixtures and runs fix-stuck-platinums.ts and
+ * fix-duplicate-trophies.ts with --apply, so it only runs against an empty database on localhost. Set up a disposable one:
  *
  *   initdb -D /tmp/trophy-verify -U postgres --auth=trust
  *   pg_ctl -D /tmp/trophy-verify -o "-p 5499" -w start
@@ -150,15 +151,18 @@ async function familyTotals(familyId: string) {
   return data.gameFamily;
 }
 
-function runCleanup(...args: string[]) {
-  const script = fileURLToPath(new URL("./fix-duplicate-trophies.ts", import.meta.url));
+function runScript(name: string, ...args: string[]) {
+  const script = fileURLToPath(new URL(`./${name}.ts`, import.meta.url));
   const result = spawnSync("npx", ["tsx", script, ...args], {
     env: process.env,
     encoding: "utf8",
   });
-  assert.equal(result.status, 0, `fix-duplicate-trophies failed:\n${result.stderr}`);
+  assert.equal(result.status, 0, `${name} failed:\n${result.stderr}`);
   return result.stdout;
 }
+
+const runCleanup = (...args: string[]) => runScript("fix-duplicate-trophies", ...args);
+const runStuckCleanup = (...args: string[]) => runScript("fix-stuck-platinums", ...args);
 
 async function main() {
   if ((await prisma.user.count()) > 0) {
@@ -570,6 +574,86 @@ async function verify() {
   // Leave the family as the later checks expect to find it
   await prisma.user.delete({ where: { id: ivy.id } });
   await prisma.achievement.delete({ where: { id: platinum.id } });
+
+  console.log("fix-stuck-platinums.ts");
+
+  // A second list that counts, with its own Platinum, next to a Platinum on
+  // the official list
+  const officialPlatinum = await prisma.achievement.create({
+    data: { title: "Verify Platinum", tier: "PLATINUM", achievementSetId: official.id },
+  });
+  const second = await prisma.achievementSet.create({
+    data: {
+      title: "Second list",
+      type: AchievementSetType.OFFICIAL,
+      visibility: AchievementSetVisibility.PUBLIC,
+      gameFamilyId: family.id,
+      achievements: {
+        create: [{ title: "Second list 1" }, { title: "Second list Platinum", tier: "PLATINUM" }],
+      },
+    },
+    include: { achievements: { orderBy: { title: "asc" } } },
+  });
+  const [secondRegular, secondPlatinum] = second.achievements as [
+    (typeof second.achievements)[number],
+    (typeof second.achievements)[number],
+  ];
+  const jack = await makeUser("jack");
+  const kate = await makeUser("kate");
+  const holds = async (user: User, achievementId: string) =>
+    (await prisma.userAchievement.count({ where: { userId: user.id, achievementId } })) === 1;
+
+  for (const user of [jack, kate]) {
+    for (const achievement of [...eligible, secondRegular]) await mark(user, achievement.id);
+  }
+  check(
+    "finishing both lists gives jack both Platinums",
+    [await holds(jack, officialPlatinum.id), await holds(jack, secondPlatinum.id)],
+    [true, true]
+  );
+
+  // The list stops counting, then jack unticks a trophy in a list that does
+  await prisma.achievementSet.update({ where: { id: second.id }, data: { countsTowardTrophy: false } });
+  await unmark(jack, firstOfficial.id);
+  check(
+    "unticking takes jack's trophy and counting Platinum, but not the one in the list that stopped counting",
+    [await trophyGameIds(jack), await holds(jack, officialPlatinum.id), await holds(jack, secondPlatinum.id)],
+    [[], false, true]
+  );
+
+  const trophiesBeforeStuck = await prisma.trophy.count();
+  const secondPlatinumRows = () =>
+    prisma.userAchievement.count({ where: { achievementId: secondPlatinum.id } });
+  check(
+    "dry run plans jack's and kate's Platinums in that list",
+    runStuckCleanup().includes("Rows to delete: 2"),
+    true
+  );
+  check("dry run deletes nothing", await secondPlatinumRows(), 2);
+
+  runStuckCleanup("--apply");
+  check("apply removes the Platinums in the list that stopped counting", await secondPlatinumRows(), 0);
+  check(
+    "regular ticks in that list stay",
+    await prisma.userAchievement.count({ where: { achievementId: secondRegular.id } }),
+    2
+  );
+  check(
+    "kate keeps her trophy and her Platinum in the list that counts",
+    [await trophyGameIds(kate), await holds(kate, officialPlatinum.id)],
+    [[gameOld.id], true]
+  );
+  check("no Trophy row is deleted", await prisma.trophy.count(), trophiesBeforeStuck);
+  check(
+    "a second run finds nothing to delete",
+    runStuckCleanup("--apply").includes("Rows to delete: 0"),
+    true
+  );
+
+  // Leave the family as the later checks expect to find it
+  await prisma.user.deleteMany({ where: { id: { in: [jack.id, kate.id] } } });
+  await prisma.achievementSet.delete({ where: { id: second.id } });
+  await prisma.achievement.delete({ where: { id: officialPlatinum.id } });
 
   console.log("fix-duplicate-trophies.ts");
 
