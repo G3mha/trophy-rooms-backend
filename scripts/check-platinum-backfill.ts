@@ -10,11 +10,13 @@
  *   a. counting lists with no Platinum or more than one
  *   b. finished players missing the Trophy row or a Platinum
  *   c. players holding a Trophy row or a Platinum without being finished
+ *   d. Platinums held in lists that don't count (private custom lists,
+ *      countsTowardTrophy cleared). The app can't remove these, so
+ *      fix-stuck-platinums.ts does.
  *
  * Left out of (c) on purpose, because the code never touches them: trophies
  * on games with nothing to tick in a counting list (awardTrophyIfComplete and
- * unmarkAchievementComplete both stop at zero), and Platinums in lists that
- * don't count (private custom lists, countsTowardTrophy cleared).
+ * unmarkAchievementComplete both stop at zero).
  *
  *   npx tsx scripts/check-platinum-backfill.ts
  */
@@ -128,6 +130,25 @@ async function main() {
     }
   }
 
+  const stuckRows = await prisma.userAchievement.findMany({
+    where: {
+      achievement: {
+        tier: AchievementTier.PLATINUM,
+        achievementSet: { NOT: trophyEligibleSetWhere },
+      },
+    },
+    select: {
+      userId: true,
+      achievement: {
+        select: { achievementSet: { select: { title: true, gameFamily: { select: { title: true } } } } },
+      },
+    },
+    orderBy: [{ achievementId: "asc" }, { userId: "asc" }],
+  });
+  const stuck = stuckRows.map(({ userId, achievement: { achievementSet: set } }) =>
+    `${set.gameFamily?.title ?? "no game"} / ${set.title}: user ${userId} has the Platinum`
+  );
+
   const report = (label: string, rows: string[]) => {
     console.log(`\n${label}: ${rows.length}`);
     for (const row of rows) console.log(`  ${row}`);
@@ -136,6 +157,7 @@ async function main() {
   report("a. Lists without exactly one Platinum", badLists);
   report("b. Finished but missing the Trophy row or Platinum", missing);
   report("c. Trophy row or Platinum without being finished", unearned);
+  report("d. Platinums in lists that don't count (fix-stuck-platinums.ts)", stuck);
   console.log(`\nSkipped: ${trophiesWithoutList} trophies on games with nothing to tick in a counting list.`);
 }
 
