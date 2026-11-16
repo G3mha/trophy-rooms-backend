@@ -153,6 +153,7 @@ builder.mutationField("unmarkAchievementComplete", (t) =>
             achievementId,
           },
         },
+        include: { achievement: { select: { tier: true } } },
       });
 
       if (!existing) {
@@ -162,6 +163,18 @@ builder.mutationField("unmarkAchievementComplete", (t) =>
             code: ErrorCode.NOT_FOUND,
             message: "You have not completed this trophy",
             field: null,
+          },
+        };
+      }
+
+      // The Platinum only goes when a trophy in the list is unticked, below
+      if (existing.achievement.tier === AchievementTier.PLATINUM) {
+        return {
+          success: false,
+          error: {
+            code: ErrorCode.VALIDATION_ERROR,
+            message: "Untick a trophy in the list to give up the Platinum",
+            field: "achievementId",
           },
         };
       }
