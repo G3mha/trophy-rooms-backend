@@ -1,20 +1,22 @@
 /**
- * Replace the cup-shaped Platinum icons of Watch Dogs and Watch Dogs 2.
+ * Replace the Platinum icons that are a trophy cup.
  *
- * PSN's own Platinum icon for both games is a plain trophy cup drawn in the
- * game's icon style. These swap the cup for the series' fox emblem, drawn the
- * way each game draws its other trophies: white line work inside a wire ring
- * for Watch Dogs, a dot matrix inside the dotted ring for Watch Dogs 2. The
- * emblem is traced from the official "magnifier" trophy icon, and each
- * background is what the game's own icons share. Hosted on
- * assets.trophyrooms.org.
+ * PSN's own Platinum icon for these games is a cup. Each one is redrawn the
+ * way the game draws its other trophies, from official material, and hosted
+ * on assets.trophyrooms.org:
+ * - Watch Dogs: the series' fox emblem in white line work inside a wire ring.
+ * - Watch Dogs 2: the same emblem as a dot matrix inside the dotted ring.
+ *   The emblem is traced from the official "magnifier" trophy icon, and each
+ *   background is what the game's own icons share.
+ * - Resident Evil Requiem: the square key art (IGDB ar5xpo) in silver inside
+ *   the Platinum's own engraved rim, in place of the cherubs and their cup.
  *
  * An icon is only replaced while it is still the official cup, so a later
  * hand edit is never overwritten. The cup files stay in the bucket, so
  * putting FROM back restores them.
  *
- *   npx tsx scripts/fix-watch-dogs-platinum-icons.ts          # dry run
- *   npx tsx scripts/fix-watch-dogs-platinum-icons.ts --apply
+ *   npx tsx scripts/fix-cup-platinum-icons.ts          # dry run
+ *   npx tsx scripts/fix-cup-platinum-icons.ts --apply
  */
 
 import assert from "node:assert/strict";
@@ -36,6 +38,11 @@ const FIXES = [
     slug: "watch-dogs-2",
     from: "watch-dogs-2/graduation-day-19845696.webp",
     to: "watch-dogs-2/graduation-day-0ed66eb0.webp",
+  },
+  {
+    slug: "resident-evil-requiem",
+    from: "resident-evil-requiem/requiem-649dc44c.webp",
+    to: "resident-evil-requiem/requiem-9931d450.webp",
   },
 ];
 
