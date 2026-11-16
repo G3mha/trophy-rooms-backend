@@ -5,13 +5,12 @@ import type { Prisma, PrismaClient } from "@prisma/client";
 import { notPlatinum } from "../../lib/trophies.js";
 
 /**
- * Leaves "Mark all complete" out of the achievement feed.
+ * Leaves bulk-written completions out of the achievement feed.
  *
- * markAllAchievementsComplete writes one completion per achievement, all with
- * the same createdAt, so a single tap on a 135-achievement game would fill the
- * whole feed with one player. The trophy it awards is that moment's entry, so
- * the completions themselves are dropped. A player's own ticks never share a
- * timestamp, which is what tells the two apart without a schema change.
+ * Imports write many completions with the same createdAt, so one import of a
+ * 135-achievement game would fill the whole feed with one player. A player's
+ * own ticks never share a timestamp, which is what tells the two apart without
+ * a schema change.
  *
  * The Platinum is left out of the feed for the same reason (notPlatinum): it
  * is completed together with the trophy, which already has its own entry.
