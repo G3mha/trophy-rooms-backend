@@ -75,17 +75,12 @@ builder.queryField("myCollection", (t) =>
         where.hasManual = true;
       }
 
-      // Merge query includes with our explicit includes to ensure eager loading
+      // Pass the Pothos query through untouched: overriding its include with
+      // `game: true` drops the gameFamily select that Game.title/coverUrl need.
       return ctx.prisma.collectionItem.findMany({
         ...query,
         where,
         orderBy: { createdAt: "desc" },
-        include: {
-          ...query.include,
-          game: true,
-          platform: true,
-          gameVersion: true,
-        },
       });
     },
   })
