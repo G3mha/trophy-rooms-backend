@@ -90,7 +90,8 @@ export function toTsQuery(search: string): string {
 async function searchGamesFullTextUncached(
   prisma: PrismaClient,
   search: string,
-  limit: number
+  limit: number,
+  minSimilarity: number
 ): Promise<string[]> {
   const normalizedSearch = normalizeForSearch(search);
 
@@ -99,7 +100,7 @@ async function searchGamesFullTextUncached(
     SELECT g.id
     FROM "Game" g
     JOIN "GameFamily" gf ON g."gameFamilyId" = gf.id
-    WHERE similarity(gf.title, ${search}) > 0.1
+    WHERE similarity(gf.title, ${search}) > ${minSimilarity}
        OR LOWER(gf.title) LIKE ${"%" + search.toLowerCase() + "%"}
        OR gf."searchTitle" LIKE ${"%" + normalizedSearch + "%"}
     ORDER BY
@@ -162,14 +163,16 @@ async function searchGamesFuzzyUncached(
 export async function searchGames(
   prisma: PrismaClient,
   search: string,
-  limit: number = 1000
+  limit: number = 1000,
+  // 0.1 forgives typos but matches over a thousand games on a two-word title
+  minSimilarity: number = 0.1
 ): Promise<string[]> {
-  const key = cacheKey(CachePrefix.GAME_SEARCH, { search: search.toLowerCase(), limit });
+  const key = cacheKey(CachePrefix.GAME_SEARCH, { search: search.toLowerCase(), limit, minSimilarity });
 
   return getCachedOrCompute(key, CacheTTL.SEARCH_RESULTS, async () => {
     let fullTextResults: string[] = [];
     try {
-      fullTextResults = await searchGamesFullTextUncached(prisma, search, limit);
+      fullTextResults = await searchGamesFullTextUncached(prisma, search, limit, minSimilarity);
     } catch (error) {
       if (!isMissingTrigramExtensionError(error)) {
         throw error;
