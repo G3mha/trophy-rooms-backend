@@ -1,5 +1,5 @@
 import { builder } from "../builder.js";
-import { POINTS_DEPRECATION, USER_EMAIL_DEPRECATION } from "../deprecations.js";
+import { USER_EMAIL_DEPRECATION } from "../deprecations.js";
 import { countFinishedGames, topUsersByFinishedGames } from "../../lib/trophies.js";
 
 // Leaderboard entry type
@@ -139,71 +139,6 @@ builder.queryField("leaderboardByAchievements", (t) =>
           userName: user?.name || null,
           value: r._count.id,
           secondaryValue: trophyMap.get(r.userId) || 0,
-        };
-      });
-    },
-  })
-);
-
-// Top users by total points
-builder.queryField("leaderboardByPoints", (t) =>
-  t.field({
-    type: [LeaderboardEntry],
-    deprecationReason: POINTS_DEPRECATION,
-    args: {
-      limit: t.arg.int({ required: false, defaultValue: 10 }),
-    },
-    resolve: async (_root, args, ctx) => {
-      const limit = Math.min(args.limit || 10, 100);
-
-      // Get all user achievements with points
-      const userAchievements = await ctx.prisma.userAchievement.findMany({
-        select: {
-          userId: true,
-          achievement: {
-            select: { points: true },
-          },
-        },
-      });
-
-      // Calculate total points per user
-      const pointsMap = new Map<string, number>();
-      for (const ua of userAchievements) {
-        const current = pointsMap.get(ua.userId) || 0;
-        pointsMap.set(ua.userId, current + ua.achievement.points);
-      }
-
-      // Sort and limit
-      const sortedUsers = Array.from(pointsMap.entries())
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, limit);
-
-      const userIds = sortedUsers.map(([userId]) => userId);
-      const users = await ctx.prisma.user.findMany({
-        where: { id: { in: userIds } },
-        select: { id: true, name: true },
-      });
-
-      const userMap = new Map(users.map((u) => [u.id, u]));
-
-      // Get achievement counts for secondary value
-      const achievementCounts = await ctx.prisma.userAchievement.groupBy({
-        by: ["userId"],
-        where: { userId: { in: userIds } },
-        _count: { id: true },
-      });
-      const achievementMap = new Map(
-        achievementCounts.map((a) => [a.userId, a._count.id])
-      );
-
-      return sortedUsers.map(([userId, points], index) => {
-        const user = userMap.get(userId);
-        return {
-          rank: index + 1,
-          userId,
-          userName: user?.name || null,
-          value: points,
-          secondaryValue: achievementMap.get(userId) || 0,
         };
       });
     },
