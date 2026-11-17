@@ -1,7 +1,11 @@
 import type { PrismaClient, User } from "@prisma/client";
 import { UserRole } from "@prisma/client";
 import { prisma } from "./lib/prisma.js";
-import { extractBearerToken, verifySupabaseToken } from "./lib/supabase.js";
+import {
+  extractBearerToken,
+  supabaseUserExists,
+  verifySupabaseToken,
+} from "./lib/supabase.js";
 import { logger } from "./lib/logger.js";
 
 export interface Context {
@@ -46,8 +50,11 @@ export async function createContext(request: Request): Promise<Context> {
         }
       }
 
-      if (!user) {
-        // Create user on first authentication
+      // Create user on first authentication. A token outlives its identity
+      // until it expires, so a request made right after deleteMyAccount must
+      // not recreate the row. Only a definite "gone" blocks creation, so first
+      // sign-ins still work if Supabase can't be reached.
+      if (!user && (await supabaseUserExists(identity.id)) !== false) {
         try {
           user = await prisma.user.create({
             data: {
