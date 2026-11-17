@@ -223,7 +223,8 @@ builder.queryField("adminGames", (t) =>
 
       // Use full-text search for better performance and relevance
       if (args.search) {
-        const matchingIds = await searchGames(ctx.prisma, args.search);
+        // Stricter than public search, so the total isn't a page of near misses
+        const matchingIds = await searchGames(ctx.prisma, args.search, 1000, 0.3);
         if (matchingIds.length === 0) {
           return {
             items: [],
