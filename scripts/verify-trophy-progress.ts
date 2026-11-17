@@ -114,14 +114,12 @@ type Progress = {
   gameFamilyId: string;
   earnedCount: number;
   totalCount: number;
-  earnedPoints: number;
-  totalPoints: number;
   percentComplete: number;
   hasTrophy: boolean;
 };
 
 const PROGRESS_FIELDS =
-  "gameFamilyId earnedCount totalCount earnedPoints totalPoints percentComplete hasTrophy";
+  "gameFamilyId earnedCount totalCount percentComplete hasTrophy";
 
 async function myProgress(user: User, familyId: string) {
   const data = await run<{ myGameProgress: Progress[] }>(
@@ -317,8 +315,6 @@ async function verify() {
     gameFamilyId: family.id,
     earnedCount: 3,
     totalCount: 3,
-    earnedPoints: 35,
-    totalPoints: 35,
     percentComplete: 1,
     hasTrophy: true,
   };
@@ -334,8 +330,6 @@ async function verify() {
     gameFamilyId: family.id,
     earnedCount: 1,
     totalCount: 3,
-    earnedPoints: 10,
-    totalPoints: 35,
     percentComplete: 1 / 3,
     hasTrophy: false,
   });

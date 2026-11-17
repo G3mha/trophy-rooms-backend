@@ -1,6 +1,5 @@
 import { builder } from "../builder.js";
 import { notPlatinum, trophyEligibleSetWhere } from "../../lib/trophies.js";
-import { POINTS_DEPRECATION } from "../deprecations.js";
 
 function computePercentComplete(earnedCount: number, totalCount: number): number {
   if (totalCount <= 0) return 0;
@@ -14,8 +13,6 @@ const UserGameProgress = builder.objectRef<{
   gameCoverUrl: string | null;
   earnedCount: number;
   totalCount: number;
-  earnedPoints: number;
-  totalPoints: number;
   percentComplete: number;
   hasTrophy: boolean;
   trophyEarnedAt: Date | null;
@@ -29,8 +26,6 @@ UserGameProgress.implement({
     gameCoverUrl: t.exposeString("gameCoverUrl", { nullable: true }),
     earnedCount: t.exposeInt("earnedCount"),
     totalCount: t.exposeInt("totalCount"),
-    earnedPoints: t.exposeInt("earnedPoints", { deprecationReason: POINTS_DEPRECATION }),
-    totalPoints: t.exposeInt("totalPoints", { deprecationReason: POINTS_DEPRECATION }),
     percentComplete: t.exposeFloat("percentComplete"),
     hasTrophy: t.exposeBoolean("hasTrophy"),
     trophyEarnedAt: t.expose("trophyEarnedAt", { type: "DateTime", nullable: true }),
@@ -103,7 +98,6 @@ builder.queryField("myGameProgress", (t) =>
           gameTitle: string;
           gameCoverUrl: string | null;
           earnedIds: Set<string>;
-          earnedPoints: number;
           lastActivityAt: Date;
         }
       >();
@@ -117,19 +111,17 @@ builder.queryField("myGameProgress", (t) =>
             gameTitle: gameFamily.title,
             gameCoverUrl: gameFamily.coverUrl,
             earnedIds: new Set(),
-            earnedPoints: 0,
             lastActivityAt: ua.createdAt,
           });
         }
         const familyData = gameFamilyMap.get(gameFamily.id)!;
         familyData.earnedIds.add(ua.achievement.id);
-        familyData.earnedPoints += ua.achievement.points;
         if (ua.createdAt > familyData.lastActivityAt) {
           familyData.lastActivityAt = ua.createdAt;
         }
       }
 
-      // Get total achievement counts and points for each game family
+      // Get total achievement counts for each game family
       const gameFamilyIds = Array.from(gameFamilyMap.keys());
       const gameFamilyTotals = await ctx.prisma.achievement.groupBy({
         by: ["achievementSetId"],
@@ -141,7 +133,6 @@ builder.queryField("myGameProgress", (t) =>
           },
         },
         _count: { id: true },
-        _sum: { points: true },
       });
 
       // Get achievement set to game family mapping
@@ -152,14 +143,13 @@ builder.queryField("myGameProgress", (t) =>
       const setToFamilyMap = new Map(achievementSets.map((s) => [s.id, s.gameFamilyId]));
 
       // Aggregate totals by game family
-      const familyTotalMap = new Map<string, { count: number; points: number }>();
+      const familyTotalMap = new Map<string, { count: number }>();
       for (const total of gameFamilyTotals) {
         const familyId = setToFamilyMap.get(total.achievementSetId);
         if (familyId) {
-          const existing = familyTotalMap.get(familyId) || { count: 0, points: 0 };
+          const existing = familyTotalMap.get(familyId) || { count: 0 };
           familyTotalMap.set(familyId, {
             count: existing.count + total._count.id,
-            points: existing.points + (total._sum.points || 0),
           });
         }
       }
@@ -171,8 +161,6 @@ builder.queryField("myGameProgress", (t) =>
         gameCoverUrl: string | null;
         earnedCount: number;
         totalCount: number;
-        earnedPoints: number;
-        totalPoints: number;
         percentComplete: number;
         hasTrophy: boolean;
         trophyEarnedAt: Date | null;
@@ -180,7 +168,7 @@ builder.queryField("myGameProgress", (t) =>
       }> = [];
 
       for (const [familyId, data] of gameFamilyMap.entries()) {
-        const totals = familyTotalMap.get(familyId) || { count: 0, points: 0 };
+        const totals = familyTotalMap.get(familyId) || { count: 0 };
         const earnedCount = data.earnedIds.size;
         const totalCount = totals.count;
         const percentComplete = computePercentComplete(earnedCount, totalCount);
@@ -191,8 +179,6 @@ builder.queryField("myGameProgress", (t) =>
           gameCoverUrl: data.gameCoverUrl,
           earnedCount,
           totalCount,
-          earnedPoints: data.earnedPoints,
-          totalPoints: totals.points,
           percentComplete,
           hasTrophy: trophyMap.has(familyId),
           trophyEarnedAt: trophyMap.get(familyId) || null,
@@ -278,7 +264,6 @@ builder.queryField("userGameProgress", (t) =>
           gameTitle: string;
           gameCoverUrl: string | null;
           earnedIds: Set<string>;
-          earnedPoints: number;
           lastActivityAt: Date;
         }
       >();
@@ -292,19 +277,17 @@ builder.queryField("userGameProgress", (t) =>
             gameTitle: gameFamily.title,
             gameCoverUrl: gameFamily.coverUrl,
             earnedIds: new Set(),
-            earnedPoints: 0,
             lastActivityAt: ua.createdAt,
           });
         }
         const familyData = gameFamilyMap.get(gameFamily.id)!;
         familyData.earnedIds.add(ua.achievement.id);
-        familyData.earnedPoints += ua.achievement.points;
         if (ua.createdAt > familyData.lastActivityAt) {
           familyData.lastActivityAt = ua.createdAt;
         }
       }
 
-      // Get total achievement counts and points for each game family
+      // Get total achievement counts for each game family
       const gameFamilyIds = Array.from(gameFamilyMap.keys());
       const gameFamilyTotals = await ctx.prisma.achievement.groupBy({
         by: ["achievementSetId"],
@@ -316,7 +299,6 @@ builder.queryField("userGameProgress", (t) =>
           },
         },
         _count: { id: true },
-        _sum: { points: true },
       });
 
       // Get achievement set to game family mapping
@@ -327,14 +309,13 @@ builder.queryField("userGameProgress", (t) =>
       const setToFamilyMap = new Map(achievementSets.map((s) => [s.id, s.gameFamilyId]));
 
       // Aggregate totals by game family
-      const familyTotalMap = new Map<string, { count: number; points: number }>();
+      const familyTotalMap = new Map<string, { count: number }>();
       for (const total of gameFamilyTotals) {
         const familyId = setToFamilyMap.get(total.achievementSetId);
         if (familyId) {
-          const existing = familyTotalMap.get(familyId) || { count: 0, points: 0 };
+          const existing = familyTotalMap.get(familyId) || { count: 0 };
           familyTotalMap.set(familyId, {
             count: existing.count + total._count.id,
-            points: existing.points + (total._sum.points || 0),
           });
         }
       }
@@ -346,8 +327,6 @@ builder.queryField("userGameProgress", (t) =>
         gameCoverUrl: string | null;
         earnedCount: number;
         totalCount: number;
-        earnedPoints: number;
-        totalPoints: number;
         percentComplete: number;
         hasTrophy: boolean;
         trophyEarnedAt: Date | null;
@@ -355,7 +334,7 @@ builder.queryField("userGameProgress", (t) =>
       }> = [];
 
       for (const [familyId, data] of gameFamilyMap.entries()) {
-        const totals = familyTotalMap.get(familyId) || { count: 0, points: 0 };
+        const totals = familyTotalMap.get(familyId) || { count: 0 };
         const earnedCount = data.earnedIds.size;
         const totalCount = totals.count;
         const percentComplete = computePercentComplete(earnedCount, totalCount);
@@ -366,8 +345,6 @@ builder.queryField("userGameProgress", (t) =>
           gameCoverUrl: data.gameCoverUrl,
           earnedCount,
           totalCount,
-          earnedPoints: data.earnedPoints,
-          totalPoints: totals.points,
           percentComplete,
           hasTrophy: trophyMap.has(familyId),
           trophyEarnedAt: trophyMap.get(familyId) || null,
