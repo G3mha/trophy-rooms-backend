@@ -452,7 +452,15 @@ builder.mutationField("deleteAchievementSet", (t) =>
         };
       }
 
+      const counted =
+        (await ctx.prisma.achievementSet.count({ where: { id, ...trophyEligibleSetWhere } })) > 0;
+
+      // The cascade takes the list's achievements and every tick on them
       await ctx.prisma.achievementSet.delete({ where: { id } });
+
+      if (counted && existing.gameFamilyId) {
+        await settleTrophiesAfterRemoval(ctx.prisma, existing.gameFamilyId);
+      }
 
       return {
         success: true,
