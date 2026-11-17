@@ -50,11 +50,8 @@ export async function createContext(request: Request): Promise<Context> {
         }
       }
 
-      // Create user on first authentication. A token outlives its identity
-      // until it expires, so a request made right after deleteMyAccount must
-      // not recreate the row. Only a definite "gone" blocks creation, so first
-      // sign-ins still work if Supabase can't be reached.
-      if (!user && (await supabaseUserExists(identity.id)) !== false) {
+      if (!user) {
+        // Create user on first authentication
         try {
           user = await prisma.user.create({
             data: {
@@ -75,6 +72,16 @@ export async function createContext(request: Request): Promise<Context> {
               "Failed to create user"
             );
           }
+        }
+
+        // A token outlives its identity until it expires, so a request made
+        // around deleteMyAccount can land here. Checking after the insert
+        // means either this sees the identity gone, or the mutation's second
+        // pass sees this row. Only a definite "gone" counts, so first sign-ins
+        // still work if Supabase can't be reached.
+        if (user && (await supabaseUserExists(identity.id)) === false) {
+          await prisma.user.deleteMany({ where: { id: user.id } });
+          user = null;
         }
       }
     }
