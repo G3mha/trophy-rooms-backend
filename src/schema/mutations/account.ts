@@ -37,19 +37,24 @@ builder.mutationField("deleteMyAccount", (t) =>
         };
       }
 
-      const { id, supabaseId } = ctx.user;
+      const { supabaseId } = ctx.user;
+
+      // Keyed by supabaseId, not id, so the second pass also catches a row
+      // recreated under a new id. Custom sets are the user's own content but
+      // their creator FK is SET NULL (it also tags catalog sets admins
+      // created), so they're removed here.
+      const deleteAppData = () =>
+        ctx.prisma.$transaction([
+          ctx.prisma.achievementSet.deleteMany({
+            where: { type: AchievementSetType.CUSTOM, createdBy: { supabaseId } },
+          }),
+          ctx.prisma.user.deleteMany({ where: { supabaseId } }),
+        ]);
 
       // App data first (cascades wipe collection, library, journal, etc.);
       // if the identity deletion then fails, the next authenticated request
       // recreates an empty user row and the deletion can be retried.
-      // Custom sets are the user's own content but their creator FK is SET
-      // NULL (it also tags catalog sets admins created), so remove them here.
-      await ctx.prisma.$transaction([
-        ctx.prisma.achievementSet.deleteMany({
-          where: { createdByUserId: id, type: AchievementSetType.CUSTOM },
-        }),
-        ctx.prisma.user.delete({ where: { id } }),
-      ]);
+      await deleteAppData();
 
       const identityDeleted = await deleteSupabaseUser(supabaseId);
       if (!identityDeleted) {
@@ -62,6 +67,12 @@ builder.mutationField("deleteMyAccount", (t) =>
           },
         };
       }
+
+      // A request that landed between the two deletes could have recreated
+      // the row while the identity still existed. createContext drops any row
+      // it creates once Supabase reports the identity gone, so this pass and
+      // that check together leave nothing behind.
+      await deleteAppData();
 
       return { success: true, error: null };
     },
