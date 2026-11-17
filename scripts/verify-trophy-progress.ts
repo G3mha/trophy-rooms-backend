@@ -843,6 +843,54 @@ async function verify() {
     [[], [], false, false]
   );
 
+  console.log("updateAchievement: a counting achievement is retiered to Platinum");
+
+  const retier = await makeSoloList("Retier", nina);
+  const retierSecond = await prisma.achievement.create({
+    data: { title: "Retier 2", achievementSetId: retier.id },
+  });
+  const makePlatinum = async (id: string) =>
+    (
+      await run<{ updateAchievement: { success: boolean } }>(
+        nina,
+        `mutation ($id: ID!, $input: UpdateAchievementInput!) {
+           updateAchievement(id: $id, input: $input) { success }
+         }`,
+        { id, input: { tier: "PLATINUM" } }
+      )
+    ).updateAchievement.success;
+  await mark(nina, retier.regular.id);
+  await mark(nina, retierSecond.id);
+  await mark(owen, retierSecond.id);
+  check(
+    "nina finished the list, owen ticked one of two",
+    [await trophyGameIds(nina), await trophyGameIds(owen)],
+    [[soloGame.id], []]
+  );
+  check("nina retiers the one owen ticked", await makePlatinum(retierSecond.id), true);
+  check(
+    "nina keeps her trophy and holds the new Platinum",
+    [await trophyGameIds(nina), await holds(nina, retierSecond.id)],
+    [[soloGame.id], true]
+  );
+  check(
+    "owen has no trophy, so his tick on the new Platinum goes",
+    [await trophyGameIds(owen), await holds(owen, retierSecond.id)],
+    [[], false]
+  );
+  check("nina retiers the last regular achievement", await makePlatinum(retier.regular.id), true);
+  check(
+    "nothing is left to finish, so the trophy and every Platinum go",
+    [
+      await trophyGameIds(nina),
+      await holds(nina, retier.regular.id),
+      await holds(nina, retierSecond.id),
+      await holds(nina, retier.platinum.id),
+    ],
+    [[], false, false, false]
+  );
+  check("fix-stuck-platinums finds nothing after the retiers", runStuckCleanup().includes("Rows to delete: 0"), true);
+
   await prisma.user.deleteMany({ where: { id: { in: [nina.id, owen.id] } } });
   await prisma.gameFamily.delete({ where: { id: soloFamily.id } });
 
