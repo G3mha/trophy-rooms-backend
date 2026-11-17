@@ -25,10 +25,12 @@ import type { AddressInfo } from "node:net";
 process.env.NODE_ENV = "production";
 
 // Constructing PrismaClient needs a syntactically valid URL, and supabase.ts
-// resolves SUPABASE_URL at import. Nothing here connects to either.
+// resolves SUPABASE_URL and SUPABASE_SECRET_KEY at import. Nothing here
+// connects to either.
 process.env.DATABASE_URL ??= "postgresql://postgres@127.0.0.1:5499/unused";
 process.env.DIRECT_URL ??= process.env.DATABASE_URL;
 process.env.SUPABASE_URL ??= "http://127.0.0.1.invalid";
+process.env.SUPABASE_SECRET_KEY ??= "unused";
 
 const { yoga } = await import("../src/server.js");
 

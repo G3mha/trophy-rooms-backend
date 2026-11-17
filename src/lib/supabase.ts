@@ -1,18 +1,24 @@
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { logger } from "./logger.js";
 
-// A wrong or missing project URL silently breaks every token verification, so
-// resolve it at boot: a misconfigured deploy fails its healthcheck instead of
-// rejecting logins against the wrong project.
-function requireSupabaseUrl(): string {
-  const url = process.env.SUPABASE_URL;
-  if (!url) {
-    throw new Error("SUPABASE_URL is required");
+// A missing value silently breaks sign-in, so resolve both at boot: a
+// misconfigured deploy fails its healthcheck instead.
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`${name} is required`);
   }
-  return url;
+  return value;
 }
 
-const SUPABASE_URL = requireSupabaseUrl();
+// A wrong project URL rejects every login against the wrong project.
+const SUPABASE_URL = requireEnv("SUPABASE_URL");
+// The service-role key for the admin API (account deletion, identity lookups).
+const SUPABASE_SECRET_KEY = requireEnv("SUPABASE_SECRET_KEY");
+const adminHeaders = {
+  apikey: SUPABASE_SECRET_KEY,
+  Authorization: `Bearer ${SUPABASE_SECRET_KEY}`,
+};
 
 export interface SupabaseUser {
   id: string;
@@ -66,13 +72,10 @@ export async function verifySupabaseToken(
 export async function supabaseUserExists(
   supabaseId: string
 ): Promise<boolean | null> {
-  const secretKey = process.env.SUPABASE_SECRET_KEY;
-  if (!secretKey) return null;
-
   try {
     const response = await fetch(
       `${SUPABASE_URL}/auth/v1/admin/users/${supabaseId}`,
-      { headers: { apikey: secretKey, Authorization: `Bearer ${secretKey}` } }
+      { headers: adminHeaders }
     );
     if (response.ok) return true;
     if (response.status === 404) return false;
@@ -85,23 +88,13 @@ export async function supabaseUserExists(
 }
 
 /// Permanently deletes a user from Supabase Auth via the admin API.
-/// Requires the service-role key (SUPABASE_SECRET_KEY).
 export async function deleteSupabaseUser(supabaseId: string): Promise<boolean> {
-  const secretKey = process.env.SUPABASE_SECRET_KEY;
-  if (!secretKey) {
-    logger.error("SUPABASE_SECRET_KEY is not configured");
-    return false;
-  }
-
   try {
     const response = await fetch(
       `${SUPABASE_URL}/auth/v1/admin/users/${supabaseId}`,
       {
         method: "DELETE",
-        headers: {
-          apikey: secretKey,
-          Authorization: `Bearer ${secretKey}`,
-        },
+        headers: adminHeaders,
       }
     );
 

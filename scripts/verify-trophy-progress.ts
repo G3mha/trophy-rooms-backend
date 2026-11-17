@@ -38,8 +38,10 @@ if (!databaseUrl || !LOCAL_HOSTS.has(new URL(databaseUrl).hostname)) {
   process.exit(1);
 }
 
-// context.ts resolves SUPABASE_URL at import. No token is verified here.
+// context.ts resolves SUPABASE_URL and SUPABASE_SECRET_KEY at import. No
+// token is verified here.
 process.env.SUPABASE_URL ??= "http://127.0.0.1.invalid";
+process.env.SUPABASE_SECRET_KEY ??= "unused";
 
 const { graphql } = await import("graphql");
 const { schema } = await import("../src/schema/index.js");
