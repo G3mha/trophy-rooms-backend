@@ -655,6 +655,77 @@ async function verify() {
   await prisma.achievementSet.delete({ where: { id: second.id } });
   await prisma.achievement.delete({ where: { id: officialPlatinum.id } });
 
+  console.log("updateAchievementSet: a public custom list goes back to private");
+
+  const listPlatinums = await Promise.all(
+    [official, davePublic].map((set) =>
+      prisma.achievement.create({
+        data: { title: `${set.title} Platinum`, tier: "PLATINUM", achievementSetId: set.id },
+      })
+    )
+  );
+  const [officialListPlatinum, daveListPlatinum] = listPlatinums as [
+    (typeof listPlatinums)[number],
+    (typeof listPlatinums)[number],
+  ];
+  const [daveRegular] = davePublic.achievements as [(typeof davePublic.achievements)[number]];
+  const liam = await makeUser("liam");
+  const mona = await makeUser("mona");
+  for (const achievement of eligible) await mark(liam, achievement.id);
+  for (const achievement of official.achievements) await mark(mona, achievement.id);
+  check(
+    "liam finished both lists and holds both Platinums",
+    [await holds(liam, officialListPlatinum.id), await holds(liam, daveListPlatinum.id)],
+    [true, true]
+  );
+  check("mona is one list short, so she has no trophy", await trophyGameIds(mona), []);
+
+  const setVisibility = async (visibility: AchievementSetVisibility) =>
+    (
+      await run<{ updateAchievementSet: { success: boolean } }>(
+        dave,
+        `mutation ($id: ID!, $input: UpdateAchievementSetInput!) {
+           updateAchievementSet(id: $id, input: $input) { success }
+         }`,
+        { id: davePublic.id, input: { visibility } }
+      )
+    ).updateAchievementSet.success;
+  const trophiesBeforePrivate = await prisma.trophy.count();
+
+  check("dave makes his list private", await setVisibility(AchievementSetVisibility.PRIVATE), true);
+  check("liam's Platinum in that list goes with it", await holds(liam, daveListPlatinum.id), false);
+  check("his regular tick in it stays", await holds(liam, daveRegular.id), true);
+  check(
+    "he keeps his trophy and the Platinum in the list that counts",
+    [await trophyGameIds(liam), await holds(liam, officialListPlatinum.id)],
+    [[gameOld.id], true]
+  );
+  check(
+    "mona is finished now, so she gets the trophy and the counting Platinum only",
+    [
+      await trophyGameIds(mona),
+      await holds(mona, officialListPlatinum.id),
+      await holds(mona, daveListPlatinum.id),
+    ],
+    [[gameOld.id], true, false]
+  );
+  check("mona's is the only new Trophy row", await prisma.trophy.count(), trophiesBeforePrivate + 1);
+  check(
+    "nothing is left for fix-stuck-platinums",
+    runStuckCleanup().includes("Rows to delete: 0"),
+    true
+  );
+
+  // Leave the family as the later checks expect to find it
+  await prisma.achievementSet.update({
+    where: { id: davePublic.id },
+    data: { visibility: AchievementSetVisibility.PUBLIC },
+  });
+  await prisma.user.deleteMany({ where: { id: { in: [liam.id, mona.id] } } });
+  await prisma.achievement.deleteMany({
+    where: { id: { in: [officialListPlatinum.id, daveListPlatinum.id] } },
+  });
+
   console.log("fix-duplicate-trophies.ts");
 
   // Rows the old mutation left behind: one trophy per game in the family
