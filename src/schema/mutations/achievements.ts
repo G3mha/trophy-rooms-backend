@@ -9,8 +9,9 @@ import {
 } from "../types/achievement.js";
 import { hasRequiredRole } from "../../context.js";
 import { visibleSetWhere } from "../../lib/achievement-visibility.js";
-import { AchievementSetType, UserRole } from "@prisma/client";
+import { AchievementSetType, AchievementTier, UserRole } from "@prisma/client";
 import { invalidateAchievementCaches } from "../../lib/cache.js";
+import { notPlatinum, settleTrophiesAfterRemoval, trophyEligibleSetWhere } from "../../lib/trophies.js";
 
 builder.mutationField("createAchievement", (t) =>
   t.field({
@@ -332,7 +333,16 @@ builder.mutationField("deleteAchievement", (t) =>
         };
       }
 
+      const gameFamilyId = existing.achievementSet.gameFamilyId;
+      const counted =
+        existing.tier !== AchievementTier.PLATINUM &&
+        (await ctx.prisma.achievementSet.count({
+          where: { id: existing.achievementSetId, ...trophyEligibleSetWhere },
+        })) > 0;
+
       await ctx.prisma.achievement.delete({ where: { id } });
+
+      if (counted && gameFamilyId) await settleTrophiesAfterRemoval(ctx.prisma, gameFamilyId);
 
       // Invalidate achievement caches after successful deletion
       invalidateAchievementCaches().catch(() => {});
@@ -516,9 +526,23 @@ builder.mutationField("bulkDeleteAchievements", (t) =>
         };
       }
 
+      const families = await ctx.prisma.achievementSet.findMany({
+        where: {
+          achievements: { some: { id: { in: ids }, ...notPlatinum } },
+          gameFamilyId: { not: null },
+          ...trophyEligibleSetWhere,
+        },
+        select: { gameFamilyId: true },
+        distinct: ["gameFamilyId"],
+      });
+
       const result = await ctx.prisma.achievement.deleteMany({
         where: { id: { in: ids } },
       });
+
+      for (const { gameFamilyId } of families) {
+        if (gameFamilyId) await settleTrophiesAfterRemoval(ctx.prisma, gameFamilyId);
+      }
 
       // Invalidate achievement caches after successful bulk deletion
       invalidateAchievementCaches().catch(() => {});
