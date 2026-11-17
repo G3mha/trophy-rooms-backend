@@ -8,7 +8,7 @@ import { ErrorCode } from "../../lib/errors.js";
 import { hasRequiredRole } from "../../context.js";
 import { visibleSetWhere } from "../../lib/achievement-visibility.js";
 import { invalidateAchievementCaches } from "../../lib/cache.js";
-import { awardTrophyIfComplete, notPlatinum, trophyEligibleSetWhere } from "../../lib/trophies.js";
+import { settleTrophiesAfterRemoval, trophyEligibleSetWhere } from "../../lib/trophies.js";
 import {
   AchievementSetVisibility,
   AchievementSetType,
@@ -366,23 +366,8 @@ builder.mutationField("updateAchievementSet", (t) =>
           where: { achievement: { tier: AchievementTier.PLATINUM, achievementSetId: id } },
         });
 
-        // One list fewer can finish the game for players who will never tick
-        // again. Holders finished a longer list, so they are left alone.
-        const gameFamilyId = updated.gameFamilyId;
-        const eligible = { ...notPlatinum, achievementSet: { gameFamilyId, ...trophyEligibleSetWhere } };
-        const total = gameFamilyId ? await ctx.prisma.achievement.count({ where: eligible }) : 0;
-        if (gameFamilyId && total > 0) {
-          const finished = await ctx.prisma.userAchievement.groupBy({
-            by: ["userId"],
-            where: {
-              achievement: eligible,
-              user: { trophies: { none: { game: { gameFamilyId } } } },
-            },
-            having: { achievementId: { _count: { gte: total } } },
-          });
-          for (const { userId } of finished) {
-            await awardTrophyIfComplete(ctx.prisma, userId, gameFamilyId);
-          }
+        if (updated.gameFamilyId) {
+          await settleTrophiesAfterRemoval(ctx.prisma, updated.gameFamilyId);
         }
       }
 

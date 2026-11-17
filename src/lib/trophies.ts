@@ -144,6 +144,35 @@ export async function awardTrophyIfComplete(
   }
 }
 
+/**
+ * Settle a family's trophies after it lost achievements that counted: a list
+ * stopped counting or was deleted, or achievements were removed from one.
+ */
+export async function settleTrophiesAfterRemoval(
+  prisma: PrismaClient,
+  gameFamilyId: string
+): Promise<void> {
+  const eligibleSet = { gameFamilyId, ...trophyEligibleSetWhere };
+  const eligible = { ...notPlatinum, achievementSet: eligibleSet };
+  const total = await prisma.achievement.count({ where: eligible });
+
+  if (total === 0) return;
+
+  // A shorter bar can finish the game for players who will never tick again.
+  // Holders finished a longer one, so they are left alone.
+  const finished = await prisma.userAchievement.groupBy({
+    by: ["userId"],
+    where: {
+      achievement: eligible,
+      user: { trophies: { none: { game: { gameFamilyId } } } },
+    },
+    having: { achievementId: { _count: { gte: total } } },
+  });
+  for (const { userId } of finished) {
+    await awardTrophyIfComplete(prisma, userId, gameFamilyId);
+  }
+}
+
 // Earliest release first, undated games last; createdAt and id keep the pick
 // stable between the mutation and the cleanup script
 function compareByRelease(a: TrophyGameCandidate, b: TrophyGameCandidate): number {
