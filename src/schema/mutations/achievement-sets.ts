@@ -519,6 +519,9 @@ builder.mutationField("setAchievementSetType", (t) =>
         };
       }
 
+      const counted =
+        (await ctx.prisma.achievementSet.count({ where: { id, ...trophyEligibleSetWhere } })) > 0;
+
       const updated = await ctx.prisma.achievementSet.update({
         where: { id },
         data: {
@@ -529,6 +532,16 @@ builder.mutationField("setAchievementSetType", (t) =>
               : AchievementSetVisibility.PUBLIC,
         },
       });
+
+      // A list turned custom is private, so it stops counting
+      if (counted && type === AchievementSetType.CUSTOM) {
+        await ctx.prisma.userAchievement.deleteMany({
+          where: { achievement: { tier: AchievementTier.PLATINUM, achievementSetId: id } },
+        });
+        if (updated.gameFamilyId) {
+          await settleTrophiesAfterRemoval(ctx.prisma, updated.gameFamilyId);
+        }
+      }
 
       await invalidateAchievementCaches().catch(() => {});
 
@@ -584,9 +597,19 @@ builder.mutationField("bulkDeleteAchievementSets", (t) =>
         };
       }
 
+      const families = await ctx.prisma.achievementSet.findMany({
+        where: { id: { in: ids }, gameFamilyId: { not: null }, ...trophyEligibleSetWhere },
+        select: { gameFamilyId: true },
+        distinct: ["gameFamilyId"],
+      });
+
       const result = await ctx.prisma.achievementSet.deleteMany({
         where: { id: { in: ids } },
       });
+
+      for (const { gameFamilyId } of families) {
+        if (gameFamilyId) await settleTrophiesAfterRemoval(ctx.prisma, gameFamilyId);
+      }
 
       return {
         success: true,
