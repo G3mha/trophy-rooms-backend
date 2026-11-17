@@ -61,6 +61,29 @@ export async function verifySupabaseToken(
   }
 }
 
+/// Whether a Supabase Auth user still exists. Returns false only when Supabase
+/// answers that it's gone, and null when that can't be determined.
+export async function supabaseUserExists(
+  supabaseId: string
+): Promise<boolean | null> {
+  const secretKey = process.env.SUPABASE_SECRET_KEY;
+  if (!secretKey) return null;
+
+  try {
+    const response = await fetch(
+      `${SUPABASE_URL}/auth/v1/admin/users/${supabaseId}`,
+      { headers: { apikey: secretKey, Authorization: `Bearer ${secretKey}` } }
+    );
+    if (response.ok) return true;
+    if (response.status === 404) return false;
+    logger.warn({ status: response.status, supabaseId }, "Could not look up Supabase user");
+    return null;
+  } catch (error) {
+    logger.warn({ error, supabaseId }, "Could not look up Supabase user");
+    return null;
+  }
+}
+
 /// Permanently deletes a user from Supabase Auth via the admin API.
 /// Requires the service-role key (SUPABASE_SECRET_KEY).
 export async function deleteSupabaseUser(supabaseId: string): Promise<boolean> {
