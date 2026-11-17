@@ -256,6 +256,26 @@ builder.mutationField("updateAchievement", (t) =>
         },
       });
 
+      // Retiered to Platinum, it is no longer something to finish
+      if (existing.tier !== AchievementTier.PLATINUM && updated.tier === AchievementTier.PLATINUM) {
+        const gameFamilyId = existing.achievementSet.gameFamilyId;
+        const counted =
+          (await ctx.prisma.achievementSet.count({
+            where: { id: existing.achievementSetId, ...trophyEligibleSetWhere },
+          })) > 0;
+        if (counted && gameFamilyId) await settleTrophiesAfterRemoval(ctx.prisma, gameFamilyId);
+
+        // A Platinum is only held with the trophy, so every other tick on it goes
+        await ctx.prisma.userAchievement.deleteMany({
+          where: {
+            achievementId: id,
+            ...(counted && gameFamilyId
+              ? { user: { trophies: { none: { game: { gameFamilyId } } } } }
+              : {}),
+          },
+        });
+      }
+
       // Invalidate achievement caches after successful update
       invalidateAchievementCaches().catch(() => {});
 
