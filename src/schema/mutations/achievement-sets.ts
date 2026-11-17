@@ -8,9 +8,11 @@ import { ErrorCode } from "../../lib/errors.js";
 import { hasRequiredRole } from "../../context.js";
 import { visibleSetWhere } from "../../lib/achievement-visibility.js";
 import { invalidateAchievementCaches } from "../../lib/cache.js";
+import { awardTrophyIfComplete, notPlatinum, trophyEligibleSetWhere } from "../../lib/trophies.js";
 import {
   AchievementSetVisibility,
   AchievementSetType,
+  AchievementTier,
   UserRole,
 } from "@prisma/client";
 
@@ -349,10 +351,40 @@ builder.mutationField("updateAchievementSet", (t) =>
         updateData.visibility = input.visibility;
       }
 
+      const countsForTrophy = async () =>
+        (await ctx.prisma.achievementSet.count({ where: { id, ...trophyEligibleSetWhere } })) > 0;
+      const counted = await countsForTrophy();
+
       const updated = await ctx.prisma.achievementSet.update({
         where: { id },
         data: updateData,
       });
+
+      if (counted && !(await countsForTrophy())) {
+        // Ticks only reach Platinums in lists that count, so this one would be stuck
+        await ctx.prisma.userAchievement.deleteMany({
+          where: { achievement: { tier: AchievementTier.PLATINUM, achievementSetId: id } },
+        });
+
+        // One list fewer can finish the game for players who will never tick
+        // again. Holders finished a longer list, so they are left alone.
+        const gameFamilyId = updated.gameFamilyId;
+        const eligible = { ...notPlatinum, achievementSet: { gameFamilyId, ...trophyEligibleSetWhere } };
+        const total = gameFamilyId ? await ctx.prisma.achievement.count({ where: eligible }) : 0;
+        if (gameFamilyId && total > 0) {
+          const finished = await ctx.prisma.userAchievement.groupBy({
+            by: ["userId"],
+            where: {
+              achievement: eligible,
+              user: { trophies: { none: { game: { gameFamilyId } } } },
+            },
+            having: { achievementId: { _count: { gte: total } } },
+          });
+          for (const { userId } of finished) {
+            await awardTrophyIfComplete(ctx.prisma, userId, gameFamilyId);
+          }
+        }
+      }
 
       // Cached search results are shared by every viewer; drop them before
       // responding when a set's visibility may have changed, so a set made
