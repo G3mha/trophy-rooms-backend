@@ -156,7 +156,16 @@ export async function settleTrophiesAfterRemoval(
   const eligible = { ...notPlatinum, achievementSet: eligibleSet };
   const total = await prisma.achievement.count({ where: eligible });
 
-  if (total === 0) return;
+  if (total === 0) {
+    // A game with nothing left to finish has no trophy, or publishing a
+    // one-achievement list and withdrawing it would leave one behind
+    await prisma.trophy.deleteMany({ where: { game: { gameFamilyId } } });
+    // The Platinum is the trophy, so it goes with it
+    await prisma.userAchievement.deleteMany({
+      where: { achievement: { tier: AchievementTier.PLATINUM, achievementSet: eligibleSet } },
+    });
+    return;
+  }
 
   // A shorter bar can finish the game for players who will never tick again.
   // Holders finished a longer one, so they are left alone.
