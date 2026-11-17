@@ -726,6 +726,126 @@ async function verify() {
     where: { id: { in: [officialListPlatinum.id, daveListPlatinum.id] } },
   });
 
+  console.log("A family's last counting list goes private or is deleted");
+
+  const soloFamily = await prisma.gameFamily.create({
+    data: { title: "Verify Game Three", slug: "verify-game-three" },
+  });
+  const soloGame = await prisma.game.create({
+    data: { gameFamilyId: soloFamily.id, platformId: platformD.id },
+  });
+  const nina = await makeUser("nina");
+  const owen = await makeUser("owen");
+  // A public custom list with one regular achievement and a Platinum
+  const makeSoloList = async (title: string, owner: User) => {
+    const list = await prisma.achievementSet.create({
+      data: {
+        title,
+        type: AchievementSetType.CUSTOM,
+        visibility: AchievementSetVisibility.PUBLIC,
+        gameFamilyId: soloFamily.id,
+        createdByUserId: owner.id,
+        achievements: { create: [{ title: `${title} 1` }, { title: `${title} Platinum`, tier: "PLATINUM" }] },
+      },
+      include: { achievements: { orderBy: { title: "asc" } } },
+    });
+    const [regular, platinum] = list.achievements as [
+      (typeof list.achievements)[number],
+      (typeof list.achievements)[number],
+    ];
+    return { id: list.id, regular, platinum };
+  };
+  const deleteList = async (user: User, id: string) =>
+    (
+      await run<{ deleteAchievementSet: { success: boolean } }>(
+        user,
+        `mutation ($id: ID!) { deleteAchievementSet(id: $id) { success } }`,
+        { id }
+      )
+    ).deleteAchievementSet.success;
+
+  const onlyList = await makeSoloList("Only", nina);
+  await mark(nina, onlyList.regular.id);
+  check(
+    "nina finishes the only list and gets the trophy and its Platinum",
+    [await trophyGameIds(nina), await holds(nina, onlyList.platinum.id)],
+    [[soloGame.id], true]
+  );
+  check(
+    "she makes it private",
+    (
+      await run<{ updateAchievementSet: { success: boolean } }>(
+        nina,
+        `mutation ($id: ID!, $input: UpdateAchievementSetInput!) {
+           updateAchievementSet(id: $id, input: $input) { success }
+         }`,
+        { id: onlyList.id, input: { visibility: AchievementSetVisibility.PRIVATE } }
+      )
+    ).updateAchievementSet.success,
+    true
+  );
+  check(
+    "nothing is left to finish, so the trophy and the Platinum go",
+    [await trophyGameIds(nina), await holds(nina, onlyList.platinum.id)],
+    [[], false]
+  );
+  check("her regular tick stays", await holds(nina, onlyList.regular.id), true);
+  await prisma.achievementSet.delete({ where: { id: onlyList.id } });
+
+  const doomed = await makeSoloList("Doomed", nina);
+  await mark(nina, doomed.regular.id);
+  check("nina finishes a new only list", await trophyGameIds(nina), [soloGame.id]);
+  check("she deletes it", await deleteList(nina, doomed.id), true);
+  check("the trophy goes with the only list", await trophyGameIds(nina), []);
+
+  console.log("deleteAchievementSet: one of two counting lists is deleted");
+
+  const kept = await makeSoloList("Kept", nina);
+  const extra = await makeSoloList("Extra", owen);
+  for (const list of [kept, extra]) await mark(nina, list.regular.id);
+  await mark(owen, kept.regular.id);
+  check(
+    "nina finished both lists, owen is one list short",
+    [await trophyGameIds(nina), await trophyGameIds(owen)],
+    [[soloGame.id], []]
+  );
+  check("owen deletes his list", await deleteList(owen, extra.id), true);
+  check(
+    "nina keeps her trophy and the Platinum in the list that is left",
+    [await trophyGameIds(nina), await holds(nina, kept.platinum.id)],
+    [[soloGame.id], true]
+  );
+  check(
+    "owen is finished now, so he gets the trophy and the Platinum",
+    [await trophyGameIds(owen), await holds(owen, kept.platinum.id)],
+    [[soloGame.id], true]
+  );
+
+  check(
+    "nina deletes the last regular achievement in the list",
+    (
+      await run<{ deleteAchievement: { success: boolean } }>(
+        nina,
+        `mutation ($id: ID!) { deleteAchievement(id: $id) { success } }`,
+        { id: kept.regular.id }
+      )
+    ).deleteAchievement.success,
+    true
+  );
+  check(
+    "nothing is left to finish, so both trophies and Platinums go",
+    [
+      await trophyGameIds(nina),
+      await trophyGameIds(owen),
+      await holds(nina, kept.platinum.id),
+      await holds(owen, kept.platinum.id),
+    ],
+    [[], [], false, false]
+  );
+
+  await prisma.user.deleteMany({ where: { id: { in: [nina.id, owen.id] } } });
+  await prisma.gameFamily.delete({ where: { id: soloFamily.id } });
+
   console.log("fix-duplicate-trophies.ts");
 
   // Rows the old mutation left behind: one trophy per game in the family
