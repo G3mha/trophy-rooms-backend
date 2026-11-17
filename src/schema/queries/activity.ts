@@ -1,5 +1,5 @@
 import { builder } from "../builder.js";
-import { POINTS_DEPRECATION, USER_EMAIL_DEPRECATION } from "../deprecations.js";
+import { USER_EMAIL_DEPRECATION } from "../deprecations.js";
 import { visibleSetWhere } from "../../lib/achievement-visibility.js";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { notPlatinum } from "../../lib/trophies.js";
@@ -37,7 +37,6 @@ const ActivityFeedEntry = builder.objectRef<{
   achievementId: string;
   achievementTitle: string;
   achievementTier: string;
-  achievementPoints: number;
   gameFamilyId: string;
   gameTitle: string;
   earnedAt: Date;
@@ -56,7 +55,6 @@ ActivityFeedEntry.implement({
     achievementId: t.exposeString("achievementId"),
     achievementTitle: t.exposeString("achievementTitle"),
     achievementTier: t.exposeString("achievementTier"),
-    achievementPoints: t.exposeInt("achievementPoints", { deprecationReason: POINTS_DEPRECATION }),
     gameFamilyId: t.exposeString("gameFamilyId"),
     gameTitle: t.exposeString("gameTitle"),
     earnedAt: t.expose("earnedAt", { type: "DateTime" }),
@@ -100,7 +98,6 @@ const CombinedActivityEntry = builder.objectRef<{
   achievementId?: string;
   achievementTitle?: string;
   achievementTier?: string;
-  achievementPoints?: number;
   gameId?: string;
   gameFamilyId: string;
   gameTitle: string;
@@ -123,7 +120,6 @@ CombinedActivityEntry.implement({
     achievementId: t.exposeString("achievementId", { nullable: true }),
     achievementTitle: t.exposeString("achievementTitle", { nullable: true }),
     achievementTier: t.exposeString("achievementTier", { nullable: true }),
-    achievementPoints: t.exposeInt("achievementPoints", { nullable: true, deprecationReason: POINTS_DEPRECATION }),
     gameId: t.exposeString("gameId", { nullable: true }),
     gameFamilyId: t.exposeString("gameFamilyId"),
     gameTitle: t.exposeString("gameTitle"),
@@ -160,7 +156,6 @@ builder.queryField("recentAchievementActivity", (t) =>
               id: true,
               title: true,
               tier: true,
-              points: true,
               achievementSet: {
                 select: {
                   gameFamily: {
@@ -183,7 +178,6 @@ builder.queryField("recentAchievementActivity", (t) =>
         achievementId: ua.achievement.id,
         achievementTitle: ua.achievement.title,
         achievementTier: ua.achievement.tier,
-        achievementPoints: ua.achievement.points,
         gameFamilyId: ua.achievement.achievementSet.gameFamily?.id ?? "",
         gameTitle: ua.achievement.achievementSet.gameFamily?.title ?? "Unknown",
         earnedAt: ua.createdAt,
@@ -261,7 +255,6 @@ builder.queryField("activityFeed", (t) =>
                 id: true,
                 title: true,
                 tier: true,
-                points: true,
                 achievementSet: {
                   select: {
                     gameFamily: {
@@ -308,7 +301,6 @@ builder.queryField("activityFeed", (t) =>
         achievementId?: string;
         achievementTitle?: string;
         achievementTier?: string;
-        achievementPoints?: number;
         gameId?: string;
         gameFamilyId: string;
         gameTitle: string;
@@ -323,7 +315,6 @@ builder.queryField("activityFeed", (t) =>
         achievementId: ua.achievement.id,
         achievementTitle: ua.achievement.title,
         achievementTier: ua.achievement.tier,
-        achievementPoints: ua.achievement.points,
         gameFamilyId: ua.achievement.achievementSet.gameFamily?.id ?? "",
         gameTitle: ua.achievement.achievementSet.gameFamily?.title ?? "Unknown",
         earnedAt: ua.createdAt,
@@ -337,7 +328,6 @@ builder.queryField("activityFeed", (t) =>
         achievementId?: string;
         achievementTitle?: string;
         achievementTier?: string;
-        achievementPoints?: number;
         gameId?: string;
         gameFamilyId: string;
         gameTitle: string;
