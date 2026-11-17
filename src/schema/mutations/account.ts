@@ -1,3 +1,4 @@
+import { AchievementSetType } from "@prisma/client";
 import { builder, MutationErrorRef } from "../builder.js";
 import { ErrorCode } from "../../lib/errors.js";
 import { deleteSupabaseUser } from "../../lib/supabase.js";
@@ -41,7 +42,14 @@ builder.mutationField("deleteMyAccount", (t) =>
       // App data first (cascades wipe collection, library, journal, etc.);
       // if the identity deletion then fails, the next authenticated request
       // recreates an empty user row and the deletion can be retried.
-      await ctx.prisma.user.delete({ where: { id } });
+      // Custom sets are the user's own content but their creator FK is SET
+      // NULL (it also tags catalog sets admins created), so remove them here.
+      await ctx.prisma.$transaction([
+        ctx.prisma.achievementSet.deleteMany({
+          where: { createdByUserId: id, type: AchievementSetType.CUSTOM },
+        }),
+        ctx.prisma.user.delete({ where: { id } }),
+      ]);
 
       const identityDeleted = await deleteSupabaseUser(supabaseId);
       if (!identityDeleted) {
