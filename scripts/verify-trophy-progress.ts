@@ -891,6 +891,132 @@ async function verify() {
   );
   check("fix-stuck-platinums finds nothing after the retiers", runStuckCleanup().includes("Rows to delete: 0"), true);
 
+  console.log("setAchievementSetType: a counting list is turned custom");
+
+  const admin = await prisma.user.create({
+    data: { supabaseId: "verify-admin", email: "admin@verify.invalid", name: "admin", role: "ADMIN" },
+  });
+  const makeOfficialList = async (title: string) => {
+    const list = await prisma.achievementSet.create({
+      data: {
+        title,
+        type: AchievementSetType.OFFICIAL,
+        visibility: AchievementSetVisibility.PUBLIC,
+        gameFamilyId: soloFamily.id,
+        achievements: { create: [{ title: `${title} 1` }, { title: `${title} Platinum`, tier: "PLATINUM" }] },
+      },
+      include: { achievements: { orderBy: { title: "asc" } } },
+    });
+    const [regular, platinum] = list.achievements as [
+      (typeof list.achievements)[number],
+      (typeof list.achievements)[number],
+    ];
+    return { id: list.id, regular, platinum };
+  };
+  const turnCustom = async (id: string) =>
+    (
+      await run<{ setAchievementSetType: { success: boolean } }>(
+        admin,
+        `mutation ($id: ID!) { setAchievementSetType(id: $id, type: CUSTOM) { success } }`,
+        { id }
+      )
+    ).setAchievementSetType.success;
+  const bulkDelete = async (field: "bulkDeleteAchievementSets" | "bulkDeleteAchievements", ids: string[]) =>
+    (
+      await run<Record<string, { success: boolean }>>(
+        admin,
+        `mutation ($ids: [ID!]!) { ${field}(ids: $ids) { success } }`,
+        { ids }
+      )
+    )[field]?.success;
+  // nina finishes both lists, owen only the first
+  const twoLists = async (prefix: string) => {
+    const first = await makeOfficialList(`${prefix} A`);
+    const second = await makeOfficialList(`${prefix} B`);
+    for (const list of [first, second]) await mark(nina, list.regular.id);
+    await mark(owen, first.regular.id);
+    check(
+      `${prefix}: nina finished both lists, owen is one list short`,
+      [await trophyGameIds(nina), await trophyGameIds(owen)],
+      [[soloGame.id], []]
+    );
+    return [first, second] as const;
+  };
+
+  const [typeA, typeB] = await twoLists("Type");
+  check("an admin turns the second list custom", await turnCustom(typeB.id), true);
+  check(
+    "nina keeps her trophy and loses the Platinum in the custom list",
+    [await trophyGameIds(nina), await holds(nina, typeA.platinum.id), await holds(nina, typeB.platinum.id)],
+    [[soloGame.id], true, false]
+  );
+  check(
+    "owen is finished now, so he gets the trophy and the Platinum",
+    [await trophyGameIds(owen), await holds(owen, typeA.platinum.id)],
+    [[soloGame.id], true]
+  );
+  check("the admin turns the first list custom too", await turnCustom(typeA.id), true);
+  check(
+    "nothing is left to finish, so both trophies and Platinums go",
+    [
+      await trophyGameIds(nina),
+      await trophyGameIds(owen),
+      await holds(nina, typeA.platinum.id),
+      await holds(owen, typeA.platinum.id),
+    ],
+    [[], [], false, false]
+  );
+
+  console.log("bulkDeleteAchievementSets: counting lists are deleted in bulk");
+
+  const [setsA, setsB] = await twoLists("Sets");
+  check("an admin bulk deletes the second list", await bulkDelete("bulkDeleteAchievementSets", [setsB.id]), true);
+  check(
+    "nina keeps her trophy, and owen gets it with the Platinum",
+    [await trophyGameIds(nina), await trophyGameIds(owen), await holds(owen, setsA.platinum.id)],
+    [[soloGame.id], [soloGame.id], true]
+  );
+  check("the admin bulk deletes the first list too", await bulkDelete("bulkDeleteAchievementSets", [setsA.id]), true);
+  check(
+    "nothing is left to finish, so both trophies go",
+    [await trophyGameIds(nina), await trophyGameIds(owen)],
+    [[], []]
+  );
+
+  console.log("bulkDeleteAchievements: counting achievements are deleted in bulk");
+
+  const bulk = await makeOfficialList("Bulk");
+  const bulkSecond = await prisma.achievement.create({
+    data: { title: "Bulk 2", achievementSetId: bulk.id },
+  });
+  await mark(nina, bulk.regular.id);
+  await mark(nina, bulkSecond.id);
+  await mark(owen, bulk.regular.id);
+  check(
+    "nina finished the list, owen ticked one of two",
+    [await trophyGameIds(nina), await trophyGameIds(owen)],
+    [[soloGame.id], []]
+  );
+  check("an admin bulk deletes the one owen is missing", await bulkDelete("bulkDeleteAchievements", [bulkSecond.id]), true);
+  check(
+    "nina keeps her trophy, and owen gets it with the Platinum",
+    [await trophyGameIds(nina), await trophyGameIds(owen), await holds(owen, bulk.platinum.id)],
+    [[soloGame.id], [soloGame.id], true]
+  );
+  check("the admin bulk deletes the last regular achievement", await bulkDelete("bulkDeleteAchievements", [bulk.regular.id]), true);
+  check(
+    "nothing is left to finish, so both trophies and Platinums go",
+    [
+      await trophyGameIds(nina),
+      await trophyGameIds(owen),
+      await holds(nina, bulk.platinum.id),
+      await holds(owen, bulk.platinum.id),
+    ],
+    [[], [], false, false]
+  );
+  check("fix-stuck-platinums finds nothing after the admin paths", runStuckCleanup().includes("Rows to delete: 0"), true);
+  await prisma.user.delete({ where: { id: admin.id } });
+
   await prisma.user.deleteMany({ where: { id: { in: [nina.id, owen.id] } } });
   await prisma.gameFamily.delete({ where: { id: soloFamily.id } });
 
