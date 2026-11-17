@@ -3,7 +3,6 @@ import { UserRole, AchievementTier } from "@prisma/client";
 import { hasRequiredRole } from "../../context.js";
 import { visibleSetWhere } from "../../lib/achievement-visibility.js";
 import { countFinishedGames } from "../../lib/trophies.js";
-import { POINTS_DEPRECATION } from "../deprecations.js";
 
 builder.enumType(UserRole, {
   name: "UserRole",
@@ -11,24 +10,20 @@ builder.enumType(UserRole, {
 
 // User stats object for detailed statistics
 const UserStats = builder.objectRef<{
-  totalPoints: number;
   platinumCount: number;
   goldCount: number;
   silverCount: number;
   bronzeCount: number;
   completionRate: number;
-  averagePointsPerGame: number;
 }>("UserStats");
 
 UserStats.implement({
   fields: (t) => ({
-    totalPoints: t.exposeInt("totalPoints", { deprecationReason: POINTS_DEPRECATION }),
     platinumCount: t.exposeInt("platinumCount"),
     goldCount: t.exposeInt("goldCount"),
     silverCount: t.exposeInt("silverCount"),
     bronzeCount: t.exposeInt("bronzeCount"),
     completionRate: t.exposeFloat("completionRate"),
-    averagePointsPerGame: t.exposeFloat("averagePointsPerGame", { deprecationReason: POINTS_DEPRECATION }),
   }),
 });
 
@@ -115,7 +110,6 @@ builder.prismaObject("User", {
           select: {
             achievement: {
               select: {
-                points: true,
                 tier: true,
                 achievementSet: {
                   select: { gameFamilyId: true },
@@ -125,7 +119,6 @@ builder.prismaObject("User", {
           },
         });
 
-        let totalPoints = 0;
         let platinumCount = 0;
         let goldCount = 0;
         let silverCount = 0;
@@ -133,7 +126,6 @@ builder.prismaObject("User", {
         const gameFamilyIds = new Set<string>();
 
         for (const ua of userAchievements) {
-          totalPoints += ua.achievement.points;
           const familyId = ua.achievement.achievementSet.gameFamilyId;
           if (familyId) gameFamilyIds.add(familyId);
 
@@ -171,16 +163,13 @@ builder.prismaObject("User", {
         const gamesPlayed = gameFamilyIds.size;
         const completionRate =
           gamesPlayed > 0 ? (completedFamilyIds.size / gamesPlayed) * 100 : 0;
-        const averagePointsPerGame = gamesPlayed > 0 ? totalPoints / gamesPlayed : 0;
 
         return {
-          totalPoints,
           platinumCount,
           goldCount,
           silverCount,
           bronzeCount,
           completionRate: Math.round(completionRate * 10) / 10,
-          averagePointsPerGame: Math.round(averagePointsPerGame),
         };
       },
     }),
