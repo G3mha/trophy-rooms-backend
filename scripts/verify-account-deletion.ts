@@ -1,6 +1,7 @@
 /**
  * Check that deleteMyAccount leaves no user row behind, even when a request
- * with the user's still-valid token races the deletion.
+ * with the user's still-valid token races the deletion or arrives while
+ * Supabase can't be reached.
  *
  * Runs the real createContext and mutation. fetch is stubbed to play
  * Supabase: it serves a test signing key for tokens and answers the admin
@@ -37,10 +38,11 @@ process.env.SUPABASE_SECRET_KEY = "test-secret";
 const SUPABASE_ID = "00000000-0000-4000-8000-00000000d1e7";
 const EMAIL = "verify-account-deletion@example.invalid";
 
-// Fake Supabase: the identities that exist, and a hook run when one is
-// deleted, before it's gone.
+// Fake Supabase: the identities that exist, a hook run when one is deleted
+// (before it's gone), and whether its admin API is down.
 const identities = new Set([SUPABASE_ID]);
 let beforeIdentityDeleted: () => Promise<void> = async () => {};
+let adminApiDown = false;
 
 const { publicKey, privateKey } = await generateKeyPair("ES256");
 const jwks = { keys: [{ ...(await exportJWK(publicKey)), kid: "test", alg: "ES256" }] };
@@ -51,6 +53,7 @@ globalThis.fetch = async (input, init) => {
 
   const id = url.pathname.match(/\/auth\/v1\/admin\/users\/(.+)$/)?.[1];
   if (!id) throw new Error(`Unexpected fetch: ${url}`);
+  if (adminApiDown) throw new TypeError("fetch failed");
   if (init?.method === "DELETE") {
     await beforeIdentityDeleted();
     identities.delete(id);
@@ -84,6 +87,12 @@ async function cleanUp() {
 
 try {
   await cleanUp();
+
+  // A first sign-in while Supabase can't confirm the identity creates nothing.
+  adminApiDown = true;
+  assert.equal((await authenticatedRequest()).user, null, "an unconfirmed sign-in is signed out");
+  assert.equal(await userRows(), 0, "an unconfirmed sign-in leaves no row behind");
+  adminApiDown = false;
 
   // First sign-in creates the row.
   const ctx = await authenticatedRequest();
@@ -133,6 +142,11 @@ try {
   const afterwards = await authenticatedRequest();
   assert.equal(afterwards.user, null, "a later request is treated as signed out");
   assert.equal(await userRows(), 0, "a later request leaves no row behind");
+
+  // The same holds while Supabase can't be reached to confirm it's gone.
+  adminApiDown = true;
+  assert.equal((await authenticatedRequest()).user, null, "a request during an outage is signed out");
+  assert.equal(await userRows(), 0, "a request during an outage leaves no row behind");
 
   console.log("verify-account-deletion: all checks passed");
 } finally {

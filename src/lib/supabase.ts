@@ -13,7 +13,8 @@ function requireEnv(name: string): string {
 
 // A wrong project URL rejects every login against the wrong project.
 const SUPABASE_URL = requireEnv("SUPABASE_URL");
-// The service-role key for the admin API (account deletion, identity lookups).
+// The service-role key. Without it no new identity can be confirmed, so
+// createContext would never create an account.
 const SUPABASE_SECRET_KEY = requireEnv("SUPABASE_SECRET_KEY");
 const adminHeaders = {
   apikey: SUPABASE_SECRET_KEY,
@@ -67,23 +68,22 @@ export async function verifySupabaseToken(
   }
 }
 
-/// Whether a Supabase Auth user still exists. Returns false only when Supabase
-/// answers that it's gone, and null when that can't be determined.
-export async function supabaseUserExists(
-  supabaseId: string
-): Promise<boolean | null> {
+/// Whether Supabase confirms the Auth user exists. False when it's gone and
+/// when Supabase can't be reached.
+export async function supabaseUserExists(supabaseId: string): Promise<boolean> {
   try {
     const response = await fetch(
       `${SUPABASE_URL}/auth/v1/admin/users/${supabaseId}`,
       { headers: adminHeaders }
     );
     if (response.ok) return true;
-    if (response.status === 404) return false;
-    logger.warn({ status: response.status, supabaseId }, "Could not look up Supabase user");
-    return null;
+    if (response.status !== 404) {
+      logger.warn({ status: response.status, supabaseId }, "Could not look up Supabase user");
+    }
+    return false;
   } catch (error) {
     logger.warn({ error, supabaseId }, "Could not look up Supabase user");
-    return null;
+    return false;
   }
 }
 

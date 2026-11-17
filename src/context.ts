@@ -77,9 +77,10 @@ export async function createContext(request: Request): Promise<Context> {
         // A token outlives its identity until it expires, so a request made
         // around deleteMyAccount can land here. Checking after the insert
         // means either this sees the identity gone, or the mutation's second
-        // pass sees this row. Only a definite "gone" counts, so first sign-ins
-        // still work if Supabase can't be reached.
-        if (user && (await supabaseUserExists(identity.id)) === false) {
+        // pass sees this row. The row stays only if Supabase confirms the
+        // identity, so an outage can't keep a deleted account either; a new
+        // user's first request is then treated as signed out until it's back.
+        if (user && !(await supabaseUserExists(identity.id))) {
           await prisma.user.deleteMany({ where: { id: user.id } });
           user = null;
         }
