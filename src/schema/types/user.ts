@@ -3,6 +3,9 @@ import { UserRole, AchievementTier } from "@prisma/client";
 import { hasRequiredRole } from "../../context.js";
 import { visibleSetWhere } from "../../lib/achievement-visibility.js";
 import { countFinishedGames } from "../../lib/trophies.js";
+import { showcaseEligibleWhere } from "../../lib/profile.js";
+import { signAvatarUrl } from "../../lib/supabase.js";
+import { ShowcaseListEnum } from "./profile.js";
 
 builder.enumType(UserRole, {
   name: "UserRole",
@@ -46,6 +49,38 @@ builder.prismaObject("User", {
           : "",
     }),
     name: t.exposeString("name", { nullable: true }),
+    bio: t.exposeString("bio", { nullable: true }),
+    // Signed, short-lived URL into the private avatars bucket
+    avatarUrl: t.string({
+      nullable: true,
+      resolve: (user) => (user.avatarPath ? signAvatarUrl(user.avatarPath) : null),
+    }),
+    socialLinks: t.relation("socialLinks", {
+      query: { orderBy: { network: "asc" } },
+    }),
+    // A pinned profile list in the order the user chose. Platinum and
+    // collection entries whose trophy or copy is gone are left out.
+    showcase: t.prismaField({
+      type: ["GameFamily"],
+      args: { list: t.arg({ type: ShowcaseListEnum, required: true }) },
+      resolve: async (query, user, { list }, ctx) => {
+        const entries = await ctx.prisma.profileShowcaseEntry.findMany({
+          where: {
+            userId: user.id,
+            list,
+            gameFamily: showcaseEligibleWhere(list, user.id),
+          },
+          orderBy: { position: "asc" },
+          select: { gameFamilyId: true },
+        });
+        const ids = entries.map((entry) => entry.gameFamilyId);
+        const families = await ctx.prisma.gameFamily.findMany({
+          ...query,
+          where: { id: { in: ids } },
+        });
+        return ids.flatMap((id) => families.find((family) => family.id === id) ?? []);
+      },
+    }),
     // Role tells a caller which accounts are worth attacking, so it is gated
     // the same way email is, and for the same reason: User is reachable from
     // the public user(id:) query and from public relations, so the field has

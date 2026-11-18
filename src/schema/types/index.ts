@@ -15,4 +15,5 @@ export * from "./dlc.js";
 export * from "./bundle.js";
 export * from "./buylist.js";
 export * from "./sell-list.js";
+export * from "./profile.js";
 import "./play-session.js";
