@@ -23,10 +23,14 @@ function countPlayers(ctx: Context, achievementSetId: string): Promise<number> {
   return count;
 }
 
-// Null when nobody has the game in their library. Capped at 100 because a
-// user can tick a trophy without adding the game. One decimal place.
+// Below this many players a share says nothing: with one player every trophy
+// reads 0% or 100%.
+const MIN_PLAYERS_FOR_RARITY = 10;
+
+// Null until enough users have the game in their library. Capped at 100
+// because a user can tick a trophy without adding the game. One decimal place.
 export function earnedPercent(earners: number, players: number): number | null {
-  if (players === 0) return null;
+  if (players < MIN_PLAYERS_FOR_RARITY) return null;
   return Math.min(100, Math.round((earners / players) * 1000) / 10);
 }
 
