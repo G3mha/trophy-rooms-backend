@@ -1,7 +1,7 @@
 import { AchievementSetType } from "@prisma/client";
 import { builder, MutationErrorRef } from "../builder.js";
 import { ErrorCode } from "../../lib/errors.js";
-import { deleteSupabaseUser } from "../../lib/supabase.js";
+import { deleteSupabaseUser, pruneAvatars } from "../../lib/supabase.js";
 
 const DeleteMyAccountResult = builder.objectRef<{
   success: boolean;
@@ -50,6 +50,19 @@ builder.mutationField("deleteMyAccount", (t) =>
           }),
           ctx.prisma.user.deleteMany({ where: { supabaseId } }),
         ]);
+
+      // Uploaded pictures first: nothing else is gone yet if this fails, so
+      // the user can simply try again.
+      if (!(await pruneAvatars(supabaseId, null))) {
+        return {
+          success: false,
+          error: {
+            code: ErrorCode.INTERNAL_ERROR,
+            message: "Couldn't delete your profile picture, so nothing was deleted. Please try again.",
+            field: null,
+          },
+        };
+      }
 
       // App data first (cascades wipe collection, library, journal, etc.);
       // if the identity deletion then fails, the next authenticated request
