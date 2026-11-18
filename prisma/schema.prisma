@@ -324,7 +324,6 @@ model Achievement {
   title            String
   description      String?
   iconUrl          String?
-  points           Int               @default(0)
   tier             AchievementTier   @default(BRONZE)
   achievementSet   AchievementSet    @relation(fields: [achievementSetId], references: [id], onDelete: Cascade)
   achievementSetId String
