@@ -27,8 +27,9 @@ try {
 
 const SITE = "https://trophyrooms.org";
 const SUPPORT = "support@trophyrooms.org";
-// Same file as the site header logo (trophy-rooms-web/public/email-trophies.png).
-const BANNER = `${SITE}/email-trophies.png`;
+// The site header logo (trophy-rooms-web/public/logo.png). Gmail's image proxy caches
+// by URL, so a new banner needs a new URL (or a ?v= suffix) to show up.
+const BANNER = `${SITE}/logo.png`;
 const MONO = "'SF Mono',Menlo,Consolas,monospace";
 
 const layout = (rows: string[]) => `<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:32px 16px;">
