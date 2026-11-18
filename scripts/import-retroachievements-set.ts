@@ -139,7 +139,6 @@ async function main() {
       return {
         title: achievement.Title!.trim(),
         description: achievement.Description?.trim() || null,
-        points,
         tier: tierForRetroPoints(points),
         iconUrl: badgeName
           ? `https://media.retroachievements.org/Badge/${badgeName}.png`

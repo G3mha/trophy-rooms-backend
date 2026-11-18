@@ -16,14 +16,6 @@ const prisma = new PrismaClient();
 const FAMILY_TITLE = "Super Mario Odyssey";
 const SET_TITLE = "Completionist list";
 
-// Same scale as the hand-authored New Super Mario Bros. set.
-const POINTS_BY_TIER: Record<AchievementTier, number> = {
-  [AchievementTier.BRONZE]: 15,
-  [AchievementTier.SILVER]: 30,
-  [AchievementTier.GOLD]: 90,
-  [AchievementTier.PLATINUM]: 300,
-};
-
 type AchievementSeed = {
   title: string;
   description: string;
@@ -164,7 +156,6 @@ async function main() {
     const data = {
       description: achievement.description,
       tier: achievement.tier,
-      points: POINTS_BY_TIER[achievement.tier],
     };
 
     const result = await prisma.achievement.upsert({
@@ -190,13 +181,8 @@ async function main() {
     }
   }
 
-  const totalPoints = ACHIEVEMENTS.reduce(
-    (sum, achievement) => sum + POINTS_BY_TIER[achievement.tier],
-    0
-  );
-
   console.log(
-    `${ACHIEVEMENTS.length} achievements (${created} created, ${updated} updated), ${totalPoints} points total`
+    `${ACHIEVEMENTS.length} achievements (${created} created, ${updated} updated)`
   );
 }
 

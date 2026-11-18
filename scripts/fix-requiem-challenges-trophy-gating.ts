@@ -92,12 +92,10 @@ async function main() {
       achievementSet: { gameFamilyId: family.id, countsTowardTrophy: true },
     },
     _count: { id: true },
-    _sum: { points: true },
   });
 
   console.log(
-    `${family.title} trophy now needs ${gating._count.id} achievements ` +
-      `worth ${gating._sum.points ?? 0} points`
+    `${family.title} trophy now needs ${gating._count.id} achievements`
   );
 }
 

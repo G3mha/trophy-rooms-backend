@@ -165,7 +165,6 @@ async function ensureSetFromRetroAchievements(familyId: string, retroGameId: num
       return {
         title: achievement.Title!.trim(),
         description: achievement.Description?.trim() || null,
-        points,
         tier: tierForPoints(points),
         iconUrl: badgeName
           ? `https://media.retroachievements.org/Badge/${badgeName}.png`
@@ -256,7 +255,6 @@ async function cloneCompletionistSet(sourceFamilyId: string, targetFamilyId: str
       data: {
         title: achievement.title,
         description: achievement.description,
-        points: achievement.points,
         tier: achievement.tier,
         iconUrl: achievement.iconUrl,
         achievementSetId: clonedSet.id,

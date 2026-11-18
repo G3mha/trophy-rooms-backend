@@ -36,13 +36,6 @@ const prisma = new PrismaClient();
 const FAMILY_TITLE = "Resident Evil Requiem";
 const SET_TITLE = "PSN Trophy List";
 
-const POINTS_BY_TIER: Record<AchievementTier, number> = {
-  [AchievementTier.BRONZE]: 15,
-  [AchievementTier.SILVER]: 30,
-  [AchievementTier.GOLD]: 90,
-  [AchievementTier.PLATINUM]: 300,
-};
-
 type AchievementSeed = {
   title: string;
   description: string;
@@ -198,7 +191,6 @@ async function main() {
     const data = {
       description: achievement.description,
       tier: achievement.tier,
-      points: POINTS_BY_TIER[achievement.tier],
     };
 
     const result = await prisma.achievement.upsert({
@@ -224,13 +216,8 @@ async function main() {
     }
   }
 
-  const totalPoints = ACHIEVEMENTS.reduce(
-    (sum, achievement) => sum + POINTS_BY_TIER[achievement.tier],
-    0
-  );
-
   console.log(
-    `${ACHIEVEMENTS.length} trophies (${created} created, ${updated} updated), ${totalPoints} points total`
+    `${ACHIEVEMENTS.length} trophies (${created} created, ${updated} updated)`
   );
 }
 

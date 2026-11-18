@@ -243,7 +243,7 @@ async function verify() {
         gameFamilyId: family.id,
         createdByUserId: createdBy?.id ?? null,
         achievements: {
-          create: points.map((value, index) => ({ title: `${title} ${index + 1}`, points: value })),
+          create: points.map((_, index) => ({ title: `${title} ${index + 1}` })),
         },
       },
       include: { achievements: { orderBy: { title: "asc" } } },
@@ -358,8 +358,8 @@ async function verify() {
       countsTowardTrophy: false,
       achievements: {
         create: [
-          { title: "A restating list 1", points: 10 },
-          { title: "A restating list 2", points: 20 },
+          { title: "A restating list 1" },
+          { title: "A restating list 2" },
         ],
       },
     },
