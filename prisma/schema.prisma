@@ -90,6 +90,27 @@ enum ItemCondition {
   POOR
 }
 
+// The lists a user can pin to their public profile, ten games each
+enum ShowcaseList {
+  ALL_TIME   // favorite games of all time, any game in the catalog
+  PLATINUMS  // games the user holds a trophy (Platinum) for
+  COLLECTION // games in the user's collection, standalone or in a bundle
+}
+
+enum SocialNetwork {
+  X
+  BLUESKY
+  INSTAGRAM
+  TIKTOK
+  YOUTUBE
+  TWITCH
+  DISCORD
+  STEAM
+  PSN
+  XBOX
+  NINTENDO
+}
+
 enum SellListItemStatus {
   ACTIVE
   SOLD
@@ -101,7 +122,13 @@ model User {
   supabaseId      String            @unique
   email           String            @unique
   name            String?
+  bio             String?
+  // Object key in the private "avatars" Supabase Storage bucket, always
+  // "<supabaseId>/<file>"; served through short-lived signed URLs
+  avatarPath      String?
   role            UserRole          @default(USER)
+  socialLinks     UserSocialLink[]
+  showcaseEntries ProfileShowcaseEntry[]
   achievements    UserAchievement[]
   trophies        Trophy[]
   userGames       UserGame[]
@@ -180,6 +207,7 @@ model GameFamily {
   dlcs            DLC[]
   bundles         Bundle[]         @relation("BundleGameFamilies")
   buylistItems    BuylistItem[]
+  showcaseEntries ProfileShowcaseEntry[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -332,6 +360,32 @@ model Trophy {
   @@unique([userId, gameId])
   @@index([userId])
   @@index([gameId])
+}
+
+model UserSocialLink {
+  id      String        @id @default(cuid())
+  user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId  String
+  network SocialNetwork
+  handle  String
+
+  @@unique([userId, network])
+}
+
+// One game pinned to a profile list. Platinum and collection entries are
+// checked on write and filtered again on read, so a game drops off once the
+// trophy or the copy is gone.
+model ProfileShowcaseEntry {
+  id           String       @id @default(cuid())
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String
+  list         ShowcaseList
+  gameFamily   GameFamily   @relation(fields: [gameFamilyId], references: [id], onDelete: Cascade)
+  gameFamilyId String
+  position     Int
+
+  @@unique([userId, list, gameFamilyId])
+  @@index([gameFamilyId])
 }
 
 model PlaySession {
