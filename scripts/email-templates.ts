@@ -10,6 +10,10 @@
  *   npx tsx scripts/email-templates.ts --out <dir>  write the HTML to preview
  *   npx tsx scripts/email-templates.ts --push       update the ones that differ
  *
+ * After --push, Supabase's auth server keeps sending the old templates for
+ * roughly 10 minutes (seen 2026-11-18: still old 2 minutes after its config
+ * reload, new 12 minutes after). Wait before sending a test email.
+ *
  * Reads SUPABASE_URL from .env for the project ref. The Management API token
  * comes from SUPABASE_ACCESS_TOKEN, or from the Supabase CLI's macOS keychain
  * entry after `supabase login`.
