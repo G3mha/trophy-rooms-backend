@@ -1,4 +1,6 @@
-import type { User } from "@prisma/client";
+import { ShowcaseList, type User } from "@prisma/client";
+import { showcaseEligibleWhere } from "../../lib/profile.js";
+import { ShowcaseListEnum } from "../types/profile.js";
 import { builder } from "../builder.js";
 import { visibleSetWhere } from "../../lib/achievement-visibility.js";
 import { countFinishedGames } from "../../lib/trophies.js";
@@ -194,6 +196,24 @@ builder.queryField("myStats", (t) =>
         totalAchievements: achievementCount,
         totalGamesPlayed: gamesPlayed,
       };
+    },
+  })
+);
+
+// Games the signed-in user may pin to a Platinum or collection list, by
+// title. ALL_TIME takes any catalog game, so clients search for those and
+// this returns none.
+builder.queryField("myShowcaseCandidates", (t) =>
+  t.prismaField({
+    type: ["GameFamily"],
+    args: { list: t.arg({ type: ShowcaseListEnum, required: true }) },
+    resolve: (query, _root, { list }, ctx) => {
+      if (!ctx.user || list === ShowcaseList.ALL_TIME) return [];
+      return ctx.prisma.gameFamily.findMany({
+        ...query,
+        where: showcaseEligibleWhere(list, ctx.user.id),
+        orderBy: { title: "asc" },
+      });
     },
   })
 );
