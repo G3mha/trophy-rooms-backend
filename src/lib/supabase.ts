@@ -111,3 +111,77 @@ export async function deleteSupabaseUser(supabaseId: string): Promise<boolean> {
     return false;
   }
 }
+
+// Profile pictures live in a private bucket: clients upload into their own
+// "<supabaseId>/" folder (storage RLS enforces it), and everyone reads them
+// through signed URLs the API hands out.
+export const AVATAR_BUCKET = "avatars";
+const AVATAR_URL_TTL_SECONDS = 60 * 60;
+
+/// A signed URL for an avatar, or null when the object is missing or
+/// Supabase can't be reached.
+// shortcut: signs on every read, so browsers refetch the image each page
+// load; cache the URL (e.g. in Redis) if profile lists start showing avatars.
+export async function signAvatarUrl(path: string): Promise<string | null> {
+  try {
+    const response = await fetch(
+      `${SUPABASE_URL}/storage/v1/object/sign/${AVATAR_BUCKET}/${path}`,
+      {
+        method: "POST",
+        headers: { ...adminHeaders, "Content-Type": "application/json" },
+        body: JSON.stringify({ expiresIn: AVATAR_URL_TTL_SECONDS }),
+      }
+    );
+    if (!response.ok) return null;
+    const { signedURL } = (await response.json()) as { signedURL?: string };
+    return signedURL ? `${SUPABASE_URL}/storage/v1${signedURL}` : null;
+  } catch (error) {
+    logger.warn({ error, path }, "Could not sign avatar URL");
+    return null;
+  }
+}
+
+/// Deletes every file in the user's avatar folder except `keepPath`, which
+/// also clears uploads that were never saved to the profile. False when
+/// Supabase didn't confirm, so callers can refuse to drop the reference.
+export async function pruneAvatars(
+  supabaseId: string,
+  keepPath: string | null
+): Promise<boolean> {
+  try {
+    const listed = await fetch(
+      `${SUPABASE_URL}/storage/v1/object/list/${AVATAR_BUCKET}`,
+      {
+        method: "POST",
+        headers: { ...adminHeaders, "Content-Type": "application/json" },
+        body: JSON.stringify({ prefix: supabaseId, limit: 1000 }),
+      }
+    );
+    if (!listed.ok) {
+      logger.error({ status: listed.status, supabaseId }, "Could not list avatars");
+      return false;
+    }
+    const objects = (await listed.json()) as { name: string }[];
+    const stale = objects
+      .map((object) => `${supabaseId}/${object.name}`)
+      .filter((path) => path !== keepPath);
+    if (stale.length === 0) return true;
+
+    const deleted = await fetch(
+      `${SUPABASE_URL}/storage/v1/object/${AVATAR_BUCKET}`,
+      {
+        method: "DELETE",
+        headers: { ...adminHeaders, "Content-Type": "application/json" },
+        body: JSON.stringify({ prefixes: stale }),
+      }
+    );
+    if (!deleted.ok) {
+      logger.error({ status: deleted.status, supabaseId }, "Could not delete avatars");
+      return false;
+    }
+    return true;
+  } catch (error) {
+    logger.error({ error, supabaseId }, "Could not prune avatars");
+    return false;
+  }
+}
