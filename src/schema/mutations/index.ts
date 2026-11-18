@@ -16,3 +16,4 @@ import "./buylist.js";
 import "./sell-list.js";
 import "./play-sessions.js";
 import "./account.js";
+import "./profile.js";
